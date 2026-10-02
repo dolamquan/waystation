@@ -1,0 +1,498 @@
+import { randomBytes } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { redact } from '../domain/text.ts';
+import type { Agent, AgentEvent } from '../domain/types.ts';
+import type { ManagedLaunch, ManagedRunner } from '../managed/types.ts';
+import { BoardError, lead, markRead, memberById, postMessage, replaceMember, toView, unreadFor } from './board.ts';
+import { briefing, idleNudge, wakeText } from './prompts.ts';
+import { parseTeamInput, slug } from './teamInput.ts';
+import { callTool, toolsFor, type ToolDefinition } from './tools.ts';
+import {
+  EVERYONE, OPERATOR, SYSTEM,
+  type Actor, type TeamLogEntry, type TeamLogKind, type TeamMember, type TeamState, type TeamStatus, type TeamView,
+} from './types.ts';
+import {
+  createWorktree, deleteBranch, diffWorktree, mergeMember, prepareRepo, removeWorktree, type MemberDiff,
+} from './workspace.ts';
+
+export class TeamError extends Error {}
+export class TeamAuthError extends Error {}
+
+export const TEAM_MCP_SCRIPT = fileURLToPath(new URL('./team-mcp.mjs', import.meta.url));
+const RESUME_EXTRA_WAKES = 20;
+const RESUME_EXTRA_MS = 30 * 60 * 1000;
+const ACTIVITY_KINDS = new Set<AgentEvent['kind']>(['tool_call', 'assistant', 'error', 'stop']);
+const MAX_LOG_SUMMARY_CHARS = 2000;
+export const TOKEN_ENV = 'AGENT_TOWER_TEAM_TOKEN';
+
+export interface TeamHost {
+  readonly launch: (launch: ManagedLaunch) => Agent;
+  readonly runner: (agentId: string) => ManagedRunner | undefined;
+  readonly agent: (agentId: string) => Agent | undefined;
+  readonly audit: (action: string, target: string, detail: unknown) => void;
+  readonly codexAvailable: () => boolean;
+}
+
+export interface TeamStore {
+  saveTeam(team: TeamState): void;
+  deleteTeam(teamId: string): void;
+  loadTeams(): TeamState[];
+  appendTeamLog(entry: TeamLogEntry): void;
+  teamLog(teamId: string, limit?: number): TeamLogEntry[];
+}
+
+export interface TeamManagerOptions {
+  readonly teamsDir: string;
+  /** The tower's state folder (holds its access token): Claude members' file tools may not read it. */
+  readonly privateRoot?: string;
+  readonly mcpScript?: string;
+  readonly nodePath?: string;
+  readonly now?: () => number;
+}
+
+interface Membership { readonly teamId: string; readonly memberId: string }
+
+/** A team loaded after a restart has no live agents: members relaunch when it is resumed. */
+function restored(saved: TeamState): TeamState {
+  const wasActive = saved.status === 'running' || saved.status === 'paused';
+  return {
+    ...saved,
+    status: wasActive ? 'stopped' : saved.status,
+    statusReason: wasActive ? 'The tower restarted. Resume to continue.' : saved.statusReason,
+    members: saved.members.map((member) => ({ ...member, agentId: undefined })),
+  };
+}
+
+/**
+ * Runs agent teams: git-worktree sandboxes, a shared channel + task board reached through MCP,
+ * automatic wake-ups when a member has mail, and budgets that pause the team instead of looping.
+ */
+export class TeamManager extends EventEmitter<{ teams: [TeamView[]]; log: [TeamLogEntry] }> {
+  private teams = new Map<string, TeamState>();
+  private tokens = new Map<string, Membership>();
+  private byAgent = new Map<string, Membership>();
+  private endpoint: string | undefined;
+  private readonly now: () => number;
+
+  constructor(private readonly host: TeamHost, private readonly store: TeamStore, private readonly opts: TeamManagerOptions) {
+    super();
+    this.now = opts.now ?? Date.now;
+    for (const saved of store.loadTeams()) {
+      const team = restored(saved);
+      this.teams.set(team.id, team);
+      store.saveTeam(team);
+    }
+  }
+
+  /** Base URL of the daemon, handed to each member's MCP bridge. */
+  setEndpoint(url: string): void {
+    this.endpoint = url;
+  }
+
+  list(): TeamView[] {
+    return [...this.teams.values()].sort((a, b) => b.createdAt - a.createdAt).map(toView);
+  }
+
+  log(teamId: string): TeamLogEntry[] {
+    this.require(teamId);
+    return this.store.teamLog(teamId);
+  }
+
+  async create(raw: unknown): Promise<{ team: TeamView; notes: readonly string[] }> {
+    const input = parseTeamInput(raw);
+    if (!this.endpoint) throw new TeamError('The team channel is not ready yet. Try again in a moment.');
+    if (input.members.some((m) => m.vendor === 'codex') && !this.host.codexAvailable()) {
+      throw new TeamError('Codex CLI not found (expected an npm global install of @openai/codex).');
+    }
+    const repo = await prepareRepo(input.cwd, { initGit: input.initGit });
+    const id = randomBytes(3).toString('hex');
+    const branchBase = `team/${slug(input.name)}-${id}`;
+    const members: TeamMember[] = input.members.map((m) => ({
+      ...m,
+      id: m.name,
+      worktree: join(this.opts.teamsDir, id, m.name),
+      branch: `${branchBase}/${m.name}`,
+      merged: false,
+    }));
+    await this.createWorktrees(repo.root, repo.head, members);
+    const now = this.now();
+    this.commit({
+      id,
+      name: input.name,
+      goal: input.goal,
+      repoRoot: repo.root,
+      baseBranch: repo.branch,
+      baseCommit: repo.head,
+      status: 'running',
+      createdAt: now,
+      members,
+      tasks: [],
+      messages: [],
+      readUpTo: {},
+      budget: { maxWakes: input.maxWakes, wakesUsed: 0, deadline: now + input.maxMinutes * 60_000 },
+      idleNudged: false,
+      intercept: input.intercept,
+    });
+    this.host.audit('team_create', repo.root, { team: id, goal: input.goal, members: input.members });
+    const roster = members.map((m) => `${m.name} (${m.role}, ${m.vendor}${m.model ? ` ${m.model}` : ''})`).join(', ');
+    this.append(id, 'system', SYSTEM, `Team created from ${repo.branch} @ ${repo.head.slice(0, 7)}: ${roster}`);
+    for (const note of repo.notes) this.append(id, 'system', SYSTEM, note);
+    const leader = members.find((m) => m.role === 'lead')!;
+    this.post(id, OPERATOR, leader.id, `Team goal: ${input.goal}\n\nPlan the work and delegate it to your teammates now.`);
+    return { team: toView(this.require(id)), notes: repo.notes };
+  }
+
+  // ---- agent-facing (MCP bridge) ------------------------------------------------------------
+
+  authenticate(token: string | undefined): Membership | undefined {
+    return token ? this.tokens.get(token) : undefined;
+  }
+
+  toolsForToken(token: string | undefined): readonly ToolDefinition[] {
+    const { team, member } = this.caller(token);
+    return toolsFor(memberById(team, member)!);
+  }
+
+  callForToken(token: string | undefined, name: unknown, args: unknown): { text: string; isError: boolean } {
+    const { team, member } = this.caller(token);
+    const toolArgs = args && typeof args === 'object' && !Array.isArray(args) ? args as Record<string, unknown> : {};
+    try {
+      const outcome = callTool(team, member, String(name ?? ''), toolArgs);
+      const changed = outcome.state !== team;
+      const finished = outcome.finished !== undefined;
+      if (changed || finished) {
+        this.commit({
+          ...outcome.state,
+          idleNudged: false,
+          ...(finished ? { status: 'done' as const, statusReason: 'The lead finished. Review each branch and merge.' } : {}),
+        });
+      }
+      for (const entry of outcome.log) this.append(team.id, entry.kind, member, entry.summary);
+      if (changed && !finished) this.deliverAll(team.id);
+      return { text: outcome.text, isError: false };
+    } catch (error) {
+      if (error instanceof BoardError) return { text: error.message, isError: true };
+      throw error;
+    }
+  }
+
+  // ---- tower hooks --------------------------------------------------------------------------
+
+  /** Every managed agent snapshot passes through here: idle members get their mail, exited ones are released. */
+  onAgent(agent: Agent): void {
+    const membership = this.byAgent.get(agent.id);
+    if (!membership) return;
+    if (agent.status === 'stopped') {
+      this.releaseMember(membership, agent.id);
+      return;
+    }
+    if (agent.status !== 'idle') return;
+    this.deliver(membership.teamId, membership.memberId);
+    this.checkIdle(membership.teamId);
+  }
+
+  /** Mirror member activity into the shared team timeline. */
+  onAgentEvent(event: AgentEvent): void {
+    const membership = this.byAgent.get(event.agentId);
+    if (!membership || !ACTIVITY_KINDS.has(event.kind) || !this.teams.has(membership.teamId)) return;
+    this.append(membership.teamId, 'activity', membership.memberId, event.kind === 'tool_call' ? `⚙ ${event.summary}` : event.summary);
+  }
+
+  /** Graceful daemon stop: running teams become resumable instead of silently dead. */
+  shutdown(): void {
+    for (const team of this.teams.values()) {
+      if (team.status === 'running' || team.status === 'paused') {
+        this.commit({ ...team, status: 'stopped', statusReason: 'The tower stopped. Resume to continue.' });
+      }
+    }
+  }
+
+  // ---- operator actions ---------------------------------------------------------------------
+
+  message(teamId: string, to: unknown, text: unknown): string {
+    const team = this.require(teamId);
+    const recipient = typeof to === 'string' && to.trim() ? to : EVERYONE;
+    if (typeof text !== 'string' || !text.trim()) throw new TeamError('Message text is required.');
+    this.host.audit('team_message', teamId, { to: recipient, text });
+    this.post(teamId, OPERATOR, recipient, text);
+    return team.status === 'running' ? 'Sent.' : 'Queued. Resume the team to deliver it.';
+  }
+
+  pause(teamId: string): void {
+    this.require(teamId);
+    this.host.audit('team_pause', teamId, {});
+    this.setStatus(teamId, 'paused', 'Paused by the operator. Agents finish their current turn.');
+  }
+
+  resume(teamId: string): void {
+    const team = this.require(teamId);
+    if (team.status === 'running') return;
+    this.host.audit('team_resume', teamId, {});
+    const now = this.now();
+    const members = team.members.map((member) => {
+      const live = member.agentId && this.host.runner(member.agentId) && this.host.agent(member.agentId)?.status !== 'stopped';
+      return live ? member : { ...member, agentId: undefined };
+    });
+    this.commit({
+      ...team,
+      members,
+      status: 'running',
+      statusReason: undefined,
+      idleNudged: false,
+      budget: {
+        ...team.budget,
+        maxWakes: Math.max(team.budget.maxWakes, team.budget.wakesUsed + RESUME_EXTRA_WAKES),
+        deadline: Math.max(team.budget.deadline, now + RESUME_EXTRA_MS),
+      },
+    });
+    this.append(teamId, 'system', SYSTEM, 'Resumed by the operator.');
+    this.post(teamId, SYSTEM, lead(team).id, 'The operator resumed the team. Check read_messages and list_tasks, then continue.');
+  }
+
+  async diff(teamId: string, memberId: string): Promise<MemberDiff> {
+    const { team, member } = this.requireMember(teamId, memberId);
+    return diffWorktree(member.worktree, team.baseCommit);
+  }
+
+  async merge(teamId: string, memberId: string): Promise<string> {
+    const { team, member } = this.requireMember(teamId, memberId);
+    const status = member.agentId ? this.host.agent(member.agentId)?.status : undefined;
+    if (status === 'busy' || status === 'waiting') {
+      throw new TeamError(`${member.name} is still working. Pause the team or wait for its turn to end, then merge.`);
+    }
+    const { commits } = await mergeMember({
+      root: team.repoRoot, baseBranch: team.baseBranch, branch: member.branch, worktree: member.worktree, memberName: member.name,
+    });
+    this.commit(replaceMember(this.require(teamId), member.id, { merged: true }));
+    this.host.audit('team_merge', teamId, { member: member.name, branch: member.branch, commits });
+    this.append(teamId, 'merge', OPERATOR, `Merged ${member.branch} into ${team.baseBranch} (${commits} commit${commits === 1 ? '' : 's'})`);
+    return `Merged ${member.name}'s work into ${team.baseBranch}.`;
+  }
+
+  async disband(teamId: string, opts: { removeWorktrees: boolean }): Promise<{ keptBranches: string[] }> {
+    const team = this.require(teamId);
+    if (team.status === 'disbanded') throw new TeamError('This team is already being disbanded.');
+    this.host.audit('team_disband', teamId, opts);
+    this.commit({ ...team, status: 'disbanded', statusReason: 'Disbanding…' });
+    await Promise.allSettled(team.members.flatMap((m) => {
+      const runner = m.agentId ? this.host.runner(m.agentId) : undefined;
+      return runner ? [runner.stop()] : [];
+    }));
+    if (opts.removeWorktrees) {
+      for (const member of team.members) {
+        await removeWorktree(team.repoRoot, member.worktree).catch((error: Error) =>
+          this.append(teamId, 'system', SYSTEM, `Could not remove ${member.worktree}: ${error.message}`));
+      }
+    }
+    this.tokens = new Map([...this.tokens].filter(([, m]) => m.teamId !== teamId));
+    this.byAgent = new Map([...this.byAgent].filter(([, m]) => m.teamId !== teamId));
+    this.append(teamId, 'system', OPERATOR, `Team disbanded${opts.removeWorktrees ? ' and worktrees removed' : ''}.`);
+    this.teams = new Map([...this.teams].filter(([id]) => id !== teamId));
+    this.store.deleteTeam(teamId);
+    this.emit('teams', this.list());
+    return { keptBranches: team.members.filter((m) => !m.merged).map((m) => m.branch) };
+  }
+
+  // ---- internals ----------------------------------------------------------------------------
+
+  /**
+   * A member's agent exited (crash, Stop from the drawer, or disband). Revoke its token and forget the
+   * agent so the member restarts, with its unread mail, the next time it is woken.
+   */
+  private releaseMember(membership: Membership, agentId: string): void {
+    this.byAgent = new Map([...this.byAgent].filter(([id]) => id !== agentId));
+    this.tokens = new Map([...this.tokens].filter(([, m]) => !(m.teamId === membership.teamId && m.memberId === membership.memberId)));
+    const team = this.teams.get(membership.teamId);
+    const member = team ? memberById(team, membership.memberId) : undefined;
+    if (!team || !member || member.agentId !== agentId || team.status === 'disbanded') return;
+    this.commit(replaceMember(team, member.id, { agentId: undefined }));
+    if (team.status !== 'running') return;
+    this.append(team.id, 'system', SYSTEM, `${member.name}'s agent exited. It restarts when it next has a message.`);
+    this.deliverAll(team.id);
+    this.checkIdle(team.id);
+  }
+
+  private async createWorktrees(root: string, head: string, members: readonly TeamMember[]): Promise<void> {
+    const created: TeamMember[] = [];
+    try {
+      for (const member of members) {
+        await createWorktree(root, member.worktree, member.branch, head);
+        created.push(member);
+      }
+    } catch (error) {
+      for (const member of created) {
+        await removeWorktree(root, member.worktree).catch(() => undefined);
+        await deleteBranch(root, member.branch);
+      }
+      throw error;
+    }
+  }
+
+  private caller(token: string | undefined): { team: TeamState; member: string } {
+    const membership = this.authenticate(token);
+    const team = membership ? this.teams.get(membership.teamId) : undefined;
+    if (!membership || !team || team.status === 'disbanded') throw new TeamAuthError('not a team member');
+    return { team, member: membership.memberId };
+  }
+
+  private require(teamId: string): TeamState {
+    const team = this.teams.get(teamId);
+    if (!team) throw new TeamError('Team not found.');
+    return team;
+  }
+
+  private requireMember(teamId: string, memberId: string): { team: TeamState; member: TeamMember } {
+    const team = this.require(teamId);
+    const member = memberById(team, memberId);
+    if (!member) throw new TeamError('Member not found.');
+    return { team, member };
+  }
+
+  private commit(next: TeamState): void {
+    this.teams = new Map([...this.teams.entries(), [next.id, next]]);
+    this.store.saveTeam(next);
+    this.emit('teams', this.list());
+  }
+
+  private append(teamId: string, kind: TeamLogKind, actor: Actor, summary: string): void {
+    // Redact + clip before both storage and broadcast: summaries can carry agent-written text.
+    const entry: TeamLogEntry = { teamId, ts: this.now(), kind, actor, summary: redact(summary).slice(0, MAX_LOG_SUMMARY_CHARS) };
+    this.store.appendTeamLog(entry);
+    this.emit('log', entry);
+  }
+
+  private setStatus(teamId: string, status: TeamStatus, reason: string): void {
+    const team = this.require(teamId);
+    if (team.status === status && team.statusReason === reason) return;
+    this.commit({ ...team, status, statusReason: reason });
+    this.append(teamId, 'system', SYSTEM, reason);
+  }
+
+  private post(teamId: string, from: Actor, to: string, text: string): void {
+    const team = this.require(teamId);
+    const next = postMessage(team, from, to, text, this.now());
+    this.commit({ ...next, idleNudged: from === SYSTEM ? team.idleNudged : false });
+    const sent = next.messages[next.messages.length - 1];
+    const target = sent.to === EVERYONE ? 'all' : memberById(next, sent.to)?.name ?? sent.to;
+    this.append(teamId, 'message', from, `${from} → ${target}: ${text}`);
+    this.deliverAll(teamId);
+  }
+
+  private deliverAll(teamId: string): void {
+    for (const member of this.teams.get(teamId)?.members ?? []) this.deliver(teamId, member.id);
+  }
+
+  /** Wake one member with its unread mail, if the team is running, the member is idle (or not started) and budget remains. */
+  private deliver(teamId: string, memberId: string): void {
+    const team = this.teams.get(teamId);
+    const member = team ? memberById(team, memberId) : undefined;
+    if (!team || !member || team.status !== 'running') return;
+    const unread = unreadFor(team, memberId);
+    if (unread.length === 0) return;
+    const runner = member.agentId ? this.host.runner(member.agentId) : undefined;
+    if (member.agentId && (!runner || this.host.agent(member.agentId)?.status !== 'idle')) return;
+    const budgeted = this.spend(team);
+    if (!budgeted) return;
+    const text = wakeText(budgeted, member, unread);
+    if (!runner) {
+      this.startMember(budgeted, member, text);
+      return;
+    }
+    // Commit before sending: send() re-enters onAgent synchronously and must see the mail as read.
+    this.commit(markRead(budgeted, memberId));
+    runner.send(text).catch((error: Error) => this.undoDelivery(teamId, member, unread[0].id, error));
+  }
+
+  /** The wake never reached the agent: make its mail unread again (by message id, indexes may have shifted) and refund the wake. */
+  private undoDelivery(teamId: string, member: TeamMember, firstMessageId: string, error: Error): void {
+    const current = this.teams.get(teamId);
+    if (!current) return;
+    const index = current.messages.findIndex((m) => m.id === firstMessageId);
+    const readUpTo = index >= 0 ? Math.min(current.readUpTo[member.id] ?? 0, index) : current.readUpTo[member.id] ?? 0;
+    this.commit({
+      ...current,
+      readUpTo: { ...current.readUpTo, [member.id]: readUpTo },
+      budget: { ...current.budget, wakesUsed: Math.max(0, current.budget.wakesUsed - 1) },
+    });
+    this.append(teamId, 'system', SYSTEM, `Could not deliver to ${member.name}: ${error.message}`);
+  }
+
+  /** Launch a member with its first mail. Nothing is marked read or charged unless the launch succeeds. */
+  private startMember(charged: TeamState, member: TeamMember, firstPrompt: string): void {
+    try {
+      const agentId = this.launchMember(charged, member, firstPrompt);
+      this.commit(replaceMember(markRead(charged, member.id), member.id, { agentId }));
+      this.append(charged.id, 'system', SYSTEM, `${member.name} started (${member.vendor}${member.model ? ` ${member.model}` : ''}) in ${member.worktree}`);
+    } catch (error) {
+      this.setStatus(charged.id, 'paused', `Could not start ${member.name}: ${(error as Error).message}`);
+    }
+  }
+
+  private launchMember(team: TeamState, member: TeamMember, firstPrompt: string): string {
+    if (!this.endpoint) throw new TeamError('team channel endpoint is not set');
+    const token = randomBytes(24).toString('hex');
+    this.tokens = new Map([
+      ...[...this.tokens].filter(([, m]) => !(m.teamId === team.id && m.memberId === member.id)),
+      [token, { teamId: team.id, memberId: member.id }],
+    ]);
+    const agent = this.host.launch({
+      vendor: member.vendor,
+      cwd: member.worktree,
+      prompt: firstPrompt,
+      appendSystemPrompt: briefing(team, member),
+      name: `${team.name} · ${member.name}`.slice(0, 80),
+      model: member.model,
+      intercept: team.intercept && member.vendor === 'claude',
+      writeRoot: member.worktree,
+      readGuard: this.opts.privateRoot ? { deny: this.opts.privateRoot, allow: join(this.opts.teamsDir, team.id) } : undefined,
+      // The token lives only in the agent's environment; the bridge inherits it (never on a command line).
+      env: { [TOKEN_ENV]: token },
+      mcpServers: {
+        team: {
+          command: this.opts.nodePath ?? process.execPath,
+          args: [this.opts.mcpScript ?? TEAM_MCP_SCRIPT],
+          env: { AGENT_TOWER_TEAM_URL: this.endpoint },
+          inheritEnv: [TOKEN_ENV],
+        },
+      },
+    });
+    this.byAgent = new Map([...this.byAgent, [agent.id, { teamId: team.id, memberId: member.id }]]);
+    return agent.id;
+  }
+
+  /** Charge one wake-up, or pause the team when the budget or time limit is spent. */
+  private spend(team: TeamState): TeamState | undefined {
+    if (this.now() > team.budget.deadline) {
+      this.setStatus(team.id, 'paused', 'Time limit reached. Resume to give the team more time.');
+      return undefined;
+    }
+    if (team.budget.wakesUsed >= team.budget.maxWakes) {
+      this.setStatus(team.id, 'paused', 'Wake-up budget used up. Resume to continue.');
+      return undefined;
+    }
+    return { ...team, budget: { ...team.budget, wakesUsed: team.budget.wakesUsed + 1 } };
+  }
+
+  /** When nobody is working and nothing is queued, prompt the lead once; if that changes nothing, pause. */
+  private checkIdle(teamId: string): void {
+    const team = this.teams.get(teamId);
+    if (!team || team.status !== 'running') return;
+    const working = team.members.some((m) => {
+      const status = m.agentId ? this.host.agent(m.agentId)?.status : undefined;
+      return status === 'busy' || status === 'waiting';
+    });
+    if (working) return;
+    const deliverable = team.members.some((m) => m.agentId && this.host.agent(m.agentId)?.status === 'idle' && unreadFor(team, m.id).length > 0);
+    if (deliverable) return;
+    if (team.idleNudged) {
+      this.setStatus(teamId, 'paused', 'Everyone went idle. Send the team a message or resume to continue.');
+      return;
+    }
+    const leader = lead(team);
+    this.commit({ ...postMessage(team, SYSTEM, leader.id, idleNudge(team), this.now()), idleNudged: true });
+    this.append(teamId, 'system', SYSTEM, `Everyone is idle; prompted ${leader.name} to wrap up or reassign.`);
+    this.deliver(teamId, leader.id);
+  }
+}
