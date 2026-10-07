@@ -6,6 +6,10 @@ import './styles.css';
 import './world.css';
 import './reading.css';
 import './teams.css';
+import './ops.css';
+import './library.css';
+import './workbench.css';
+import './workspace.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

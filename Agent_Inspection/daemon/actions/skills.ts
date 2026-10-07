@@ -1,28 +1,69 @@
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, dirname, join, relative } from 'node:path';
-import { claudePaths } from '../config.ts';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { claudePaths, paths } from '../config.ts';
 
 export interface SkillInfo {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  /** "waystation", "user" or "plugin:<name>". */
   readonly source: string;
   readonly dir: string;
+}
+
+/** Where skills are looked for. "plugins" roots label each skill with the plugin it came from. */
+export interface SkillRoot {
+  readonly dir: string;
+  readonly kind: 'waystation' | 'user' | 'plugins';
 }
 
 const MAX_DEPTH = 7;
 const CACHE_MS = 60_000;
 const SAFE_SKILL_NAME = /^[A-Za-z0-9._-]+$/;
 
+function unquote(value: string): string {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    try {
+      return String(JSON.parse(value));
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) return value.slice(1, -1).replace(/''/g, "'");
+  return value;
+}
+
 export function parseSkillFrontmatter(text: string): { name?: string; description?: string } {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (!match) return {};
   const field = (key: string) => {
     const line = new RegExp(`^${key}:\\s*(.*)$`, 'm').exec(match[1]);
-    return line ? line[1].trim().replace(/^["']|["']$/g, '') : undefined;
+    return line ? unquote(line[1].trim()) : undefined;
   };
   return { name: field('name'), description: field('description') };
+}
+
+/** The id scheme every skill API shares: stable for as long as the skill folder stays put. */
+export function skillIdFor(dir: string): string {
+  return createHash('sha1').update(dir).digest('hex').slice(0, 12);
+}
+
+/** The default places skills come from: Waystation's own library, ~/.claude/skills and installed plugins. */
+export function defaultSkillRoots(): SkillRoot[] {
+  return [
+    { dir: paths.skillsLibraryDir, kind: 'waystation' },
+    { dir: claudePaths.skills, kind: 'user' },
+    { dir: claudePaths.plugins, kind: 'plugins' },
+  ];
+}
+
+function toRoot(root: string | SkillRoot): SkillRoot {
+  if (typeof root !== 'string') return root;
+  const full = resolve(root);
+  if (full === resolve(paths.skillsLibraryDir)) return { dir: root, kind: 'waystation' };
+  if (full === resolve(claudePaths.plugins)) return { dir: root, kind: 'plugins' };
+  return { dir: root, kind: 'user' };
 }
 
 function findSkillFiles(root: string, depth = 0): string[] {
@@ -41,41 +82,52 @@ function findSkillFiles(root: string, depth = 0): string[] {
   });
 }
 
-function sourceLabel(skillFile: string): string {
-  const fromPlugins = relative(claudePaths.plugins, skillFile);
-  if (!fromPlugins.startsWith('..')) {
-    const parts = fromPlugins.split(/[\\/]/);
-    const skillsIdx = parts.lastIndexOf('skills');
-    return `plugin:${parts[Math.max(0, skillsIdx - 2)] ?? 'unknown'}`;
-  }
-  return 'user';
+function sourceLabel(skillFile: string, root: SkillRoot): string {
+  if (root.kind !== 'plugins') return root.kind;
+  const parts = relative(root.dir, skillFile).split(/[\\/]/);
+  const skillsIdx = parts.lastIndexOf('skills');
+  return `plugin:${parts[Math.max(0, skillsIdx - 2)] ?? 'unknown'}`;
 }
 
-let cache: { at: number; skills: SkillInfo[] } | undefined;
+function readSkill(file: string, root: SkillRoot): SkillInfo | undefined {
+  const dir = dirname(file);
+  let meta: { name?: string; description?: string };
+  try {
+    meta = parseSkillFrontmatter(readFileSync(file, 'utf8').slice(0, 8000));
+  } catch {
+    return undefined;
+  }
+  return {
+    id: skillIdFor(dir),
+    name: meta.name || basename(dir),
+    description: (meta.description ?? '').slice(0, 300),
+    source: sourceLabel(file, root),
+    dir,
+  };
+}
 
-export function listSkills(roots: readonly string[] = [claudePaths.skills, claudePaths.plugins]): SkillInfo[] {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.skills;
+const cache = new Map<string, { at: number; skills: SkillInfo[] }>();
+
+/** Drops cached listings, e.g. after a skill was created, edited or deleted. */
+export function invalidateSkillCache(): void {
+  cache.clear();
+}
+
+export function listSkills(rootsIn: readonly (string | SkillRoot)[] = defaultSkillRoots()): SkillInfo[] {
+  const roots = rootsIn.map(toRoot);
+  const key = JSON.stringify(roots);
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.skills;
   const seen = new Set<string>();
-  const skills = roots.flatMap(findSkillFiles).flatMap((file): SkillInfo[] => {
-    const dir = dirname(file);
-    let meta: { name?: string; description?: string } = {};
-    try {
-      meta = parseSkillFrontmatter(readFileSync(file, 'utf8').slice(0, 8000));
-    } catch {
-      return [];
-    }
-    const id = createHash('sha1').update(dir).digest('hex').slice(0, 12);
-    if (seen.has(id)) return [];
-    seen.add(id);
-    return [{
-      id,
-      name: meta.name ?? basename(dir),
-      description: (meta.description ?? '').slice(0, 300),
-      source: sourceLabel(file),
-      dir,
-    }];
-  }).sort((a, b) => a.name.localeCompare(b.name));
-  cache = { at: Date.now(), skills };
+  const skills = roots
+    .flatMap((root) => findSkillFiles(root.dir).map((file) => readSkill(file, root)))
+    .filter((skill): skill is SkillInfo => {
+      if (!skill || seen.has(skill.id)) return false;
+      seen.add(skill.id);
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  cache.set(key, { at: Date.now(), skills });
   return skills;
 }
 

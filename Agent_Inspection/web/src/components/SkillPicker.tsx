@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, type SkillSummary } from '../api.ts';
 
+/** "waystation" skills were made in the Library; others keep their raw source ("user", "plugin:x"). */
+const sourceLabel = (source: string): string => (source === 'waystation' ? 'WayStation' : source);
+
 interface SkillPickerProps {
   readonly onPick: (skill: SkillSummary) => void;
 }
@@ -28,9 +31,9 @@ export function SkillPicker({ onPick }: SkillPickerProps) {
       <ul className="skill-list">
         {filtered.map((skill) => (
           <li key={skill.id}>
-            <button className="skill-row" onClick={() => onPick(skill)}>
+            <button type="button" className="skill-row" onClick={() => onPick(skill)}>
               <span className="skill-name">{skill.name}</span>
-              <span className="skill-source">{skill.source}</span>
+              <span className="skill-source">{sourceLabel(skill.source)}</span>
               <span className="skill-desc">{skill.description || 'No description'}</span>
             </button>
           </li>

@@ -21,6 +21,10 @@ export interface TeamMember {
   readonly worktree: string;
   readonly branch: string;
   readonly merged: boolean;
+  /** Set while the operator drives this member's session in their own terminal: the tower neither wakes nor relaunches it. */
+  readonly terminal?: { readonly sessionId: string; readonly since: number };
+  /** Session to continue on the member's next launch (set when it comes back from the operator's terminal). */
+  readonly resumeSessionId?: string;
 }
 
 export interface TeamTask {

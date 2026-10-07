@@ -169,4 +169,11 @@ describe('validateLaunch', () => {
     expect(() => validateLaunch({ vendor: 'claude', cwd: join(dir, 'nope'), prompt: 'x' })).toThrow(/not found/);
     expect(() => validateLaunch({ vendor: 'codex', cwd: dir, prompt: ' ' })).toThrow(/prompt/);
   });
+
+  it('keeps a trimmed name and model, and rejects model names that could become CLI flags', () => {
+    const dir = tempDir();
+    expect(validateLaunch({ vendor: 'codex', cwd: dir, prompt: 'hi', name: ' Fixer ', model: ' gpt-6.1-sol ' })).toMatchObject({ name: 'Fixer', model: 'gpt-6.1-sol' });
+    expect(validateLaunch({ vendor: 'claude', cwd: dir, prompt: 'hi', model: '' }).model).toBeUndefined();
+    expect(() => validateLaunch({ vendor: 'codex', cwd: dir, prompt: 'hi', model: '-c x' })).toThrow(/model/);
+  });
 });

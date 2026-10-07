@@ -239,6 +239,8 @@ input[type='checkbox'] { accent-color: var(--accent); flex: none; }
 .form { display: flex; flex-direction: column; gap: 18px; }
 .form label { display: flex; flex-direction: column; gap: 7px; font-size: 11px; color: #68755f; font-weight: 500; }
 .form label.check { flex-direction: row; font-weight: 400; align-items: flex-start; }
+.form-field { display: flex; flex-direction: column; gap: 7px; font-size: 11px; color: #68755f; font-weight: 500; }
+.form-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 18px 12px; }
 .form .modal-foot { padding-top: 17px; border-top: 1px solid var(--line); margin-top: 2px; }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 7px; padding: 4px; gap: 4px; background: #eef1e8; }
 .segmented button { border: 1px solid transparent; border-radius: 4px; background: transparent; padding: 9px 6px; color: var(--muted); cursor: pointer; font-size: 11px; }
@@ -404,3 +406,14 @@ input[type='checkbox'] { accent-color: var(--accent); flex: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---- subagents (Claude Code Agent/Task tool children) ---- */
+.card-parent { display: flex; align-items: center; gap: 6px; min-width: 0; margin: -4px 0 6px; color: var(--muted); font-size: 11px; }
+.card-parent span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-subagent { border-style: dashed; }
+.card-nested { margin-left: calc(18px * var(--agent-depth, 1)); position: relative; }
+.card-nested::before { content: ''; position: absolute; left: -12px; top: 18px; bottom: 18px; border-left: 2px solid var(--line); border-radius: 2px; }
+.tag-subagents { color: #6c5a8a; font-size: 9px; }
+.agent-list .card-parent { grid-column: 1; margin: 0 0 0 51px; }
+@media (max-width: 640px) { .card-nested { margin-left: calc(10px * var(--agent-depth, 1)); } .card-nested::before { left: -7px; } }
+/* ---- end subagents ---- */

@@ -1,10 +1,11 @@
 import type { Agent, AgentEvent } from './api.ts';
+import { isApprovalReview } from '../../shared/approvalReview.ts';
 
 export type ActivityFilter = 'messages' | 'tools' | 'all';
 
 export function filterActivity<T extends AgentEvent>(events: readonly T[], filter: ActivityFilter): T[] {
   return events.filter(event => filter === 'all' || (filter === 'messages'
-    ? event.kind === 'prompt' || event.kind === 'assistant' || event.kind === 'error'
+    ? event.kind === 'prompt' || (event.kind === 'assistant' && !isApprovalReview(event.summary)) || event.kind === 'error'
     : event.kind === 'tool_call' || event.kind === 'tool_result'));
 }
 

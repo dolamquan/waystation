@@ -50,10 +50,38 @@ describe('normalizeCodexLine', () => {
     expect(normalizeCodexLine(ID, { type: 'world_state' }).events).toEqual([]);
   });
 
+  it('records internal approval reviews as session updates instead of conversation', () => {
+    const message = JSON.stringify({ risk_level: 'low', user_authorization: 'medium', outcome: 'allow', rationale: 'Run local validation.' });
+    const response = normalizeCodexLine(ID, { type: 'response_item', payload: {
+      type: 'message', role: 'assistant', content: [{ type: 'output_text', text: message }],
+    } });
+    const event = normalizeCodexLine(ID, { type: 'event_msg', payload: { type: 'agent_message', message } });
+    expect(response.events[0]).toMatchObject({ kind: 'system', summary: message });
+    expect(event.events[0]).toMatchObject({ kind: 'system', summary: message });
+  });
+
   it('parses session_meta', () => {
     const meta = parseCodexSessionMeta({ type: 'session_meta', timestamp: '2026-01-01T00:00:00Z', payload: { id: 'abc', cwd: 'C:\\p', originator: 'codex_vscode' } });
     expect(meta).toMatchObject({ id: 'abc', cwd: 'C:\\p', originator: 'codex_vscode' });
     expect(parseCodexSessionMeta({ type: 'event_msg', payload: {} })).toBeUndefined();
+  });
+
+  it('preserves Codex guardian and spawned thread relationships from metadata', () => {
+    expect(parseCodexSessionMeta({ type: 'session_meta', payload: {
+      id: 'child', parent_thread_id: 'parent', source: { subagent: { other: 'guardian' } },
+    } })).toMatchObject({ parentThreadId: 'parent', agentRole: 'guardian' });
+    expect(parseCodexSessionMeta({ type: 'session_meta', payload: {
+      id: 'child', source: { subagent: { thread_spawn: { parent_thread_id: 'parent', agent_role: 'explorer', agent_nickname: 'Scout' } } },
+    } })).toMatchObject({ parentThreadId: 'parent', agentRole: 'explorer', agentNickname: 'Scout' });
+    expect(parseCodexSessionMeta({ type: 'session_meta', payload: {
+      id: 'child', parent_thread_id: 'parent', agent_role: 'worker', agent_nickname: 'Builder',
+    } })).toMatchObject({ parentThreadId: 'parent', agentRole: 'worker', agentNickname: 'Builder' });
+  });
+
+  it('does not invent a parent for ordinary sessions or malformed and self-referencing metadata', () => {
+    for (const payload of [{ id: 'root' }, { id: 'root', parent_thread_id: 'root' }, { id: 'root', parent_thread_id: 42, source: { subagent: 'review' } }]) {
+      expect(parseCodexSessionMeta({ type: 'session_meta', payload })?.parentThreadId).toBeUndefined();
+    }
   });
 });
 

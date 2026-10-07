@@ -10,6 +10,7 @@
     "daemon:dev": "tsx daemon/index.ts --dev",
     "dev:web": "vite",
     "open": "node scripts/open.mjs",
+    "attach": "tsx daemon/cli/attach.ts",
     "build": "vite build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -17,10 +18,12 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.287",
+    "nodemailer": "^10.0.15",
     "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",

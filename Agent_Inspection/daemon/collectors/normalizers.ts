@@ -1,5 +1,6 @@
 import type { AgentEvent, EventKind } from '../domain/types.ts';
 import { describeToolInput, summarize } from '../domain/text.ts';
+import { isApprovalReview } from '../../shared/approvalReview.ts';
 
 type Json = Record<string, unknown>;
 
@@ -75,7 +76,10 @@ export function normalizeCodexLine(agentId: string, line: unknown, now = Date.no
     }
     if (payload.type === 'message' && payload.role === 'assistant' && Array.isArray(payload.content)) {
       const text = payload.content.map(asRecord).find((block) => typeof block?.text === 'string');
-      if (text) return { events: [make(agentId, ts, 'assistant', summarize(String(text.text)))] };
+      if (text) {
+        const message = String(text.text);
+        return { events: [make(agentId, ts, isApprovalReview(message) ? 'system' : 'assistant', summarize(message))] };
+      }
     }
     return { events: [] };
   }
@@ -85,7 +89,7 @@ export function normalizeCodexLine(agentId: string, line: unknown, now = Date.no
       return { events: [make(agentId, ts, 'prompt', summarize(payload.message))] };
     }
     if (payload.type === 'agent_message' && typeof payload.message === 'string') {
-      return { events: [make(agentId, ts, 'assistant', summarize(payload.message))] };
+      return { events: [make(agentId, ts, isApprovalReview(payload.message) ? 'system' : 'assistant', summarize(payload.message))] };
     }
     if (payload.type === 'task_started') return { events: [make(agentId, ts, 'status', 'turn started')] };
     if (payload.type === 'task_complete') return { events: [make(agentId, ts, 'status', 'turn complete')] };
@@ -98,16 +102,26 @@ export interface CodexSessionMeta {
   readonly cwd?: string;
   readonly originator?: string;
   readonly startedAt?: number;
+  readonly parentThreadId?: string;
+  readonly agentRole?: string;
+  readonly agentNickname?: string;
 }
 
 export function parseCodexSessionMeta(line: unknown): CodexSessionMeta | undefined {
   const entry = asRecord(line);
   const payload = asRecord(entry?.payload);
   if (entry?.type !== 'session_meta' || !payload || typeof payload.id !== 'string') return undefined;
+  const subagent = asRecord(asRecord(payload.source)?.subagent);
+  const spawn = asRecord(subagent?.thread_spawn);
+  const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  const parentThreadId = text(payload.parent_thread_id) ?? text(spawn?.parent_thread_id);
   return {
     id: payload.id,
     cwd: typeof payload.cwd === 'string' ? payload.cwd : undefined,
     originator: typeof payload.originator === 'string' ? payload.originator : undefined,
     startedAt: toTs(payload.timestamp ?? entry.timestamp, Date.now()),
+    parentThreadId: parentThreadId !== payload.id ? parentThreadId : undefined,
+    agentRole: text(payload.agent_role) ?? text(spawn?.agent_role) ?? text(subagent?.other),
+    agentNickname: text(payload.agent_nickname) ?? text(spawn?.agent_nickname),
   };
 }

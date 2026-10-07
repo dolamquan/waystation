@@ -6,6 +6,8 @@ import type { AgentRegistry } from '../domain/registry.ts';
 import { projectName } from '../domain/text.ts';
 import { JsonlTailer } from './jsonlTail.ts';
 import { normalizeClaudeLine } from './normalizers.ts';
+import { SubagentCollector } from './subagents.ts';
+import { UsageMeter, claudeUsageSample, scanJsonl } from '../usage/usageMeter.ts';
 
 export const CLAUDE_SOURCE = 'claude-sessions';
 
@@ -72,6 +74,9 @@ export interface ClaudeCollectorDeps {
 
 interface SessionState {
   readonly tailer: JsonlTailer;
+  readonly meter: UsageMeter;
+  /** The one full pass over the transcript has finished. */
+  scanned: boolean;
   title?: string;
   activity?: string;
   lastEventAt?: number;
@@ -82,8 +87,12 @@ export class ClaudeSessionsCollector {
   private sessions = new Map<string, SessionState>();
   private timer: NodeJS.Timeout | undefined;
   private scanning = false;
+  /** Subagents of every live Claude agent (observed, hooked or tower-managed), polled on the same cadence. */
+  private readonly subagents: SubagentCollector;
 
-  constructor(private readonly deps: ClaudeCollectorDeps) {}
+  constructor(private readonly deps: ClaudeCollectorDeps) {
+    this.subagents = new SubagentCollector({ registry: deps.registry, projectsDir: deps.projectsDir });
+  }
 
   start(): void {
     void this.scan();
@@ -121,6 +130,11 @@ export class ClaudeSessionsCollector {
       this.deps.registry.replaceSource(CLAUDE_SOURCE, live.map((file) => this.toAgent(file)));
     } catch (error) {
       console.error('[claude-sessions] scan failed:', (error as Error).message);
+    }
+    try {
+      await this.subagents.scan();
+    } catch (error) {
+      console.error('[claude-subagents] scan failed:', (error as Error).message);
     } finally {
       this.scanning = false;
     }
@@ -154,11 +168,22 @@ export class ClaudeSessionsCollector {
     if (!state) {
       const projectsDir = this.deps.projectsDir ?? claudePaths.projects;
       const transcript = join(projectsDir, claudeProjectSlug(file.cwd), `${file.sessionId}.jsonl`);
-      state = { tailer: new JsonlTailer(transcript) };
-      this.sessions.set(file.sessionId, state);
+      const meter = new UsageMeter();
+      const created: SessionState = { tailer: new JsonlTailer(transcript), meter, scanned: false };
+      state = created;
+      this.sessions.set(file.sessionId, created);
+      // The tailer only backfills the end of the file; count the session's whole history once (deduplicated by
+      // message id). Usage is published only after this pass, so nobody sees a partial, too-small total.
+      void scanJsonl(transcript, (line) => {
+        const sample = claudeUsageSample(line);
+        if (sample) meter.addClaude(sample);
+      }).catch(() => undefined).finally(() => { created.scanned = true; });
     }
     const hooked = this.deps.hooksInstalled();
     for (const line of await state.tailer.readNew()) {
+      const sample = claudeUsageSample(line);
+      if (sample) state.meter.addClaude(sample);
+      this.subagents.noteParentLine(file.sessionId, line);
       const { events, title } = normalizeClaudeLine(agentId, line);
       if (title) state.title = title;
       for (const event of events) {
@@ -193,6 +218,8 @@ export class ClaudeSessionsCollector {
       hooked,
       intercepting: hooked && this.deps.isIntercepting(file.sessionId),
       canInstruct: hooked,
+      model: state?.meter.model,
+      usage: state?.scanned ? state.meter.snapshot() : undefined,
     };
   }
 }

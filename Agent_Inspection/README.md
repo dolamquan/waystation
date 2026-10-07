@@ -20,9 +20,15 @@ To have the tower intercept and instruct the Claude Code sessions you already ru
 
 Click **Enter the station** to see live sessions as a crew of original vector characters: Pip, Mica, Orbit, Sprout, Bolt, and Nova. Character identities stay consistent for each session. Working characters type, waiting characters wave for attention, idle characters stroll, and stopped characters sleep. The scene is a visualization; character movement does not issue agent commands.
 
-Choose **Moonbase**, **Greenhouse**, or **Deep Sea** to change the environment. Your theme preference is saved in your browser. Use the project selector to view a team, the deck arrows to see larger crews, and the camera button to zoom or fit the floor. Click a character or a crew row to open the existing agent controls.
+Each working folder has its own office. Switch between **folder tabs** above the floor to see only that folder's agents and crew; the selected folder's full path appears below the tabs. Folders with the same name are distinguished by their parent paths. Team members share a table in their team's repository office, including members working in separate worktrees. Sessions without a known folder appear in **Unassigned**.
+
+Agents launched through Waystation keep their name and controls when the background scanner discovers their session transcript. The managed session and its transcript observation share one dashboard entry. Genuine subagents and independent sessions remain separate.
+
+Choose **Moonbase**, **Greenhouse**, or **Deep Sea** to change the environment. Your theme preference is saved in your browser. Use the office crew selector to view a team within the selected office, the deck arrows to see larger crews, and the camera button to zoom or fit the floor. Click a character or a crew row to open the existing agent controls. Folder tabs also work in the full-screen station; use the arrow keys to switch tabs.
 
 **Explore the demo** shows a clearly labeled sample crew without launching agents or enabling live actions. The pause button stops scene animations, and the scene also follows your system's reduced-motion setting.
+
+Spawned Claude Code and Codex subagents are linked to their parent sessions. Dashed arrows on the floor connect parents to their subagents, and parent desks show a subagent count. Selecting a parent or child highlights the link. The crew list groups helpers beneath their parent and labels who spawned them. Open a session's Overview to navigate to its parent or any of its spawned subagents, including helpers beyond the floor's three-character preview. The agent cards preserve multiple generations of nesting.
 
 Select a session to open **Overview**, **Activity**, or **Details**. Overview shows its current state and available actions. Activity starts with conversation messages; use **Tool calls** or **Everything** to inspect recorded tools and session updates. Tool payloads and technical session identifiers are expandable, and recorded activity is searchable. Observed sessions explain where to send messages rather than showing unavailable controls.
 
@@ -52,6 +58,91 @@ How the actions work:
 - **Skills:** copies a skill from `~/.claude/skills` or an installed plugin into the project's `.claude/skills`, then tells the agent about it (when it accepts instructions).
 
 Editor-hosted Codex threads can't be stopped from the tower. They share one app-server process with your editor, and stopping it would end every Codex thread there.
+
+## Cost, guard rails, templates and schedules
+
+**On every agent card:**
+- the model it runs;
+- an estimated cost;
+- how full its context window is.
+
+A red strip appears when an agent's last turn failed, or when the runaway guard stepped in.
+
+**Spend.** Costs are estimates at Anthropic list price, from the token counts in each session's transcript.
+- Codex agents show tokens only. There is no list price we can rely on for them.
+- If you use a subscription plan, you are billed differently.
+- **Usage & schedules** in the sidebar shows today, the last 7 days, and the agents that spent the most.
+
+**Runaway guard.** It watches every agent for:
+- the same tool call repeated 6 times in a row;
+- 6 errors within 3 minutes;
+- optionally, spending past a per-agent limit.
+
+It steps in one level at a time:
+1. It sends the agent a message telling it to stop and rethink.
+2. Next time, it turns on tool approvals (Claude), or interrupts the turn (Codex).
+3. It only stops an agent if you allow it to.
+
+**Clear guard** in the agent's details resets it. Configure the guard with environment variables before `npm start`:
+- `AGENT_TOWER_AGENT_BUDGET_USD=5`: per-agent spend limit.
+- `AGENT_TOWER_BREAKER_HARD_STOP=1`: allow the last level, stopping the agent.
+
+**Rename** any agent from its details. The name is kept across tower restarts.
+
+**Restart & continue** (agents launched here):
+- It stops the agent and starts it again on the same conversation, optionally on a different model.
+- It is not available for team members (pause and resume the team instead) or for agents open in your terminal.
+
+**Questions.** When a managed Claude agent asks you something (Claude Code's `AskUserQuestion`), the question appears with the approvals. Pick an option or type an answer.
+
+**Templates.** In **New agent**, **Save as template** keeps the agent type, model, name, role instructions and first task. Picking a template later only fills in the form; you still press Launch.
+
+**Schedules** launch an agent at a set time on chosen weekdays (**Usage & schedules → New schedule**).
+- A run missed by more than 10 minutes, because the tower was off or the PC asleep, is skipped rather than fired late.
+- **Run now** launches one immediately.
+
+**Prerequisites.** That page also checks Node, Git, Claude Code, Codex, Windows Terminal and the hooks. It only reports; it never installs anything.
+
+## Working in the real Claude Code or Codex CLI
+
+Every Claude Code and Codex session can be opened in the real CLI, in a Windows Terminal tab, so you use it exactly like your own session, with `/usage`, `/model`, `/compact` and the rest.
+
+- **Open in Claude Code / Codex** (agent details, for sessions running outside Waystation, such as your own Claude Code sessions or Codex threads in your editor): opens a copy of the conversation (`claude --resume <id> --fork-session`, or `codex fork <id>`) in the session's folder. The original keeps running where it is; from then on the two are separate. A Claude session with no conversation yet opens as a new session in its folder.
+- **Agents launched from Waystation are only ever ended from Waystation.** While one is open in your terminal it keeps its card (marked *In your terminal*). Closing the terminal hands it back: Waystation resumes the same conversation and the agent waits, idle, for instructions. **Stop** in Waystation closes its terminal session and ends it. With hooks installed, messages sent from Waystation reach the terminal session after its next tool call.
+- **Continue in Claude Code / Codex** (agent details, for agents launched from Waystation): once the agent is idle, Waystation stops its own copy and opens a Windows Terminal tab running `claude --resume <session>` (or `codex resume <thread>`) in the agent's folder, with the same conversation and model. With hooks installed, Waystation keeps showing it as a Hook-control session.
+- **CLI** (team page, per member): the same, for a team member. Its session keeps its `team` tools (channel, board) and its standing instructions, plus a note that you are now driving it.
+  - While it is open in your terminal, the team never wakes it or starts a second copy. Messages to it wait.
+  - When you exit the CLI or close the tab, the member rejoins the team straight away on that same session (idle, without spending budget, unless mail is waiting). **Take back** does this immediately; the old tab then loses team access.
+  - A member in your CLI uses your normal Claude Code permission prompts instead of the team's file guard rail, so check what it writes.
+- **Open in Claude Code** (team page header): a Claude Code session for you, as the operator, opened in the project. It has team tools for you (`team_status`, `read_channel`, `send_message`, `pause_team`, `resume_team`, `member_changes`) but cannot merge or disband: those stay in Waystation. Messages it sends are posted as the operator, and Claude Code asks your permission for each tool call. Its access ends when the session closes.
+
+How it works: the tab runs a small launcher (`daemon/cli/launchCli.ts`). The tower writes a one-time ticket into its private folder (`%LOCALAPPDATA%\agent-tower\cli-tickets`) with the command and folder; the launcher reads and deletes it, checks in with the tower, and only then starts the CLI. If the tower doesn't confirm the session, the CLI is not started, so a session can never run in your terminal and in the team at once.
+- Tokens never appear on a command line. Claude Code reads its team token from a private MCP config file next to the ticket (passed with `--mcp-config <file>`); Codex receives it in its environment. Both files are deleted when the session ends.
+- The tower watches both the launcher and the CLI process. The session ends when you exit the CLI or close the tab, not if only the launcher dies.
+- Set `AGENT_TOWER_CLAUDE_EXE` if `claude.exe` is not in the npm global folder or on `PATH`.
+
+Limits:
+- A member that was in your CLI when the tower restarted rejoins the team when you resume it; close its old tab first. Its team access ended with the restart.
+- **Take back** asks you to close the member's tab first: if that session keeps running, two copies of the member would work on the same conversation.
+- A member open in your CLI can't be merged until it is back with the team.
+- The first time Claude Code runs in a folder from a terminal, it asks whether you trust that folder. That prompt is Claude Code's own.
+
+## Text console (optional)
+
+A lightweight, text-only console can follow an agent or team from any terminal without opening the CLI. It is not Claude Code: slash commands such as `/usage` don't exist there. Start it from this folder:
+
+```bash
+npm run attach                          # list what you can attach to
+npm run attach -- agent <id or name>    # one agent
+npm run attach -- team <id or name>     # one team (add --all to include member tool activity)
+```
+
+The console shows recent history, then streams live activity. It is a view onto the tower, not a second copy of the agent: closing it (`/quit` or Ctrl+C) leaves everything running.
+
+- **Agent console:** type a message to send it. `/interrupt`, `/stop`, `/intercept on|off`, and `/approve`, `/deny [reason]` or `/ask` for a held tool call.
+- **Team console:** plain text goes to everyone, `@name …` to one member. `/tasks`, `/members`, `/pause`, `/resume`, `/diff <member> [full]`, `/merge <member>`, `/attach <member>` (opens that member's own console), and `/filter channel|everything`.
+
+`/help` lists the commands. Stopping and merging ask for confirmation, as they do in the UI. The console reads the access token from `daemon.json`, the same way `npm run open` does, so the token never appears on a command line. If Windows Terminal can't be started, the error shows the `npm run attach` command to run instead.
 
 ## Agent teams
 
@@ -128,6 +219,9 @@ daemon/
   managed/      Claude Agent SDK runner, codex exec runner, write guard
   teams/        team manager, board + MCP tools, git worktree sandboxes, stdio MCP bridge
   actions/      stop (taskkill guard), skills
+  usage/        token and cost accounting (list prices, transcript parsing)
+  guard/        runaway guard policy (loops, error storms, budget)
+  ops/          rename, restart & continue, templates, schedules, prerequisites
   api/          HTTP + WebSocket server, request security
   tower.ts      service layer: every action goes through here and is audited
 web/src/        React + Framer Motion UI
@@ -142,7 +236,7 @@ Runtime state (database, token, flags, backups) lives in `%LOCALAPPDATA%\agent-t
 npm run daemon:dev   # daemon that also trusts the Vite dev server origin
 npm run dev:web      # Vite on http://127.0.0.1:5173 (proxies /api and /ws)
 npm run open         # opens the dev UI when the daemon runs with --dev
-npm test             # 187 tests
+npm test             # 273 tests
 npm run test:coverage
 npm run typecheck
 ```

@@ -5,11 +5,15 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { Tower } from '../tower.ts';
 import { UserError } from '../tower.ts';
 import { TeamAuthError } from '../teams/teamManager.ts';
+import { OpsInputError } from '../ops/templates.ts';
+import { LibraryInputError } from '../library/types.ts';
+import { agentRoutes, libraryRoutes } from './routes/index.ts';
 import {
   WS_PROTOCOL, contentSecurityPolicy, isAllowedHost, isAllowedOrigin, tokenFromProtocols, tokensMatch,
 } from './security.ts';
 
 const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_AGENT_BODY_BYTES = 32 * 1024;
 const MAX_WS_PAYLOAD_BYTES = 64 * 1024;
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -39,14 +43,14 @@ class HttpError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
 
-function readBody(req: IncomingMessage): Promise<unknown> {
+function readBody(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
   return new Promise((resolveBody, reject) => {
     let size = 0;
     let tooLarge = false;
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => {
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) tooLarge = true;
+      if (size > maxBytes) tooLarge = true;
       if (!tooLarge) chunks.push(chunk);
     });
     req.on('end', () => {
@@ -96,6 +100,46 @@ function buildRoutes(tower: Tower): Route[] {
       if (bodyOf(body).confirm !== true) throw new UserError('Attaching a skill requires confirm: true.');
       return { ok: true, target: tower.attachSkill(params[0], bodyOf(body).skillId) };
     }),
+    r('POST', '/api/terminal', async ({ body }) => ({ ok: true, ...(await tower.openTerminal(body)) })),
+    r('POST', '/api/agents/:id/cli', async ({ params }) => ({ ok: true, ...(await tower.openCli(params[0])) })),
+    r('POST', '/api/teams/:id/operator-cli', async ({ params }) => ({ ok: true, ...(await tower.openTeamOperator(params[0])) })),
+    r('POST', '/api/teams/:id/members/:member/return', ({ params }) => ({ ok: true, ...tower.returnTeamMember(params[0], params[1]) })),
+    // Reports from the launcher running in the operator's terminal tab.
+    r('POST', '/api/cli/:id/started', ({ params, body }) => {
+      tower.cliStarted(params[0], body);
+      return { ok: true };
+    }),
+    r('POST', '/api/cli/:id/ended', ({ params }) => {
+      tower.cliEnded(params[0]);
+      return { ok: true };
+    }),
+    // ---- usage, runaway guard, rename, restart, templates, schedules, prerequisites ----
+    r('GET', '/api/usage', ({ req }) => ({ usage: tower.ops.usage(Number(new URL(req.url ?? '/', 'http://localhost').searchParams.get('days') ?? 7)) })),
+    r('POST', '/api/agents/:id/name', ({ params, body }) => ({ ok: true, name: tower.ops.renameAgent(params[0], bodyOf(body).name) ?? null })),
+    r('POST', '/api/agents/:id/restart', async ({ params, body }) => {
+      if (bodyOf(body).confirm !== true) throw new UserError('Restarting requires confirm: true.');
+      return { ok: true, agent: await tower.ops.restartAgent(params[0], body) };
+    }),
+    r('POST', '/api/agents/:id/breaker/reset', ({ params }) => {
+      tower.ops.resetBreaker(params[0]);
+      return { ok: true };
+    }),
+    r('GET', '/api/templates', () => ({ templates: tower.ops.templates() })),
+    r('POST', '/api/templates', ({ body }) => ({ ok: true, template: tower.ops.createTemplate(body) })),
+    r('POST', '/api/templates/:id/delete', ({ params }) => {
+      tower.ops.deleteTemplate(params[0]);
+      return { ok: true };
+    }),
+    r('GET', '/api/schedules', () => ({ schedules: tower.ops.schedules() })),
+    r('POST', '/api/schedules', ({ body }) => ({ ok: true, schedule: tower.ops.createSchedule(body) })),
+    r('POST', '/api/schedules/:id/enabled', ({ params, body }) => ({ ok: true, schedule: tower.ops.setScheduleEnabled(params[0], bodyOf(body).enabled === true) })),
+    r('POST', '/api/schedules/:id/run', ({ params }) => ({ ok: true, agent: tower.ops.runScheduleNow(params[0]) })),
+    r('POST', '/api/schedules/:id/delete', ({ params, body }) => {
+      if (bodyOf(body).confirm !== true) throw new UserError('Deleting a schedule requires confirm: true.');
+      tower.ops.deleteSchedule(params[0]);
+      return { ok: true };
+    }),
+    r('GET', '/api/prerequisites', () => ({ prerequisites: tower.ops.prerequisites() })),
     r('GET', '/api/skills', () => ({ skills: tower.skills() })),
     r('POST', '/api/managed', ({ body }) => ({ ok: true, agent: tower.launch(body) })),
     r('POST', '/api/interceptions/:id', ({ params, body }) => {
@@ -139,6 +183,7 @@ function buildRoutes(tower: Tower): Route[] {
       res.on('close', () => { if (!res.writableEnded) tower.interceptions.cancel(id); });
       return decision;
     }),
+    ...libraryRoutes(tower),
   ];
 }
 
@@ -188,7 +233,9 @@ export function startServer(opts: ServerOptions): Promise<Server> {
   const { tower, port, host, token, webDist, dev = false } = opts;
   const routes = buildRoutes(tower);
   const teamRoutes = buildTeamRoutes(tower);
+  const bridgeRoutes = agentRoutes(tower);
   tower.teams.setEndpoint(`http://${host}:${port}`);
+  tower.library.notifier.setEndpoint(`http://${host}:${port}`);
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -203,6 +250,17 @@ export function startServer(opts: ServerOptions): Promise<Server> {
         return;
       }
       sendJson(res, 200, await teamRoute.handler({ params: [], body: await readBody(req), req, res }));
+      return;
+    }
+    if (url.pathname.startsWith('/agent/')) {
+      // Agent bridges (e.g. notify) carry their own per-agent token; each handler checks it.
+      const bridgeRoute = bridgeRoutes.find((candidate) => candidate.method === req.method && candidate.pattern.test(url.pathname));
+      if (!bridgeRoute) {
+        sendJson(res, 404, { error: 'not found' });
+        return;
+      }
+      // Bridge messages are small (title ≤ 200, body ≤ 8000): don't buffer 1 MB from an unauthenticated caller.
+      sendJson(res, 200, await bridgeRoute.handler({ params: [], body: await readBody(req, MAX_AGENT_BODY_BYTES), req, res }));
       return;
     }
     const isApi = url.pathname.startsWith('/api/') || url.pathname.startsWith('/hook/');
@@ -235,7 +293,9 @@ export function startServer(opts: ServerOptions): Promise<Server> {
 
   const server = createServer((req, res) => {
     handle(req, res).catch((error: unknown) => {
-      if (error instanceof UserError) sendJson(res, 400, { error: error.message });
+      if (error instanceof UserError || error instanceof OpsInputError || error instanceof LibraryInputError) {
+        sendJson(res, 400, { error: error.message });
+      }
       else if (error instanceof TeamAuthError) sendJson(res, 401, { error: error.message });
       else if (error instanceof HttpError) sendJson(res, error.status, { error: error.message });
       else {
@@ -277,6 +337,8 @@ export function startServer(opts: ServerOptions): Promise<Server> {
   const onPending = (pending: unknown) => broadcast({ type: 'pending', pending });
   const onTeams = (teams: unknown) => broadcast({ type: 'teams', teams });
   const onTeamLog = (entry: unknown) => broadcast({ type: 'team_log', entry });
+  const onNotification = (entry: unknown) => broadcast({ type: 'notification', entry });
+  tower.library.notifier.on('notification', onNotification);
   tower.registry.on('agents', onAgents);
   tower.registry.on('event', onEvent);
   tower.interceptions.on('changed', onPending);
@@ -288,6 +350,7 @@ export function startServer(opts: ServerOptions): Promise<Server> {
     tower.interceptions.off('changed', onPending);
     tower.teams.off('teams', onTeams);
     tower.teams.off('log', onTeamLog);
+    tower.library.notifier.off('notification', onNotification);
     for (const client of wss.clients) client.terminate();
     wss.close();
   });

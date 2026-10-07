@@ -85,3 +85,8 @@ export function classifyObserved(procs: readonly ProcInfo[]): ObservedProcess[] 
 export function hasCodexBackend(procs: readonly ProcInfo[]): boolean {
   return procs.some((proc) => /^codex/i.test(proc.name));
 }
+
+/** `codex exec` is one-shot: its rollout is live only while such a process exists. */
+export function hasCodexExecProcess(procs: readonly ProcInfo[]): boolean {
+  return procs.some((proc) => /^codex/i.test(proc.name) && /\sexec(\s|$)/i.test(proc.commandLine));
+}

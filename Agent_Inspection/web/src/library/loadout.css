@@ -1,0 +1,23 @@
+/* ---- loadout picker (skills, docs, MCP servers, plugins, notifications) ---- */
+.loadout { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.loadout-summary { margin: 0; font-size: 12px; color: var(--muted); }
+.loadout-section { margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.loadout-section:disabled { opacity: .62; }
+.loadout-section legend { padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.loadout-count { min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: #fff; font-size: 10px; line-height: 18px; text-align: center; }
+.loadout-caption { margin: 0; font-size: 11px; color: var(--muted); }
+.loadout-note { margin: 0; font-size: 11px; color: var(--muted); font-style: italic; }
+.loadout-search { width: 100%; }
+.loadout-list { list-style: none; margin: 0; padding: 0; max-height: 210px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.loadout label.loadout-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 8px; padding: 7px 8px; border: 1px solid transparent; border-radius: 6px; font-size: 12px; font-weight: 400; color: var(--text); cursor: pointer; }
+.loadout label.loadout-option:hover { border-color: var(--line); background: #f8fbf4; }
+.loadout label.loadout-option:focus-within { border-color: var(--accent); }
+.loadout-section:disabled label.loadout-option { cursor: not-allowed; }
+.loadout-option input { margin: 2px 0 0; accent-color: var(--accent); }
+.loadout-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.loadout-option-title { font-weight: 550; overflow-wrap: anywhere; }
+.loadout-option-detail { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loadout-tag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- send a context doc to a running agent ---- */
+.doc-picker-size { font-size: 9px; color: var(--muted); }

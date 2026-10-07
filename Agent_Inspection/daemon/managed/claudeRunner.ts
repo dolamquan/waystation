@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
-  query, type CanUseTool, type HookCallbackMatcher, type McpStdioServerConfig, type Query, type SDKMessage, type SDKUserMessage,
+  query, type CanUseTool, type HookCallbackMatcher, type McpServerConfig, type McpStdioServerConfig, type Query, type SDKMessage,
+  type SdkPluginConfig, type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import { READ_TOOL_MATCHER, WRITE_TOOL_MATCHER, readViolation, writeViolation } from './writeGuard.ts';
 import { MANAGED_ENV_FLAG } from '../config.ts';
@@ -9,6 +10,11 @@ import { projectName, summarize } from '../domain/text.ts';
 import { normalizeClaudeLine } from '../collectors/normalizers.ts';
 import { AsyncQueue } from './asyncQueue.ts';
 import type { ManagedHost, ManagedLaunch, ManagedRunner } from './types.ts';
+import { UsageMeter, claudeUsageSample } from '../usage/usageMeter.ts';
+import { remoteHeaderPlan } from './cliCommands.ts';
+
+/** Claude Code's built-in "ask the user" tool. Managed agents have no terminal, so the tower answers. */
+export const ASK_TOOL = 'AskUserQuestion';
 
 const userMessage = (text: string): SDKUserMessage => ({
   type: 'user',
@@ -16,15 +22,39 @@ const userMessage = (text: string): SDKUserMessage => ({
   parent_tool_use_id: null,
 } as SDKUserMessage);
 
-function sdkMcpServers(servers: NonNullable<ManagedLaunch['mcpServers']>): Record<string, McpStdioServerConfig> {
-  return Object.fromEntries(Object.entries(servers).map(([name, server]) => [name, {
+/** Team tools must be visible from the first turn, not deferred behind tool search. Library servers load as usual. */
+const ALWAYS_LOAD = new Set(['team']);
+
+export interface ClaudeSdkMcp {
+  readonly mcpServers?: Record<string, McpServerConfig>;
+  /** Secret values the CLI expands from its own environment (`${VAR}` in `--mcp-config`). */
+  readonly env: Readonly<Record<string, string>>;
+}
+
+/**
+ * The SDK passes MCP config to the CLI on its command line, readable by any local process. So secrets never
+ * go into it: stdio secrets are inherited by name and remote header values become `${VAR}` placeholders
+ * the CLI expands from its environment.
+ */
+export function claudeSdkMcp(launch: Pick<ManagedLaunch, 'mcpServers' | 'remoteMcpServers'>): ClaudeSdkMcp {
+  const plan = remoteHeaderPlan(launch.remoteMcpServers);
+  const stdio = Object.entries(launch.mcpServers ?? {}).map(([name, server]): [string, McpServerConfig] => [name, {
     type: 'stdio',
     command: server.command,
     args: [...server.args],
-    env: { ...server.env },
-    // Team tools must be visible from the first turn, not deferred behind tool search.
-    alwaysLoad: true,
-  } satisfies McpStdioServerConfig]));
+    env: { ...server.env, ...Object.fromEntries((server.inheritEnv ?? []).map((key) => [key, `\${${key}}`])) },
+    ...(ALWAYS_LOAD.has(name) ? { alwaysLoad: true } : {}),
+  } satisfies McpStdioServerConfig]);
+  const remote = Object.entries(launch.remoteMcpServers ?? {}).map(([name, server]): [string, McpServerConfig] => {
+    const headers = Object.fromEntries(Object.entries(plan.vars[name] ?? {}).map(([header, variable]) => [header, `\${${variable}}`]));
+    return [name, { type: server.type, url: server.url, ...(Object.keys(headers).length ? { headers } : {}) }];
+  });
+  const all = [...stdio, ...remote];
+  return { mcpServers: all.length ? Object.fromEntries(all) : undefined, env: plan.env };
+}
+
+export function sdkPlugins(plugins: ManagedLaunch['plugins']): SdkPluginConfig[] | undefined {
+  return plugins?.length ? [...new Set(plugins)].map((path) => ({ type: 'local' as const, path })) : undefined;
 }
 
 type Violation = (toolName: string, input: Record<string, unknown>) => string | undefined;
@@ -53,7 +83,7 @@ export function guardHooks(launch: ManagedLaunch): HookCallbackMatcher[] {
 
 /** Tier A Claude agent driven through the Claude Agent SDK with streaming input. */
 export class ClaudeRunner implements ManagedRunner {
-  readonly id = `managed:${randomUUID()}`;
+  readonly id: string;
   private sid: string | undefined;
   private status: AgentStatus = 'busy';
   private activity: string | undefined;
@@ -63,10 +93,19 @@ export class ClaudeRunner implements ManagedRunner {
   private readonly input = new AsyncQueue<SDKUserMessage>();
   private readonly abort = new AbortController();
   private readonly q: Query;
+  private readonly meter: UsageMeter;
+  private lastError: string | undefined;
 
-  constructor(private readonly launch: ManagedLaunch, private readonly host: ManagedHost) {
+  constructor(readonly launch: ManagedLaunch, private readonly host: ManagedHost) {
+    this.id = launch.agentId ?? `managed:${randomUUID()}`;
+    this.meter = new UsageMeter(launch.model);
     this.intercepting = launch.intercept ?? false;
-    this.input.push(userMessage(launch.prompt));
+    // Continuing a session without a fork keeps its id, so it is known before the SDK reports it.
+    if (launch.resumeSessionId && launch.fork === false) this.sid = launch.resumeSessionId;
+    if (launch.prompt) this.input.push(userMessage(launch.prompt));
+    else this.status = 'idle';
+    const mcp = claudeSdkMcp(launch);
+    const plugins = sdkPlugins(launch.plugins);
     this.q = query({
       prompt: this.input,
       options: {
@@ -76,9 +115,10 @@ export class ClaudeRunner implements ManagedRunner {
         permissionMode: 'default',
         settingSources: ['user', 'project', 'local'],
         // Secrets in launch.env stay in the environment (inherited by stdio MCP servers), never in argv.
-        env: { ...process.env, ...launch.env, [MANAGED_ENV_FLAG]: '1' } as Record<string, string>,
+        env: { ...process.env, ...launch.env, ...mcp.env, [MANAGED_ENV_FLAG]: '1' } as Record<string, string>,
         ...(launch.model ? { model: launch.model } : {}),
-        ...(launch.mcpServers ? { mcpServers: sdkMcpServers(launch.mcpServers) } : {}),
+        ...(mcp.mcpServers ? { mcpServers: mcp.mcpServers } : {}),
+        ...(plugins ? { plugins } : {}),
         ...(launch.writeRoot || launch.readGuard ? { hooks: { PreToolUse: guardHooks(launch) } } : {}),
         ...(launch.resumeSessionId ? { resume: launch.resumeSessionId, forkSession: launch.fork ?? true } : {}),
         ...(launch.appendSystemPrompt
@@ -92,6 +132,10 @@ export class ClaudeRunner implements ManagedRunner {
 
   get sessionId(): string | undefined {
     return this.sid;
+  }
+
+  get model(): string | undefined {
+    return this.launch.model;
   }
 
   snapshot(): Agent {
@@ -111,6 +155,9 @@ export class ClaudeRunner implements ManagedRunner {
       hooked: false,
       intercepting: this.intercepting,
       canInstruct: this.status !== 'stopped',
+      model: this.meter.model,
+      usage: this.meter.snapshot(),
+      lastError: this.lastError,
     };
   }
 
@@ -140,6 +187,8 @@ export class ClaudeRunner implements ManagedRunner {
   }
 
   private canUseTool: CanUseTool = async (toolName, input, options) => {
+    // A question for the operator is always held for an answer, intercepting or not.
+    if (toolName === ASK_TOOL) return this.askOperator(input, options?.signal);
     if (!this.intercepting) return { behavior: 'allow', updatedInput: input };
     this.status = 'waiting';
     this.publish();
@@ -157,11 +206,28 @@ export class ClaudeRunner implements ManagedRunner {
     return { behavior: 'deny', message: 'No decision from the operator in time; tool call skipped.' };
   };
 
+  /** The operator answers in the tower; the answers ride back in the tool input, as Claude Code's own prompt does. */
+  private async askOperator(input: Record<string, unknown>, signal?: AbortSignal) {
+    this.status = 'waiting';
+    this.publish();
+    const decision = await this.host.requestDecision({
+      agentId: this.id, sessionId: this.sid ?? this.id, toolName: ASK_TOOL, input, origin: 'managed',
+    }, signal);
+    this.status = 'busy';
+    this.publish();
+    if (decision.behavior === 'allow') return { behavior: 'allow' as const, updatedInput: decision.updatedInput ?? input };
+    if (decision.behavior === 'deny') return { behavior: 'deny' as const, message: decision.message };
+    return { behavior: 'deny' as const, message: 'The operator did not answer in time. Continue with your best judgement and say which option you chose.' };
+  }
+
   private async pump(): Promise<void> {
     try {
       for await (const message of this.q) this.handle(message);
     } catch (error) {
-      if (!this.abort.signal.aborted) this.event('error', summarize((error as Error).message));
+      if (!this.abort.signal.aborted) {
+        this.lastError = summarize((error as Error).message, 300);
+        this.event('error', summarize((error as Error).message));
+      }
     } finally {
       this.status = 'stopped';
       this.input.close();
@@ -174,11 +240,19 @@ export class ClaudeRunner implements ManagedRunner {
     if (message.type === 'system' && 'session_id' in message && typeof message.session_id === 'string') {
       this.sid = message.session_id;
     }
+    if (message.type === 'system' && message.subtype === 'init' && typeof message.model === 'string') {
+      this.meter.setModel(message.model);
+    }
     if (message.type === 'assistant') {
+      const sample = claudeUsageSample(message);
+      if (sample) this.meter.addClaude(sample);
       for (const event of normalizeClaudeLine(this.id, message).events) this.event(event.kind, event.summary);
     }
     if (message.type === 'result') {
       this.status = 'idle';
+      const window = this.meter.model ? message.modelUsage?.[this.meter.model]?.contextWindow : undefined;
+      this.meter.setContext(undefined, window);
+      this.lastError = message.subtype === 'success' ? undefined : `Turn ended: ${message.subtype.replace(/_/g, ' ')}`;
       const cost = 'total_cost_usd' in message && typeof message.total_cost_usd === 'number'
         ? ` · $${message.total_cost_usd.toFixed(4)}` : '';
       this.event('status', `turn complete (${message.subtype})${cost}`);

@@ -1,0 +1,14 @@
+/* Context docs panel (Library → Context docs). */
+.docs-drop { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 16px; border: 1.5px dashed var(--line-strong); border-radius: 10px; color: var(--muted); font-size: 13px; background: var(--panel); transition: border-color .15s, background .15s; }
+.docs-drop small { margin-left: auto; font-size: 11px; }
+.docs-drop-over { border-color: #8ea482; background: #eef3e8; }
+.docs-row-icon { flex: none; display: inline-flex; color: var(--muted); }
+.docs-row-open { border-color: #8ea482; }
+.docs-open { display: flex; flex-direction: column; gap: 12px; }
+.docs-open-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.docs-open-head h3 { margin: 0 0 3px; font-size: 15px; }
+.docs-open-head small { color: var(--muted); font-size: 12px; }
+.docs-preview { max-height: 480px; }
+.docs-textarea { max-height: none; min-height: 280px; resize: vertical; }
+.docs-size { color: var(--muted); font-size: 11px; margin-top: -10px; }
+.docs-size-over { color: #b4432f; font-weight: 600; }

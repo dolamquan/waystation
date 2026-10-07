@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { uniqueAgents } from '../../daemon/domain/agentIdentity.ts';
 import {
   WS_PROTOCOL, token, type Agent, type AgentEvent, type PendingInterception, type TeamLogEntry, type TeamView,
 } from './api.ts';
@@ -37,9 +38,9 @@ const INITIAL: TowerState = { connected: false, agents: [], pending: [], hooksIn
 function reduce(state: TowerState, msg: Message): TowerState {
   switch (msg.type) {
     case 'snapshot':
-      return { ...state, agents: msg.agents, pending: msg.pending, hooksInstalled: msg.hooks.installed, teams: msg.teams ?? [] };
+      return { ...state, agents: uniqueAgents(msg.agents), pending: msg.pending, hooksInstalled: msg.hooks.installed, teams: msg.teams ?? [] };
     case 'agents':
-      return { ...state, agents: msg.agents, hooksInstalled: msg.hooks.installed };
+      return { ...state, agents: uniqueAgents(msg.agents), hooksInstalled: msg.hooks.installed };
     case 'pending':
       return { ...state, pending: msg.pending };
     case 'event':

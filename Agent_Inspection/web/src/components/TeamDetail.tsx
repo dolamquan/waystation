@@ -34,6 +34,7 @@ export const TEAM_STATUS_LABEL: Record<TeamView['status'], string> = {
 const sameEntry = (a: TeamLogEntry, b: TeamLogEntry) => a.ts === b.ts && a.summary === b.summary && a.actor === b.actor;
 
 function memberStatus(member: TeamMember, agents: readonly Agent[]): { label: string; pill: string } {
+  if (member.terminal) return { label: 'In your CLI', pill: 'pill-waiting' };
   if (!member.agentId) return { label: 'Not started', pill: 'pill-stopped' };
   const agent = agents.find((a) => a.id === member.agentId);
   if (!agent) return { label: 'Exited', pill: 'pill-stopped' };
@@ -116,6 +117,16 @@ export function TeamDetail({ team, agents, teamLogFeed, now, notify, onSelectAge
     action: async () => notify((await api.mergeMember(team.id, member.id)).message),
   });
 
+  const askOpenCli = (member: TeamMember) => {
+    const cli = member.vendor === 'codex' ? 'Codex' : 'Claude Code';
+    setConfirm({
+      title: `Open ${member.name} in ${cli}?`,
+      body: `Waystation stops its copy of ${member.name} and opens the same session in ${cli} in a new terminal tab, with its team tools. The team won't wake ${member.name} while it is open there; messages wait. Close the session (or use Take back) and ${member.name} rejoins the team where it left off. ${member.name} must be idle.`,
+      label: `Open in ${cli}`,
+      action: async () => notify((await api.openCli(member.agentId!)).message),
+    });
+  };
+
   const askDisband = () => setConfirm({
     title: `Disband ${team.name}?`,
     body: 'Stops every member agent. Unmerged branches are kept, so no work is lost.',
@@ -141,6 +152,7 @@ export function TeamDetail({ team, agents, teamLogFeed, now, notify, onSelectAge
           {team.statusReason && <p className="small muted">{team.statusReason}</p>}
         </div>
         <div className="team-actions">
+          <button className="btn btn-small" disabled={!!busy || team.status === 'disbanded'} title="Open a Claude Code session that can read and steer this team" onClick={() => void run('operator', async () => notify((await api.openTeamOperator(team.id)).message))}><Icon name="terminal" size={14} />Open in Claude Code</button>
           {team.status === 'running' && <button className="btn btn-small" disabled={!!busy} onClick={() => void run('pause', () => api.pauseTeam(team.id), 'Team paused.')}><Icon name="pause" size={14} />Pause</button>}
           {canResume && <button className="btn btn-small btn-ok" disabled={!!busy} onClick={() => void run('resume', () => api.resumeTeam(team.id), 'Team resumed.')}><Icon name="play" size={14} />Resume</button>}
           <button className="btn btn-small btn-danger" disabled={!!busy} onClick={askDisband}>Disband</button>
@@ -172,6 +184,16 @@ export function TeamDetail({ team, agents, teamLogFeed, now, notify, onSelectAge
                 {member.agentId && agents.some((a) => a.id === member.agentId) && (
                   <button className="btn btn-small btn-ghost" onClick={() => onSelectAgent(member.agentId!)}>Open</button>
                 )}
+                {member.terminal
+                  ? <button className="btn btn-small" disabled={!!busy} title="Bring this member back to the team now" onClick={() => setConfirm({
+                    title: `Take ${member.name} back?`,
+                    body: `Close ${member.name}'s CLI tab first if it is still open. Taking it back while that session keeps running would leave two copies of ${member.name} working on the same conversation. The old tab loses team access either way.`,
+                    label: 'Take back',
+                    action: async () => notify((await api.returnMember(team.id, member.id)).message),
+                  })}>Take back</button>
+                  : member.agentId && agents.some((a) => a.id === member.agentId && a.sessionId) && (
+                    <button className="btn btn-small" disabled={!!busy} title={`Continue this member's session in the real ${member.vendor === 'codex' ? 'Codex' : 'Claude Code'} CLI`} onClick={() => askOpenCli(member)}><Icon name="terminal" size={13} />CLI</button>
+                  )}
                 <button className="btn btn-small" disabled={!!busy} onClick={() => openDiff(member)}>{busy === `diff:${member.id}` ? 'Loading…' : 'Diff'}</button>
                 <button className="btn btn-small btn-ok" disabled={!!busy || member.merged} onClick={() => askMerge(member)}>Merge</button>
               </div>

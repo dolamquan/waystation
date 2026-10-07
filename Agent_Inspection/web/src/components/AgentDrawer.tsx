@@ -1,17 +1,21 @@
 ﻿import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { api, type Agent, type AgentEvent, type SkillSummary } from '../api.ts';
+import { api, request, type Agent, type AgentEvent, type SkillSummary } from '../api.ts';
+import type { ContextDoc } from '../library/loadoutApi.ts';
 import { currentActivity, filterActivity, mergeActivity, readableTime, sessionSource, type ActivityFilter } from '../activity.ts';
-import { characterFor } from '../crew.ts';
 import { STATUS_LABEL, VENDOR_LABEL } from '../format.ts';
 import { ActivityFeed } from './ActivityFeed.tsx';
+import { AgentManage } from './AgentManage.tsx';
+import { AgentRelationships } from './AgentRelationships.tsx';
 import { CrewAvatar } from './CrewAvatar.tsx';
+import { DocPicker } from './DocPicker.tsx';
 import { Confirm } from './Modal.tsx';
 import { SkillPicker } from './SkillPicker.tsx';
 import { Icon } from './Icon.tsx';
 
 interface AgentDrawerProps {
   readonly agent: Agent;
+  readonly agents?: readonly Agent[];
   readonly hooksInstalled: boolean;
   readonly lastEvent?: AgentEvent;
   readonly now: number;
@@ -21,14 +25,14 @@ interface AgentDrawerProps {
 }
 
 type Tab = 'overview' | 'activity' | 'details';
-type Composer = 'message' | 'followup' | 'skills' | undefined;
+type Composer = 'message' | 'followup' | 'skills' | 'docs' | undefined;
 type Pending = { title: string; body: string; label: string; danger?: boolean; action: () => Promise<void> };
 type NumberedEvent = AgentEvent & { readonly seq: number };
 let nextSeq = 0;
 const numbered = (event: AgentEvent): NumberedEvent => ({ ...event, seq: nextSeq++ });
 const TABS: readonly Tab[] = ['overview', 'activity', 'details'];
 
-export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, onSelect, notify }: AgentDrawerProps) {
+export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now, onClose, onSelect, notify }: AgentDrawerProps) {
   const uid = useId();
   const scrollArea = useRef<HTMLDivElement>(null);
   const [events, setEvents] = useState<NumberedEvent[]>([]);
@@ -102,7 +106,6 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
   const canIntercept = !ended && isClaude && (agent.tier === 'A' || (agent.tier === 'B' && hooksInstalled));
   const canMessage = agent.canInstruct && !ended;
   const stopReason = agent.stopBlockedReason ?? (ended ? 'This session has already ended.' : undefined);
-  const character = characterFor(agent.id);
   const messages = useMemo(() => filterActivity(events, 'messages'), [events]);
   const visibleEvents = useMemo(() => filterActivity(events, filter).filter(event =>
     event.summary.toLowerCase().includes(search.trim().toLowerCase()),
@@ -124,9 +127,36 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
     },
   });
 
+  const pickDoc = (doc: ContextDoc) => setConfirm({
+    title: `Send ${doc.title} to ${agent.name}?`,
+    body: 'The agent is told to read this context doc before it carries on with its task.',
+    label: 'Send doc',
+    action: async () => {
+      const sent = await run('doc', () => request<{ ok: true }>('POST', `/api/agents/${encodeURIComponent(agent.id)}/docs`, { docId: doc.id }), `Sent ${doc.title}`);
+      if (sent) setComposer(undefined);
+    },
+  });
+
+  const cliName = agent.vendor === 'codex' ? 'Codex' : 'Claude Code';
+  // Agents launched here move into the CLI; sessions running elsewhere (your own) open as a copy.
+  const handsOff = agent.tier === 'A';
+  const canOpenInCli = !ended && !agent.inTerminal && !!agent.sessionId && agent.vendor !== 'other' && (handsOff || !!agent.cwd);
+  const confirmCli = () => setConfirm(handsOff ? {
+    title: `Continue in ${cliName}?`,
+    body: `Waystation stops its copy of this agent and opens the same conversation in ${cliName} in a new terminal tab, where you use it like any ${cliName} session (/usage, /model and so on). The agent must be idle. Team members rejoin their team when you close that session.`,
+    label: `Open in ${cliName}`,
+    action: async () => { if (await run('cli', () => api.openCli(agent.id), `Opened in ${cliName}`)) onClose(); },
+  } : {
+    title: `Open in ${cliName}?`,
+    body: `Opens this conversation in ${cliName} in a new terminal tab, where you use it like any ${cliName} session (/usage, /model and so on). This session keeps running where it is, so the new tab is a copy: from here on the two are separate.`,
+    label: `Open in ${cliName}`,
+    action: async () => { await run('cli', () => api.openCli(agent.id), `Opened in ${cliName}`); },
+  });
+
   const confirmStop = () => setConfirm({
     title: `Stop ${agent.name}?`,
-    body: agent.tier === 'A' ? 'This ends the managed agent session and cancels its current task.' : 'This ends the agent process and its child processes. Any unsaved work in that session will be lost.',
+    body: agent.inTerminal ? `This closes its ${cliName} session in your terminal and ends the agent. It won't come back to Waystation.`
+      : agent.tier === 'A' ? 'This ends the managed agent session and cancels its current task.' : 'This ends the agent process and its child processes. Any unsaved work in that session will be lost.',
     label: 'Stop agent',
     danger: true,
     action: async () => { await run('stop', () => api.stop(agent.id), 'Agent stopped'); },
@@ -150,9 +180,9 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
         <div className="detail-header-top"><span>Agent details</span><button className="icon-btn" onClick={onClose} aria-label="Close details"><Icon name="close" size={18} /></button></div>
         <div className="detail-identity">
           <span className="detail-avatar"><CrewAvatar id={agent.id} status={agent.status} size={48} animated={false} /></span>
-          <div><h2>{agent.name}</h2><p>{character.name}<span>·</span>{VENDOR_LABEL[agent.vendor]}<span>·</span>{sessionSource(agent)}</p></div>
+          <div><h2>{agent.name}</h2><p>{VENDOR_LABEL[agent.vendor]}<span>·</span>{sessionSource(agent)}</p></div>
         </div>
-        <div className="detail-status"><span className={`status-pill pill-${agent.status}`}>{STATUS_LABEL[agent.status]}</span><span className="detail-access-label"><Icon name={agent.tier === 'C' ? 'info' : 'shield'} size={14} />{agent.tier === 'A' ? 'Managed session' : agent.tier === 'B' && hooksInstalled ? 'Hooks connected' : 'Activity only'}</span></div>
+        <div className="detail-status"><span className={`status-pill pill-${agent.inTerminal ? 'waiting' : agent.status}`}>{agent.inTerminal ? 'In your terminal' : STATUS_LABEL[agent.status]}</span><span className="detail-access-label"><Icon name={agent.tier === 'C' ? 'info' : 'shield'} size={14} />{agent.tier === 'A' ? 'Managed session' : agent.tier === 'B' && hooksInstalled ? 'Hooks connected' : 'Activity only'}</span></div>
       </header>
 
       <nav className="detail-tabs" role="tablist" aria-label="Agent sections">
@@ -163,10 +193,13 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
         {tab === 'overview' && <div className="detail-overview">
           <div className="detail-project"><Icon name="folder" size={17} /><div><span>Project</span><strong>{agent.project || 'Unknown project'}</strong></div><span className="detail-last-seen">{readableTime(agent.lastEventAt ?? agent.startedAt, now)}</span></div>
           <div className={`detail-now detail-now-${agent.status}`}><span className="detail-section-label">{ended ? 'Session ended' : 'Right now'}</span><p>{currentActivity(agent, newest)}</p></div>
+          <AgentRelationships agent={agent} agents={agents} onSelect={onSelect} />
+          <AgentManage agent={agent} notify={notify} />
+          {agent.inTerminal && <div className="detail-access-note"><Icon name="terminal" size={18} /><div><strong>Open in your terminal</strong><p>Work with it there in {cliName}. When you close that terminal, it comes back here and waits for instructions. Only Stop ends it.</p></div></div>}
 
           {!canMessage && !ended && <div className="detail-access-note"><Icon name="info" size={18} /><div><strong>{agent.tier === 'B' && !hooksInstalled ? 'Connect this Claude Code session' : 'This session runs outside Waystation'}</strong><p>{agent.tier === 'B' && !hooksInstalled ? 'Install hooks from the top bar to send messages and review tool calls.' : 'You can follow its activity here. To send a message, use the app where you started it.'}</p><button onClick={() => setTab('activity')}>View activity<Icon name="arrow" size={13} /></button></div></div>}
 
-          {canMessage && composer !== 'followup' && composer !== 'skills' && <form className="detail-composer" onSubmit={e => {
+          {canMessage && composer !== 'followup' && composer !== 'skills' && composer !== 'docs' && <form className="detail-composer" onSubmit={e => {
             e.preventDefault();
             void run('message', () => api.instruct(agent.id, message.trim()), 'Message sent').then(ok => { if (ok) setMessage(''); });
           }}>
@@ -175,9 +208,11 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
             <div className="composer-footer"><span>{agent.tier === 'B' ? 'Delivered after the next tool call.' : isClaude ? 'Sent to this running session.' : 'Delivered between turns.'}</span><button className="btn btn-go" type="submit" disabled={!!busy || !message.trim()}><Icon name="send" size={15} />{busy === 'message' ? 'Sending…' : 'Send message'}</button></div>
           </form>}
 
-          {agent.cwd && <div className="detail-action-list">
+          {(canOpenInCli || agent.cwd || canMessage) && <div className="detail-action-list">
+            {canOpenInCli && <button className="detail-action" onClick={confirmCli} disabled={!!busy}><span className="detail-action-icon"><Icon name="terminal" size={19} /></span><span><strong>{busy === 'cli' ? 'Opening…' : handsOff ? `Continue in ${cliName}` : `Open in ${cliName}`}</strong><small>{handsOff ? `Move this session into the real ${cliName} CLI, with /usage, /model and everything else.` : `Open this conversation in the real ${cliName} CLI, as a copy. This session keeps running.`}</small></span><Icon name="chevronRight" size={16} /></button>}
             {agent.cwd && <button className={`detail-action ${composer === 'followup' ? 'detail-action-selected' : ''}`} onClick={() => openComposer('followup')} aria-expanded={composer === 'followup'} disabled={!!busy}><span className="detail-action-icon"><Icon name="plus" size={19} /></span><span><strong>Start a follow-up</strong><small>Create another agent for a new task in this project.</small></span><Icon name="chevronRight" size={16} /></button>}
             {agent.cwd && <button className={`detail-action ${composer === 'skills' ? 'detail-action-selected' : ''}`} onClick={() => openComposer('skills')} aria-expanded={composer === 'skills'} disabled={!!busy}><span className="detail-action-icon"><Icon name="book" size={19} /></span><span><strong>Project skills</strong><small>Add reusable instructions for Claude agents.</small></span><Icon name="chevronRight" size={16} /></button>}
+            {canMessage && <button className={`detail-action ${composer === 'docs' ? 'detail-action-selected' : ''}`} onClick={() => openComposer('docs')} aria-expanded={composer === 'docs'} disabled={!!busy}><span className="detail-action-icon"><Icon name="list" size={19} /></span><span><strong>Send a context doc</strong><small>Give this agent a Library .md file to read before it continues.</small></span><Icon name="chevronRight" size={16} /></button>}
           </div>}
 
           {composer === 'followup' && <form className="detail-followup" onSubmit={e => {
@@ -197,6 +232,8 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
 
           {composer === 'skills' && <section className="detail-skill-panel"><div className="detail-form-heading"><h3>Choose a skill</h3><button className="icon-btn" onClick={() => setComposer(undefined)} aria-label="Close skills"><Icon name="close" size={15} /></button></div><p>Skills are saved to this project’s Claude skills folder.</p><SkillPicker onPick={pickSkill} /></section>}
 
+          {composer === 'docs' && <section className="detail-skill-panel"><div className="detail-form-heading"><h3>Choose a context doc</h3><button className="icon-btn" onClick={() => setComposer(undefined)} aria-label="Close context docs"><Icon name="close" size={15} /></button></div><p>The agent reads it before it carries on. Manage docs in the Library.</p><DocPicker onPick={pickDoc} /></section>}
+
           {actionError && <p className="detail-action-error" role="alert">{actionError}</p>}
 
           {canIntercept && <section className="detail-review"><div><strong>Review tool calls</strong><p>{agent.intercepting ? 'Tool calls wait for your approval before running.' : 'Pause tool calls when they need your approval.'}</p></div><button className="detail-switch" role="switch" aria-label="Review tool calls" aria-checked={agent.intercepting} disabled={!!busy} onClick={() => void run('review', () => api.intercept(agent.id, !agent.intercepting), agent.intercepting ? 'Tool review off' : 'Tool review on')}><span /></button></section>}
@@ -205,7 +242,7 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
             {loading && !messages.length ? <p className="detail-empty-text">Loading activity…</p> : messages.length ? <ActivityFeed events={messages.slice(-3)} now={now} /> : <p className="detail-empty-text">{loadError ? 'Activity couldn’t be loaded. Open Activity to try again.' : 'Messages from this session will appear here.'}</p>}
           </section>
 
-          {(agent.tier === 'A' || !stopReason) && !ended && <details className="detail-session-controls"><summary>Session controls<Icon name="chevronDown" size={15} /></summary><p>Interrupt a task or end the session.</p><div>{agent.tier === 'A' && <button className="btn" onClick={() => void run('interrupt', () => api.interrupt(agent.id), 'Task interrupted')} disabled={!!busy}>{busy === 'interrupt' ? 'Interrupting…' : 'Interrupt task'}</button>}{!stopReason && <button className="btn btn-danger" onClick={confirmStop} disabled={!!busy}>Stop agent</button>}</div></details>}
+          {(agent.tier === 'A' || !stopReason) && !ended && <details className="detail-session-controls"><summary>Session controls<Icon name="chevronDown" size={15} /></summary><p>Interrupt a task or end the session.</p><div>{agent.tier === 'A' && !agent.inTerminal && <button className="btn" onClick={() => void run('interrupt', () => api.interrupt(agent.id), 'Task interrupted')} disabled={!!busy}>{busy === 'interrupt' ? 'Interrupting…' : 'Interrupt task'}</button>}{!stopReason && <button className="btn btn-danger" onClick={confirmStop} disabled={!!busy}>Stop agent</button>}</div></details>}
         </div>}
 
         {tab === 'activity' && <section className="detail-activity">
@@ -223,7 +260,7 @@ export function AgentDrawer({ agent, hooksInstalled, lastEvent, now, onClose, on
             if (!navigator.clipboard) { notify('Clipboard access is unavailable in this browser.', 'error'); return; }
             void navigator.clipboard.writeText(agent.cwd!).then(() => notify('Folder path copied'), () => notify('Could not copy the path. You can select it below.', 'error'));
           }}><Icon name="copy" size={14} />Copy path</button>}</div><p>{agent.cwd ?? 'No project folder was recorded for this session.'}</p></section>
-          <section className="detail-capabilities"><h3>Available here</h3><ul><li><Icon name="check" size={16} /><span>View recorded activity</span></li>{agent.cwd && <><li><Icon name="check" size={16} /><span>Create a follow-up agent</span></li><li><Icon name="check" size={16} /><span>Add Claude project skills</span></li></>}{canMessage && <li><Icon name="check" size={16} /><span>Send messages</span></li>}{canIntercept && <li><Icon name="check" size={16} /><span>Review tool calls</span></li>}{!stopReason && <li><Icon name="check" size={16} /><span>Stop this agent</span></li>}</ul></section>
+          <section className="detail-capabilities"><h3>Available here</h3><ul><li><Icon name="check" size={16} /><span>View recorded activity</span></li>{agent.cwd && <><li><Icon name="check" size={16} /><span>Create a follow-up agent</span></li><li><Icon name="check" size={16} /><span>Add Claude project skills</span></li></>}{canMessage && <><li><Icon name="check" size={16} /><span>Send messages</span></li><li><Icon name="check" size={16} /><span>Send context docs</span></li></>}{canIntercept && <li><Icon name="check" size={16} /><span>Review tool calls</span></li>}{!stopReason && <li><Icon name="check" size={16} /><span>Stop this agent</span></li>}</ul></section>
           {stopReason && <div className="detail-stop-note"><Icon name="info" size={18} /><div><strong>{ended ? 'Session ended' : 'Stopping this session'}</strong><p>{stopReason}</p></div></div>}
           <details className="detail-technical"><summary>Technical details<Icon name="chevronDown" size={15} /></summary><dl><dt>Session ID</dt><dd>{agent.sessionId ?? agent.id}</dd><dt>Source</dt><dd>{agent.source}</dd></dl></details>
         </section>}

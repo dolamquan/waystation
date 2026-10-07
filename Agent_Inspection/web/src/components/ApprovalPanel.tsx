@@ -20,15 +20,106 @@ export function ApprovalPanel({ pending, agents, notify }: ApprovalPanelProps) {
           exit={{ opacity: 0, height: 0 }}
           aria-label="Pending approvals"
         >
-          <h2 className="approvals-title"><span className="dot-alert" /> {pending.length} tool call{pending.length > 1 ? 's' : ''} waiting for you</h2>
+          <h2 className="approvals-title"><span className="dot-alert" /> {pending.length} {pending.length > 1 ? 'items' : 'item'} waiting for you</h2>
           <AnimatePresence initial={false}>
-            {pending.map((item) => (
-              <ApprovalItem key={item.id} item={item} agent={agents.find((a) => a.id === item.agentId)} notify={notify} />
-            ))}
+            {pending.map((item) => item.toolName === ASK_TOOL
+              ? <QuestionItem key={item.id} item={item} agent={agents.find((a) => a.id === item.agentId)} notify={notify} />
+              : <ApprovalItem key={item.id} item={item} agent={agents.find((a) => a.id === item.agentId)} notify={notify} />)}
           </AnimatePresence>
         </motion.section>
       )}
     </AnimatePresence>
+  );
+}
+
+/** Claude Code's "ask the user" tool: managed agents ask here, since they have no terminal. */
+const ASK_TOOL = 'AskUserQuestion';
+const OTHER = '__other__';
+
+interface Question {
+  readonly question: string;
+  readonly header?: string;
+  readonly multiSelect?: boolean;
+  readonly options: ReadonlyArray<{ readonly label: string; readonly description?: string }>;
+}
+
+function questionsOf(input: Record<string, unknown>): Question[] {
+  const raw = Array.isArray(input.questions) ? input.questions : [];
+  return raw.flatMap((q): Question[] => {
+    const question = q as Partial<Question>;
+    if (typeof question.question !== 'string') return [];
+    const options = Array.isArray(question.options) ? question.options.filter((o) => typeof o?.label === 'string') : [];
+    return [{ question: question.question, header: question.header, multiSelect: question.multiSelect === true, options }];
+  });
+}
+
+/** One agent question, answered by picking options (or typing another answer). */
+function QuestionItem({ item, agent, notify }: ApprovalItemProps) {
+  const questions = questionsOf(item.input);
+  const [picked, setPicked] = useState<Record<string, readonly string[]>>({});
+  const [other, setOther] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (q: Question, label: string) => setPicked((prev) => {
+    const current = prev[q.question] ?? [];
+    const next = q.multiSelect
+      ? (current.includes(label) ? current.filter((l) => l !== label) : [...current, label])
+      : [label];
+    return { ...prev, [q.question]: next };
+  });
+
+  const answerFor = (q: Question): string => (picked[q.question] ?? [])
+    .map((label) => (label === OTHER ? (other[q.question] ?? '').trim() : label))
+    .filter(Boolean)
+    .join(', ');
+  const complete = questions.length > 0 && questions.every((q) => answerFor(q));
+
+  const send = async (decision: Parameters<typeof api.decide>[1], done: string) => {
+    setBusy(true);
+    try {
+      await api.decide(item.id, decision);
+      notify(done);
+    } catch (error) {
+      notify((error as Error).message, 'error');
+      setBusy(false);
+    }
+  };
+
+  const submit = () => {
+    const answers = Object.fromEntries(questions.map((q) => [q.question, answerFor(q)]));
+    void send({ behavior: 'allow', updatedInput: { ...item.input, answers } }, 'Answer sent');
+  };
+
+  return (
+    <motion.article layout className="approval approval-question" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+      <header className="approval-head">
+        <strong>Question from {agent?.name ?? item.agentId}</strong>
+        <span className="muted"> · {agent?.project ?? ''}</span>
+      </header>
+      {questions.map((q) => (
+        <fieldset key={q.question} className="question">
+          <legend>{q.header && <span className="question-chip">{q.header}</span>}{q.question}</legend>
+          <div className="question-options">
+            {[...q.options, { label: OTHER, description: 'Type your own answer' }].map((option) => {
+              const on = (picked[q.question] ?? []).includes(option.label);
+              return (
+                <button type="button" key={option.label} className={`question-option ${on ? 'question-option-on' : ''}`} aria-pressed={on} onClick={() => toggle(q, option.label)} disabled={busy}>
+                  <strong>{option.label === OTHER ? 'Other' : option.label}</strong>
+                  {option.description && <small>{option.description}</small>}
+                </button>
+              );
+            })}
+          </div>
+          {(picked[q.question] ?? []).includes(OTHER) && (
+            <input className="text-input" value={other[q.question] ?? ''} onChange={(e) => setOther((prev) => ({ ...prev, [q.question]: e.target.value }))} placeholder="Your answer" aria-label={`Your answer to: ${q.question}`} autoFocus />
+          )}
+        </fieldset>
+      ))}
+      <div className="approval-actions">
+        <button className="btn btn-go" disabled={busy || !complete} onClick={submit}>Send answer</button>
+        <button className="btn btn-ghost" disabled={busy} onClick={() => void send({ behavior: 'deny', message: 'The operator chose not to answer. Use your best judgement and say which option you chose.' }, 'Skipped; the agent will decide')}>Let the agent decide</button>
+      </div>
+    </motion.article>
   );
 }
 

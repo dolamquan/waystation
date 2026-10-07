@@ -1,0 +1,19 @@
+/* MCP & plugins tab of the Library. Builds on ops.css (ops-section, ops-row, ops-form) and styles.css (form, text-input, btn). */
+.int-presets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.int-preset { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.int-preset p { margin: 0; color: var(--muted); font-size: 12px; flex: 1; }
+.int-preset .btn { align-self: flex-start; }
+.int-tag { font: 10px var(--mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.int-switch-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.int-test { font-size: 12px; overflow-wrap: anywhere; }
+.int-test-ok { color: #355a40; }
+.int-test-fail { color: var(--danger); }
+.int-pairs { display: flex; flex-direction: column; gap: 8px; }
+.int-pair { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) auto; gap: 8px; align-items: center; }
+.int-hint { color: var(--muted); font-size: 11px; margin: 0; }
+.int-output { margin: 0; max-height: 160px; overflow: auto; white-space: pre-wrap; font: 11px var(--mono); color: var(--muted); }
+.int-browse { max-height: 420px; overflow-y: auto; }
+@media (max-width: 640px) {
+  .int-pair { grid-template-columns: 1fr; }
+  .ops-row { flex-wrap: wrap; }
+}

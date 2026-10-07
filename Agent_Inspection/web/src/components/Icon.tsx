@@ -26,6 +26,8 @@ const paths = {
   chevronRight: 'm9 6 6 6-6 6',
   zoom: 'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0M10 6v8M6 10h8',
   fit: 'M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5',
+  expand: 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7',
+  collapse: 'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7',
   message: 'M21 11a8 8 0 0 1-8 8H7l-5 3 2-6a8 8 0 0 1-1-5 8 8 0 0 1 8-8h2a8 8 0 0 1 8 8ZM7 9h10M7 13h6',
   send: 'm22 2-7 20-4-9L2 9l20-7ZM11 13 22 2',
   chevronDown: 'm6 9 6 6 6-6',
@@ -33,6 +35,8 @@ const paths = {
   book: 'M12 5v16M12 5Q7 2 2 5v15q5-3 10 1 5-4 10-1V5q-5-3-10 0',
   refresh: 'M20 7V2M20 7h-5M4 17v5M4 17h5M20 7a9 9 0 0 0-15-3M4 17a9 9 0 0 0 15 3',
   info: 'M12 11v6M12 7h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+  clock: 'M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+  trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
 } as const;
 
 export function Icon({ name, size = 18, style }: { readonly name: keyof typeof paths; readonly size?: number; readonly style?: CSSProperties }) {

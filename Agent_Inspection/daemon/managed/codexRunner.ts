@@ -8,6 +8,8 @@ import type { Agent, AgentStatus, EventKind } from '../domain/types.ts';
 import { describeToolInput, projectName, summarize } from '../domain/text.ts';
 import type { ManagedHost, ManagedLaunch, ManagedRunner } from './types.ts';
 import { stopProcessTree } from '../actions/kill.ts';
+import { UsageMeter, codexExecTurnUsage } from '../usage/usageMeter.ts';
+import { codexMcpArgs, codexRemoteMcpArgs, remoteHeaderPlan } from './cliCommands.ts';
 
 /** Resolve the npm-installed Codex CLI entry so we can spawn it without a shell. */
 export function resolveCodexEntry(): string | undefined {
@@ -21,29 +23,7 @@ export function resolveCodexEntry(): string | undefined {
 
 type Json = Record<string, unknown>;
 
-/** TOML-safe literal: JSON strings and string arrays are valid TOML basic strings/arrays. */
-const toml = (value: string | readonly string[]) => JSON.stringify(value);
-const tomlTable = (env: Readonly<Record<string, string>>) =>
-  `{${Object.entries(env).map(([key, value]) => `${key}=${toml(value)}`).join(', ')}}`;
-
-/** `-c` overrides that register stdio MCP servers for this run, auto-approving their tools. */
-export function codexMcpArgs(servers: ManagedLaunch['mcpServers']): string[] {
-  return Object.entries(servers ?? {}).flatMap(([name, server]) => {
-    const envNames = [...Object.keys(server.env), ...(server.inheritEnv ?? [])];
-    if (!/^[A-Za-z0-9_-]+$/.test(name) || !envNames.every((key) => /^[A-Za-z0-9_]+$/.test(key))) {
-      throw new Error(`invalid MCP server config for "${name}"`);
-    }
-    const prefix = `mcp_servers.${name}`;
-    return [
-      '-c', `${prefix}.command=${toml(server.command)}`,
-      '-c', `${prefix}.args=${toml(server.args)}`,
-      '-c', `${prefix}.env=${tomlTable(server.env)}`,
-      // Secrets travel in the codex process environment and are forwarded by name, never on argv.
-      ...(server.inheritEnv?.length ? ['-c', `${prefix}.env_vars=${toml(server.inheritEnv)}`] : []),
-      '-c', `${prefix}.default_tools_approval_mode="approve"`,
-    ];
-  });
-}
+export { codexMcpArgs, codexRemoteMcpArgs } from './cliCommands.ts';
 
 export function codexArgs(entry: string, launch: ManagedLaunch, threadId?: string): string[] {
   const options = [
@@ -52,10 +32,16 @@ export function codexArgs(entry: string, launch: ManagedLaunch, threadId?: strin
     ...(launch.model ? ['-m', launch.model] : []),
     ...(launch.writeRoot ? ['-c', 'sandbox_mode="workspace-write"'] : []),
     ...codexMcpArgs(launch.mcpServers),
+    ...codexRemoteMcpArgs(launch.remoteMcpServers),
   ];
   return threadId
     ? [entry, 'exec', 'resume', threadId, ...options, '-']
     : [entry, 'exec', ...options, '-C', launch.cwd, '-'];
+}
+
+/** The codex process environment: secrets (stdio `inheritEnv`, remote MCP headers) travel here, never on argv. */
+export function codexEnv(launch: ManagedLaunch, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...base, ...launch.env, ...remoteHeaderPlan(launch.remoteMcpServers).env, [MANAGED_ENV_FLAG]: '1' };
 }
 
 /** `codex exec --json` line -> tower event. */
@@ -78,7 +64,7 @@ export function normalizeCodexExecLine(line: Json): { kind: EventKind; summary: 
 
 /** Tier A Codex agent: each turn is a `codex exec` (or `codex exec resume`) process. */
 export class CodexRunner implements ManagedRunner {
-  readonly id = `managed:${randomUUID()}`;
+  readonly id: string;
   private threadId: string | undefined;
   private child: ChildProcess | undefined;
   private status: AgentStatus = 'busy';
@@ -86,13 +72,28 @@ export class CodexRunner implements ManagedRunner {
   private lastEventAt = Date.now();
   private readonly startedAt = Date.now();
   private stopped = false;
+  private readonly meter: UsageMeter;
+  private lastError: string | undefined;
 
-  constructor(private readonly launch: ManagedLaunch, private readonly host: ManagedHost, private readonly entry: string) {
-    this.runTurn(launch.prompt);
+  constructor(readonly launch: ManagedLaunch, private readonly host: ManagedHost, private readonly entry: string) {
+    this.id = launch.agentId ?? `managed:${randomUUID()}`;
+    this.meter = new UsageMeter(launch.model);
+    // Continuing an earlier thread (e.g. back from the operator's terminal): its first turn already had the briefing.
+    this.threadId = launch.resumeSessionId;
+    if (launch.prompt) {
+      this.runTurn(launch.prompt);
+      return;
+    }
+    this.status = 'idle';
+    this.publish();
   }
 
   get sessionId(): string | undefined {
     return this.threadId;
+  }
+
+  get model(): string | undefined {
+    return this.launch.model;
   }
 
   snapshot(): Agent {
@@ -113,6 +114,9 @@ export class CodexRunner implements ManagedRunner {
       hooked: false,
       intercepting: false,
       canInstruct: !this.stopped && this.status !== 'busy',
+      model: this.meter.model,
+      usage: this.meter.snapshot(),
+      lastError: this.lastError,
     };
   }
 
@@ -146,7 +150,7 @@ export class CodexRunner implements ManagedRunner {
   private runTurn(prompt: string): void {
     const child = spawn(process.execPath, codexArgs(this.entry, this.launch, this.threadId), {
       cwd: this.launch.cwd,
-      env: { ...process.env, ...this.launch.env, [MANAGED_ENV_FLAG]: '1' },
+      env: codexEnv(this.launch),
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -167,6 +171,7 @@ export class CodexRunner implements ManagedRunner {
     child.on('close', (code) => {
       if (this.child === child) this.child = undefined;
       if (this.stopped) return;
+      if (code !== 0) this.lastError = summarize(stderr.trim() || `codex exited with code ${code}`, 300);
       if (code !== 0 && stderr.trim()) this.event('error', summarize(stderr));
       this.status = 'idle';
       this.publish();
@@ -181,8 +186,14 @@ export class CodexRunner implements ManagedRunner {
     } catch {
       return;
     }
+    const turnUsage = codexExecTurnUsage(parsed);
+    if (turnUsage) {
+      this.meter.addTurn(turnUsage);
+      this.lastError = undefined;
+    }
     const normalized = normalizeCodexExecLine(parsed);
     if (!normalized) return;
+    if (normalized.kind === 'error') this.lastError = summarize(normalized.summary, 300);
     if (normalized.threadId) this.threadId = normalized.threadId;
     this.event(normalized.kind, normalized.summary);
   }

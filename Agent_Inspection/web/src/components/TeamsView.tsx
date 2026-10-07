@@ -3,6 +3,7 @@ import type { Agent, TeamView } from '../api.ts';
 import type { TeamLogItem } from '../useTower.ts';
 import { timeAgo } from '../format.ts';
 import { Icon } from './Icon.tsx';
+import { WorkspaceDoodle } from './WorkspaceDoodle.tsx';
 import { TEAM_STATUS_LABEL, TeamDetail } from './TeamDetail.tsx';
 
 interface TeamsViewProps {
@@ -26,9 +27,9 @@ export function TeamsView({
   if (teams.length === 0) {
     return (
       <motion.div className="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <div className="empty-icon"><Icon name="crew" size={30} /></div>
+        <WorkspaceDoodle kind="team" />
         <h3>No teams yet</h3>
-        <p>A team is a lead plus workers, and each worker can be a different model (Claude or Codex). Every member gets its own git worktree, and they coordinate through a shared channel and task board you can watch here.</p>
+        <p>Bring a lead and a few workers together on one goal. Each gets a separate workspace, with a shared task board and conversation here.</p>
         {connected && <button className="btn btn-go" onClick={onNewTeam}><Icon name="plus" size={16} />Create a team</button>}
       </motion.div>
     );

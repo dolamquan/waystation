@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, type NewTeamMember, type TeamView } from '../api.ts';
+import { MODEL_SUGGESTIONS, modelListId } from '../models.ts';
 import { Icon } from './Icon.tsx';
 import { Modal } from './Modal.tsx';
 
@@ -80,7 +81,7 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
           <input className="text-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Auth refactor" maxLength={60} />
         </label>
         <label>Project folder (absolute path to a git repository)
-          <input className="text-input" value={cwd} onChange={(e) => setCwd(e.target.value)} placeholder="C:\\Users\\you\\project" required />
+          <input className="text-input" value={cwd} onChange={(e) => setCwd(e.target.value)} placeholder="C:\Users\you\project" required />
         </label>
         <label>Goal
           <textarea className="text-input" value={goal} onChange={(e) => setGoal(e.target.value)} rows={4} required placeholder="What should the team deliver? The lead splits this into tasks." />
@@ -115,6 +116,7 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
               <input
                 className="text-input"
                 aria-label={`Member ${index + 1} model`}
+                list={modelListId(member.vendor)}
                 value={member.model ?? ''}
                 onChange={(e) => update(index, { model: e.target.value })}
                 placeholder="default model"
@@ -127,6 +129,11 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
           <button type="button" className="btn btn-small btn-ghost" onClick={add} disabled={members.length >= MAX_MEMBERS}>
             <Icon name="plus" size={14} />Add member
           </button>
+          {(['claude', 'codex'] as const).map((v) => (
+            <datalist key={v} id={modelListId(v)}>
+              {MODEL_SUGGESTIONS[v].map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </datalist>
+          ))}
         </fieldset>
 
         <div className="team-budget">

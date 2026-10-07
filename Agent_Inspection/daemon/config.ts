@@ -15,6 +15,18 @@ export const paths = {
   database: join(TOWER_HOME, 'tower.db'),
   /** Team member worktrees (outside OneDrive, like the rest of the runtime state). */
   teamsDir: join(TOWER_HOME, 'teams'),
+  /** One-time tickets for sessions opened in the operator's terminal (they can hold a team token). */
+  cliTicketsDir: join(TOWER_HOME, 'cli-tickets'),
+  /** Skills created in Waystation, one folder per skill holding SKILL.md. */
+  skillsLibraryDir: join(TOWER_HOME, 'library', 'skills'),
+  /** Context docs (.md) agents read before their task. */
+  docsDir: join(TOWER_HOME, 'library', 'docs'),
+  /** Files attached to schedules as resources, one folder per schedule. */
+  resourcesDir: join(TOWER_HOME, 'library', 'resources'),
+  /** Per-launch generated plugin folders (the skills an agent was given). */
+  loadoutsDir: join(TOWER_HOME, 'loadouts'),
+  /** Secret values (MCP tokens, webhook URLs, SMTP passwords). Never returned by the API. */
+  secretsFile: join(TOWER_HOME, 'secrets.json'),
   claudeHome: process.env.CLAUDE_HOME ?? join(homedir(), '.claude'),
   codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex'),
 } as const;
@@ -36,6 +48,8 @@ export const timings = {
   processScanPollMs: 4000,
   codexLiveWindowMs: 60 * 60 * 1000,
   codexBusyWindowMs: 20 * 1000,
+  /** A finished editor thread has no liveness signal of its own; hide it after this much quiet. */
+  codexIdleWindowMs: 10 * 60 * 1000,
   hookDecisionTimeoutMs: 570_000,
   eventRetentionMs: 7 * 24 * 60 * 60 * 1000,
 } as const;

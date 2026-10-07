@@ -22,6 +22,23 @@ describe('readable session activity', () => {
     expect(merged[1].summary).toBe('Read: app.ts');
   });
 
+  it('excludes full and clipped historical approval reviews while retaining all activity', () => {
+    const review = { risk_level: 'low', user_authorization: 'medium', outcome: 'allow', rationale: 'Local validation. '.repeat(40) };
+    const full = JSON.stringify(review);
+    const events = [
+      event('prompt', 1, full),
+      event('assistant', 2, full),
+      event('assistant', 3, `${full.slice(0, 279)}…`),
+      event('assistant', 4, 'Validation passed.'),
+      event('assistant', 5, '{"outcome":"allow","message":"An ordinary JSON reply"}'),
+      event('assistant', 6, `Example review: ${full}`),
+      event('assistant', 7, JSON.stringify({ ...review, risk_level: 'invalid' })),
+      event('assistant', 8, JSON.stringify({ ...review, outcome: 'approved' })),
+    ];
+    expect(filterActivity(events, 'messages').map(e => e.ts)).toEqual([1, 4, 5, 6, 7, 8]);
+    expect(filterActivity(events, 'all')).toEqual(events);
+  });
+
   it('uses human labels while keeping recorded tool payloads intact', () => {
     const tool = event('tool_call', 1, 'exec: const code = true');
     expect(activityTitle(tool)).toBe('Run a tool');

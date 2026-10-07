@@ -1,7 +1,36 @@
 import type { Agent, AgentEvent, PendingInterception } from '../../daemon/domain/types.ts';
 import type { TeamLogEntry, TeamMember, TeamTask, TeamView } from '../../daemon/teams/types.ts';
+import type { UsageSummary } from '../../daemon/store/db.ts';
+import type { AgentTemplate } from '../../daemon/ops/templates.ts';
+import type { ScheduleView } from '../../daemon/ops/agentOps.ts';
+import type { Prerequisite } from '../../daemon/ops/prerequisites.ts';
+import type { LaunchLoadout, ScheduleNotify, ScheduleResource } from '../../daemon/library/types.ts';
+import type { ScheduleRun } from '../../daemon/ops/schedules.ts';
 
 export type { Agent, AgentEvent, PendingInterception, TeamLogEntry, TeamMember, TeamTask, TeamView };
+export type { AgentTemplate, Prerequisite, ScheduleView, UsageSummary };
+
+export interface NewSchedule {
+  readonly label: string;
+  readonly time: string;
+  readonly days: readonly number[];
+  readonly enabled: boolean;
+  readonly launch: {
+    readonly vendor: 'claude' | 'codex';
+    readonly cwd: string;
+    readonly prompt: string;
+    readonly name?: string;
+    readonly model?: string;
+    readonly appendSystemPrompt?: string;
+    readonly intercept?: boolean;
+    readonly loadout?: LaunchLoadout;
+  };
+  /** Ids may be omitted for new resources; the tower assigns them. */
+  readonly resources?: ReadonlyArray<Omit<ScheduleResource, 'id'> & { readonly id?: string }>;
+  readonly notify?: ScheduleNotify;
+  readonly stopWhenDone?: boolean;
+  readonly maxMinutes?: number;
+}
 
 export interface NewTeamMember {
   readonly name: string;
@@ -65,7 +94,7 @@ export const token = (): string => sessionToken;
 
 export class ApiError extends Error {}
 
-async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+export async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method,
     headers: { 'content-type': 'application/json', 'x-tower-token': token() },
@@ -89,7 +118,12 @@ export const api = {
   attachSkill: (id: string, skillId: string) =>
     request<{ ok: true; target: string }>('POST', `/api/agents/${enc(id)}/skills`, { skillId, confirm: true }),
   skills: () => request<{ skills: SkillSummary[] }>('GET', '/api/skills'),
-  launch: (body: { vendor: 'claude' | 'codex'; cwd: string; prompt: string; name?: string; intercept?: boolean }) =>
+  openTerminal: (kind: 'agent' | 'team', id: string) => request<{ ok: true; command: string }>('POST', '/api/terminal', { kind, id }),
+  openCli: (id: string) => request<{ ok: true; message: string }>('POST', `/api/agents/${enc(id)}/cli`),
+  openTeamOperator: (id: string) => request<{ ok: true; message: string }>('POST', `/api/teams/${enc(id)}/operator-cli`),
+  returnMember: (id: string, member: string) =>
+    request<{ ok: true; message: string }>('POST', `/api/teams/${enc(id)}/members/${enc(member)}/return`),
+  launch: (body: { vendor: 'claude' | 'codex'; cwd: string; prompt: string; name?: string; model?: string; appendSystemPrompt?: string; intercept?: boolean; loadout?: LaunchLoadout }) =>
     request<{ ok: true; agent: Agent }>('POST', '/api/managed', body),
   decide: (id: string, decision: { behavior: 'allow'; updatedInput?: unknown } | { behavior: 'deny'; message: string } | { behavior: 'ask' }) =>
     request<{ ok: true }>('POST', `/api/interceptions/${enc(id)}`, decision),
@@ -106,4 +140,24 @@ export const api = {
     request<{ ok: true; keptBranches: string[] }>('POST', `/api/teams/${enc(id)}/disband`, { confirm: true, removeWorktrees }),
   installHooks: () => request<{ ok: true; backup?: string }>('POST', '/api/hooks/install', { confirm: true }),
   uninstallHooks: () => request<{ ok: true }>('POST', '/api/hooks/uninstall'),
+  // ---- usage, runaway guard, rename, restart, templates, schedules, prerequisites ----
+  usage: (days = 7) => request<{ usage: UsageSummary }>('GET', `/api/usage?days=${days}`),
+  rename: (id: string, name: string) => request<{ ok: true; name: string | null }>('POST', `/api/agents/${enc(id)}/name`, { name }),
+  restart: (id: string, body: { model?: string; message?: string }) =>
+    request<{ ok: true; agent: Agent }>('POST', `/api/agents/${enc(id)}/restart`, { ...body, confirm: true }),
+  resetBreaker: (id: string) => request<{ ok: true }>('POST', `/api/agents/${enc(id)}/breaker/reset`),
+  templates: () => request<{ templates: AgentTemplate[] }>('GET', '/api/templates'),
+  createTemplate: (body: Omit<AgentTemplate, 'id' | 'createdAt'>) => request<{ ok: true; template: AgentTemplate }>('POST', '/api/templates', body),
+  deleteTemplate: (id: string) => request<{ ok: true }>('POST', `/api/templates/${enc(id)}/delete`),
+  schedules: () => request<{ schedules: ScheduleView[] }>('GET', '/api/schedules'),
+  createSchedule: (body: NewSchedule) => request<{ ok: true; schedule: ScheduleView }>('POST', '/api/schedules', body),
+  updateSchedule: (id: string, body: NewSchedule) => request<{ ok: true; schedule: ScheduleView }>('POST', `/api/schedules/${enc(id)}`, body),
+  uploadScheduleResource: (id: string, body: { filename: string; contentBase64: string; label?: string }) =>
+    request<{ ok: true; schedule: ScheduleView }>('POST', `/api/schedules/${enc(id)}/resources/upload`, body),
+  scheduleRuns: (id: string) => request<{ runs: ScheduleRun[] }>('GET', `/api/schedules/${enc(id)}/runs`),
+  setScheduleEnabled: (id: string, enabled: boolean) =>
+    request<{ ok: true; schedule: ScheduleView }>('POST', `/api/schedules/${enc(id)}/enabled`, { enabled }),
+  runSchedule: (id: string) => request<{ ok: true; agent: Agent }>('POST', `/api/schedules/${enc(id)}/run`),
+  deleteSchedule: (id: string) => request<{ ok: true }>('POST', `/api/schedules/${enc(id)}/delete`, { confirm: true }),
+  prerequisites: () => request<{ prerequisites: Prerequisite[] }>('GET', '/api/prerequisites'),
 };

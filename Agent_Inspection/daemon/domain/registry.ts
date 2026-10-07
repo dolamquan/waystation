@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { Agent, AgentEvent } from './types.ts';
+import { uniqueAgents } from './agentIdentity.ts';
 
 const MAX_EVENTS_PER_AGENT = 200;
 const DUPLICATE_EVENT_WINDOW_MS = 2000;
@@ -62,8 +63,7 @@ export class AgentRegistry extends EventEmitter<RegistryEvents> {
         if (!existing || agent.tier < existing.tier) merged.set(agent.id, agent);
       }
     }
-    return [...merged.values()]
-      .map((agent) => ({ ...agent, ...this.overrides.get(agent.id) }))
+    return uniqueAgents([...merged.values()].map(agent => ({ ...agent, ...this.overrides.get(agent.id) })))
       .sort((a, b) => (b.lastEventAt ?? b.startedAt ?? 0) - (a.lastEventAt ?? a.startedAt ?? 0));
   }
 

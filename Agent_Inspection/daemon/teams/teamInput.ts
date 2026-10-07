@@ -1,6 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { EVERYONE, OPERATOR, SYSTEM, type TeamRole, type TeamVendor } from './types.ts';
+import { isValidModelName } from '../managed/modelName.ts';
 
 export class TeamInputError extends Error {}
 
@@ -12,7 +13,6 @@ const MAX_WAKES_LIMIT = 300;
 const DEFAULT_MAX_MINUTES = 60;
 const MAX_MINUTES_LIMIT = 8 * 60;
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,23}$/;
-const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,63}$/;
 const RESERVED_NAMES = new Set([EVERYONE, OPERATOR, SYSTEM]);
 
 export interface MemberInput {
@@ -52,7 +52,7 @@ function parseMember(raw: unknown, index: number): MemberInput {
   const vendor = body.vendor === 'codex' ? 'codex' : body.vendor === 'claude' ? 'claude' : undefined;
   if (!vendor) throw new TeamInputError(`member "${name}": vendor must be claude or codex`);
   const model = text(body.model) || undefined;
-  if (model && !MODEL_PATTERN.test(model)) throw new TeamInputError(`member "${name}": model name looks invalid`);
+  if (model && !isValidModelName(model)) throw new TeamInputError(`member "${name}": model name looks invalid`);
   return { name, role, vendor, model };
 }
 

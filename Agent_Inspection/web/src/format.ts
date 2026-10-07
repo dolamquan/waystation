@@ -19,6 +19,41 @@ export const TIER_LABEL: Record<Agent['tier'], { label: string; hint: string }> 
 
 export const VENDOR_LABEL: Record<Agent['vendor'], string> = { claude: 'Claude', codex: 'Codex', other: 'Agent' };
 
+/** "claude-opus-5-5" → "Opus 5.5"; other ids stay as they are. */
+export function shortModel(model: string | undefined): string | undefined {
+  if (!model) return undefined;
+  const match = /^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d))?(?:-\d{8})?$/.exec(model);
+  if (!match) return model;
+  const [, family, major, minor] = match;
+  return `${family[0].toUpperCase()}${family.slice(1)} ${major}${minor ? `.${minor}` : ''}`;
+}
+
+export function formatUsd(value: number | undefined): string {
+  if (value === undefined) return '—';
+  if (value > 0 && value < 0.01) return '<$0.01';
+  return `$${value.toFixed(2)}`;
+}
+
+export function formatTokens(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return String(value);
+}
+
+/** Share of the context window used by the latest request, 0–100, when both numbers are known. */
+export function contextPercent(agent: Agent): number | undefined {
+  const used = agent.usage?.contextTokens;
+  const window = agent.usage?.contextWindow;
+  return used !== undefined && window ? Math.min(100, Math.round((used / window) * 100)) : undefined;
+}
+
+export const BREAKER_LABEL: Record<NonNullable<Agent['breaker']>['level'], string> = {
+  ok: 'OK',
+  warned: 'Guard warned',
+  constrained: 'Guard: approvals on',
+  stopped: 'Guard stopped it',
+};
+
 export const STATUS_LABEL: Record<Agent['status'], string> = {
   busy: 'Working',
   idle: 'Idle',
@@ -26,3 +61,11 @@ export const STATUS_LABEL: Record<Agent['status'], string> = {
   stopped: 'Stopped',
   unknown: 'Running',
 };
+
+/** "Subagent of <parent>" for a subagent card; undefined for top-level agents. */
+export function subagentOfLabel(agent: Agent): string | undefined {
+  if (!agent.parentId) return undefined;
+  return `Subagent of ${agent.subagent?.parentName ?? 'another session'}`;
+}
+
+export const subagentCountLabel = (count: number): string => `${count} ${count === 1 ? 'subagent' : 'subagents'}`;

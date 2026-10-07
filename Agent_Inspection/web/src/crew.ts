@@ -40,3 +40,39 @@ export function groupCrews(agents: readonly Agent[]) {
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
 }
+
+/** Subagents keyed by their parent's id, oldest first. */
+export function subagentsByParent(agents: readonly Agent[]): ReadonlyMap<string, readonly Agent[]> {
+  const byParent = new Map<string, Agent[]>();
+  for (const agent of agents) {
+    if (agent.parentId) byParent.set(agent.parentId, [...(byParent.get(agent.parentId) ?? []), agent]);
+  }
+  return new Map([...byParent].map(([id, children]) => [id, [...children].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))] as const));
+}
+
+export interface NestedAgent {
+  readonly agent: Agent;
+  /** Shown indented under its parent. */
+  readonly nested: boolean;
+  readonly subagentCount: number;
+  readonly depth: number;
+}
+
+/** Keeps the list order, but moves each subagent directly under its parent (when the parent is listed too). */
+export function nestSubagents(agents: readonly Agent[]): NestedAgent[] {
+  const listed = new Set(agents.map((agent) => agent.id));
+  const children = subagentsByParent(agents.filter((agent) => agent.parentId && listed.has(agent.parentId)));
+  const visited = new Set<string>();
+  const result: NestedAgent[] = [];
+  const visit = (agent: Agent, depth: number) => {
+    if (visited.has(agent.id)) return;
+    visited.add(agent.id);
+    const kids = children.get(agent.id) ?? [];
+    result.push({ agent, nested: depth > 0, depth, subagentCount: kids.length });
+    kids.forEach(child => visit(child, depth + 1));
+  };
+  agents.filter(agent => !agent.parentId || !listed.has(agent.parentId)).forEach(agent => visit(agent, 0));
+  // Incomplete or cyclic relationship metadata must never hide an agent.
+  agents.forEach(agent => visit(agent, 0));
+  return result;
+}

@@ -12,15 +12,23 @@ import { Icon } from './components/Icon.tsx';
 import { AgentWorld } from './components/AgentWorld.tsx';
 import { NewTeamDialog } from './components/NewTeamDialog.tsx';
 import { TeamsView } from './components/TeamsView.tsx';
+import { OpsView } from './components/OpsView.tsx';
+import { LibraryView } from './components/library/LibraryView.tsx';
+import { WorkspaceDoodle, type WorkspaceDoodleKind } from './components/WorkspaceDoodle.tsx';
+import { UpdatesBadge } from './components/library/UpdatesBadge.tsx';
+import { nestSubagents } from './crew.ts';
 
 type Toast = { id: number; text: string; kind: 'ok' | 'error' };
 type Filter = 'all' | 'claude' | 'codex' | 'other';
-type View = 'fleet' | 'attention' | 'teams';
+type View = 'fleet' | 'attention' | 'teams' | 'ops' | 'library';
 const VIEW_TITLE: Record<View, { crumb: string; title: string; subtitle: string }> = {
   fleet: { crumb: 'Overview', title: 'Your workspace', subtitle: 'See what’s running and pick up where you left off.' },
   attention: { crumb: 'Needs attention', title: 'Needs attention', subtitle: 'Sessions waiting for your input or approval.' },
-  teams: { crumb: 'Teams', title: 'Agent teams', subtitle: 'Mixed-model teams working in sandboxed branches, coordinating on a shared board.' },
+  teams: { crumb: 'Teams', title: 'Agent teams', subtitle: 'A shared goal, a task board, and room for everyone’s work.' },
+  ops: { crumb: 'Usage & schedules', title: 'Usage & schedules', subtitle: 'The numbers so far, and what’s on the calendar.' },
+  library: { crumb: 'Library', title: 'The library', subtitle: 'Your shelf of skills, notes and useful tools.' },
 };
+const VIEW_DOODLE: Record<View, WorkspaceDoodleKind> = { fleet: 'desk', attention: 'notice', teams: 'team', ops: 'planner', library: 'books' };
 const TOAST_MS = 4200;
 const CLOCK_MS = 5000;
 
@@ -91,7 +99,7 @@ export function App() {
         {!powered ? (
           <PowerOn key="standby" onReady={() => setPowered(true)} />
         ) : (
-          <motion.div key="tower" className="tower" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+          <motion.div key="tower" className="tower workbench-content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
             <aside className="sidebar">
               <div className="sidebar-brand"><span className="brand-mark"><Icon name="planet" size={24} /></span><div>Waystation<span>Your agent workspace</span></div></div>
               <div className="workspace-label"><span className="workspace-avatar"><Icon name="terminal" size={17} /></span><div>Local workspace<small>This machine</small></div><span className={`connection-dot ${tower.connected ? 'live' : ''}`} /></div>
@@ -100,6 +108,8 @@ export function App() {
                 <button className={view === 'fleet' ? 'nav-active' : ''} aria-current={view === 'fleet' ? 'page' : undefined} onClick={() => { setView('fleet'); setFilter('all'); setQuery(''); }}><Icon name="grid" />Agent overview<span className="nav-count">{counts.total}</span></button>
                 <button className={view === 'attention' ? 'nav-active' : ''} aria-current={view === 'attention' ? 'page' : undefined} onClick={() => { setView('attention'); setFilter('all'); setQuery(''); }}><Icon name="alert" />Needs attention<span className={`nav-count ${counts.attention ? 'nav-alert' : ''}`}>{counts.attention}</span></button>
                 <button className={view === 'teams' ? 'nav-active' : ''} aria-current={view === 'teams' ? 'page' : undefined} onClick={() => setView('teams')}><Icon name="crew" />Teams<span className="nav-count">{tower.teams.length}</span></button>
+                <button className={view === 'ops' ? 'nav-active' : ''} aria-current={view === 'ops' ? 'page' : undefined} onClick={() => setView('ops')}><Icon name="activity" />Usage &amp; schedules</button>
+                <button className={view === 'library' ? 'nav-active' : ''} aria-current={view === 'library' ? 'page' : undefined} onClick={() => setView('library')}><Icon name="book" />Library<UpdatesBadge /></button>
               </nav>
               <div className="sidebar-bottom">
                 <div className="integration-card"><Icon name="link" /><strong>Connect your sessions</strong><p>Use Claude Code hooks to review tools and send instructions.</p><button onClick={() => setHookConfirm(tower.hooksInstalled ? 'uninstall' : 'install')}>{tower.hooksInstalled ? 'Manage hooks' : 'Set up hooks'}<Icon name="arrow" size={15} /></button></div>
@@ -121,12 +131,15 @@ export function App() {
               </div>
             </header>
 
-            <div className="dashboard-content">
+            <div className="dashboard-content" data-view={view}>
               <section className="page-heading">
                 <div><h1>{VIEW_TITLE[view].title}</h1><p>{VIEW_TITLE[view].subtitle}</p></div>
+                <div className="page-heading-tools">
+                <WorkspaceDoodle kind={VIEW_DOODLE[view]} />
                 {view === 'teams'
                   ? <button className="btn btn-go" onClick={() => setShowNewTeam(true)}><Icon name="plus" size={17} />New team</button>
-                  : <button className="btn btn-go" onClick={() => setShowNew(true)}><Icon name="plus" size={17} />New agent</button>}
+                  : (view === 'fleet' || view === 'attention') && <button className="btn btn-go" onClick={() => setShowNew(true)}><Icon name="plus" size={17} />New agent</button>}
+                </div>
               </section>
 
               {view === 'teams' && (
@@ -146,10 +159,12 @@ export function App() {
                   />
                 </>
               )}
-              {view !== 'teams' && <>
-              {view === 'fleet' && <AgentWorld agents={tower.agents} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} />}
+              {view === 'ops' && <OpsView defaultCwd={selected?.cwd} notify={notify} onNewAgent={() => setShowNew(true)} />}
+              {view === 'library' && <LibraryView notify={notify} />}
+              {(view === 'fleet' || view === 'attention') && <>
+              {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={(teamId) => { setView('teams'); setSelectedTeamId(teamId); }} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} />}
 
-              <section className="metric-grid" aria-label="Fleet summary">
+              <section className="metric-grid fleet-metrics" aria-label="Fleet summary">
                 <div className="metric"><div className="metric-label">Total agents<Icon name="grid" /></div><div className="metric-value">{counts.total.toString().padStart(2, '0')}</div><div className="metric-note">Across your local workspace</div></div>
                 <div className="metric"><div className="metric-label">Working now<Icon name="activity" /></div><div className="metric-value">{counts.busy.toString().padStart(2, '0')}<span className="metric-indicator"><span className="connection-dot live" />{counts.busy ? 'Active' : 'Quiet'}</span></div><div className="metric-note">Agents currently on a task</div></div>
                 <button className={`metric metric-button ${counts.waiting ? 'metric-attention' : ''}`} onClick={() => { setView('attention'); setFilter('all'); setQuery(''); }}><div className="metric-label">Pending approvals<Icon name="alert" /></div><div className="metric-value">{counts.waiting.toString().padStart(2, '0')}</div><div className="metric-note">{counts.waiting ? 'Tool calls waiting for your review' : 'No tool calls waiting for review'}<Icon name="arrow" size={14} /></div></button>
@@ -174,8 +189,8 @@ export function App() {
 
             <main className={`grid ${layout === 'list' ? 'agent-list' : ''}`}>
               <AnimatePresence>
-                {agents.map((agent) => (
-                  <AgentCard key={agent.id} agent={agent} selected={agent.id === selectedId} now={now} onSelect={setSelectedId} />
+                {nestSubagents(agents).map(({ agent, nested, depth, subagentCount }) => (
+                  <AgentCard key={agent.id} agent={agent} nested={nested} depth={depth} parentName={tower.agents.find(parent => parent.id === agent.parentId)?.name} subagentCount={subagentCount} selected={agent.id === selectedId} now={now} onSelect={setSelectedId} />
                 ))}
               </AnimatePresence>
               {agents.length === 0 && (
@@ -203,6 +218,7 @@ export function App() {
                 <AgentDrawer
                   key={selected.id}
                   agent={selected}
+                  agents={tower.agents}
                   hooksInstalled={tower.hooksInstalled}
                   lastEvent={tower.lastEvent}
                   now={now}
