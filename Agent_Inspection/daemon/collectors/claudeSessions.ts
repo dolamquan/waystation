@@ -6,6 +6,7 @@ import type { AgentRegistry } from '../domain/registry.ts';
 import { projectName } from '../domain/text.ts';
 import { JsonlTailer } from './jsonlTail.ts';
 import { normalizeClaudeLine } from './normalizers.ts';
+import { activityFromEvent } from '../../shared/plainActivity.ts';
 import { SubagentCollector } from './subagents.ts';
 import { UsageMeter, claudeUsageSample, scanJsonl } from '../usage/usageMeter.ts';
 
@@ -78,6 +79,8 @@ interface SessionState {
   /** The one full pass over the transcript has finished. */
   scanned: boolean;
   title?: string;
+  /** From the first user request; used when Claude Code has not named the session yet. */
+  taskTitle?: string;
   activity?: string;
   lastEventAt?: number;
 }
@@ -112,7 +115,7 @@ export class ClaudeSessionsCollector {
   noteActivity(sessionId: string, event: AgentEvent): void {
     const state = this.sessions.get(sessionId);
     if (!state) return;
-    if (event.kind !== 'status' && event.kind !== 'system') state.activity = event.summary;
+    if (event.kind !== 'status' && event.kind !== 'system') state.activity = activityFromEvent(event);
     state.lastEventAt = event.ts;
   }
 
@@ -184,12 +187,13 @@ export class ClaudeSessionsCollector {
       const sample = claudeUsageSample(line);
       if (sample) state.meter.addClaude(sample);
       this.subagents.noteParentLine(file.sessionId, line);
-      const { events, title } = normalizeClaudeLine(agentId, line);
+      const { events, title, taskTitle } = normalizeClaudeLine(agentId, line);
       if (title) state.title = title;
+      if (taskTitle && !state.taskTitle) state.taskTitle = taskTitle;
       for (const event of events) {
         // With hooks installed, tool calls arrive live from the hook bridge instead.
         if (hooked && event.kind === 'tool_call') continue;
-        state.activity = event.summary;
+        state.activity = activityFromEvent(event);
         state.lastEventAt = event.ts;
         this.deps.registry.pushEvent(event);
       }
@@ -205,7 +209,7 @@ export class ClaudeSessionsCollector {
       id: `claude:${file.sessionId}`,
       vendor: 'claude',
       tier: 'B',
-      name: state?.title ?? file.name ?? `Claude ${file.sessionId.slice(0, 8)}`,
+      name: state?.title ?? file.name ?? state?.taskTitle ?? `Claude · ${projectName(file.cwd)}`,
       sessionId: file.sessionId,
       pid: file.pid,
       cwd: file.cwd,

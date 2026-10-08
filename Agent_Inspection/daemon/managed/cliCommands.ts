@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import type { ManagedLaunch, RemoteMcpServer } from './types.ts';
 
@@ -23,8 +23,23 @@ function checkedSessionId(id: string): string {
   return id;
 }
 
+/**
+ * Smallest file accepted as the native CLI. An npm install whose postinstall did not finish leaves a
+ * few-hundred-byte script at bin/claude.exe that Windows refuses to start (spawn UNKNOWN).
+ */
+const MIN_NATIVE_EXE_BYTES = 1024 * 1024;
+
+/** True for a file big enough to be the real native binary rather than npm's placeholder. */
+export function isNativeExe(path: string): boolean {
+  try {
+    return statSync(path).size >= MIN_NATIVE_EXE_BYTES;
+  } catch {
+    return false;
+  }
+}
+
 /** npm installs ship a native claude.exe behind a .cmd shim, which cannot be started without a shell. */
-export function resolveClaudeExe(env: NodeJS.ProcessEnv = process.env, exists: (path: string) => boolean = existsSync): string | undefined {
+export function resolveClaudeExe(env: NodeJS.ProcessEnv = process.env, exists: (path: string) => boolean = isNativeExe): string | undefined {
   const searchPath = (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean);
   const candidates = [
     env.AGENT_TOWER_CLAUDE_EXE,

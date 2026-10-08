@@ -1,0 +1,174 @@
+/* Team sessions: an overview, a focused workspace, and a compact member roster. */
+.workbench-content .teams-layout { display: flex; flex-direction: column; gap: 22px; }
+.workbench-content .team-list { position: static; display: flex; flex-direction: column; width: 100%; gap: 12px; padding: 0; overflow: visible; }
+.team-list-heading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.team-list-heading strong { font-weight: 600; }
+.team-list-cards { display: flex; gap: 12px; overflow-x: auto; padding: 2px 3px 6px; scrollbar-width: thin; }
+.workbench-content .team-list .team-card { flex: 0 0 300px; min-width: 0; gap: 8px; padding: 16px 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: none; }
+.workbench-content .team-list .team-card:hover { border-color: var(--pencil); background: #faf6fc; }
+.workbench-content .team-list .team-card-on { border-color: #a88ab9; background: #f2eaf7; box-shadow: 0 0 0 3px #e6d9ee; }
+.workbench-content .team-list .team-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.team-card-blocked { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; padding: 2px 8px; border-radius: 20px; background: #fcf0eb; color: #8a4f35; font-size: 11px; font-weight: 600; }
+.workbench-content .team-list .team-card-head > strong { font-size: 15px; overflow-wrap: anywhere; min-width: 0; }
+.workbench-content .team-list .team-card .muted { color: var(--muted); }
+.team-card-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; font-size: 11px; color: var(--muted); }
+.workbench-content .team-detail.team-session { width: 100%; gap: 20px; padding: 26px; border: 1px solid #d7c9df; border-radius: 18px; background: var(--paper); box-shadow: 0 4px 18px #594d6206; }
+.workbench-content .team-session .team-detail-head { align-items: flex-start; gap: 20px; }
+.session-started { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+.workbench-content .team-session .team-detail-head h2 { margin: 0 0 9px; font: 400 30px/1.2 Georgia, serif; gap: 12px; overflow-wrap: anywhere; }
+.workbench-content .team-session .team-goal { font-size: 14px; line-height: 1.7; max-width: 80ch; }
+.workbench-content .team-session .team-actions { flex: 0 0 auto; align-items: center; gap: 8px; }
+.workbench-content .team-session .btn { border-radius: 8px; border-width: 1px; box-shadow: none; }
+.workbench-content .team-session .btn-small { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+.workbench-content .team-session .team-status, .workbench-content .team-list .team-status { border-radius: 20px; padding: 4px 9px; font: 600 11px/1.5 var(--font); }
+.team-session .team-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; margin-right: 5px; }
+.session-menu { position: relative; }
+.session-menu > summary { display: flex; align-items: center; gap: 5px; list-style: none; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; font-size: 12px; min-height: 34px; }
+.session-menu > summary::-webkit-details-marker, .session-member-workspace > summary::-webkit-details-marker { display: none; }
+.session-menu[open] > summary { background: #f2eaf7; }
+.session-menu-items { display: flex; flex-direction: column; gap: 6px; position: absolute; right: 0; top: calc(100% + 8px); z-index: 5; width: 230px; padding: 10px; border: 1px solid var(--line); background: var(--paper); border-radius: 10px; box-shadow: 0 8px 24px #493f511a; }
+.session-menu-items .btn { justify-content: flex-start; }
+.session-menu summary:focus-visible, .session-member-workspace summary:focus-visible, .session-task-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.session-notice { display: flex; align-items: flex-start; gap: 9px; background: #f8edda; border-radius: 9px; padding: 12px 15px; font-size: 13px; color: #7a603b; overflow-wrap: anywhere; }
+.session-notice svg { margin-top: 2px; }
+.session-summary { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #d4dfc5; background: #f2f5e9; border-radius: 10px; padding: 14px 16px; color: #536a41; font-size: 13px; }
+.session-summary p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; }
+.session-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #e7dce7; background: #f9f4ef; border-radius: 12px; }
+.session-stat { min-width: 0; padding: 16px 20px; }
+.session-stat + .session-stat { border-left: 1px solid #e7dce7; }
+.session-stat > span { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+.session-stat > strong { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; margin-top: 8px; font-size: 27px; line-height: 1.2; font-weight: 550; letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
+.session-stat small { font: 400 11px/1.5 var(--font); color: var(--muted); letter-spacing: 0; }
+.workbench-content .team-session .meter { height: 4px; margin-top: 9px; max-width: 160px; }
+.session-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+.session-main { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fffdf9; }
+.session-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); padding: 0 20px; }
+.session-tabs > button { position: relative; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 17px 0; color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; }
+.session-tabs > button[aria-selected='true'] { color: #705080; }
+.session-tabs > button[aria-selected='true']::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; border-radius: 3px 3px 0 0; background: #9b7aaf; }
+.session-count { display: inline-grid; place-items: center; padding: 1px 6px; min-width: 21px; height: 21px; border-radius: 6px; font: 500 11px var(--font); color: var(--muted); background: #eee6f2; }
+.session-channel-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 19px 20px 12px; }
+.session-channel-head > div { display: flex; flex-direction: column; gap: 4px; }
+.session-channel-head strong { font-size: 13px; font-weight: 600; }
+.session-channel-head span { font-size: 12px; color: var(--muted); }
+.session-activity-toggle { display: flex; align-items: center; gap: 5px; flex: none; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+.session-tabs > button:hover { color: #705080; }
+.session-tabs > button:focus-visible, .session-activity-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.session-activity-toggle:hover { border-color: #d0bbdb; color: #705080; }
+.session-activity-toggle[aria-pressed='true'] { background: #eee6f2; color: #705080; border-color: #d0bbdb; }
+.workbench-content .team-session .team-log { height: 360px; max-height: 480px; overflow-y: auto; scrollbar-width: thin; border: 0; border-radius: 0; padding: 4px 20px 16px; background: transparent; gap: 8px; }
+.team-session .tl { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: 10px; font-size: 12px; border: 0; padding: 10px 0; }
+.session-log-avatar, .session-member-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: #eee6f2; color: #856a94; font-size: 12px; font-weight: 650; flex: none; }
+.avatar-claude { background: #f4e4d7; color: #9d654a; }
+.avatar-codex { background: #e4ecdf; color: #587447; }
+.session-log-meta { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.session-log-meta strong { font-size: 12px; font-weight: 600; }
+.session-log-meta > span { color: var(--muted); font-size: 10px; }
+.session-log-meta time { margin-left: auto; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.session-log-body { min-width: 0; }
+.session-log-body p { margin: 6px 0 0; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.team-session .team-log-message .session-log-body { background: #f4eef7; border: 1px solid #e8dfed; border-radius: 0 10px 10px 10px; padding: 10px 12px; }
+.team-session .team-log-system .session-log-body p, .team-session .team-log-activity .session-log-body p { color: var(--muted); font-size: 11px; }
+.team-session .team-log-merge .session-log-body p { color: #587447; }
+.session-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center; padding: 28px 20px; gap: 12px; }
+.session-empty-icon { display: grid; place-items: center; width: 60px; height: 60px; border: 1px solid #e5d7eb; border-radius: 20px; background: #f4eef7; color: #9b7aaf; }
+.session-empty strong { font: 400 22px Georgia, serif; color: var(--ink); }
+.session-empty p { max-width: 37ch; margin: 0; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.workbench-content .team-session .team-composer { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); background: #faf6f1; padding: 16px 20px; }
+.session-message-label { font-size: 12px; font-weight: 600; }
+.workbench-content .team-session .team-composer .text-input { background: #fffdf9; font-size: 13px; line-height: 1.6; border: 1px solid #d7c9df; border-radius: 9px; min-height: 85px; }
+.session-composer-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.session-recipient { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.session-recipient select { font-size: 12px; border: 1px solid #d7c9df; border-radius: 6px; background: #fffdf9; padding: 6px 5px; max-width: 160px; }
+.session-send-hint { margin-left: auto; font-size: 10px; color: var(--muted); }
+.team-session .session-composer-footer .btn { font-size: 12px; min-height: 36px; padding: 7px 12px; margin-left: auto; }
+.session-send-hint + .btn { margin-left: 0; }
+.session-composer-note { font-size: 12px; color: var(--muted); margin: 0; }
+.session-sidebar { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.session-members-panel, .session-project { border: 1px solid var(--line); border-radius: 12px; background: #fffdf9; }
+.session-panel-head { display: flex; flex-direction: column; gap: 6px; padding: 17px 16px; border-bottom: 1px solid var(--line); }
+.session-panel-head h3, .session-project h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 600; }
+.session-panel-head > span { font-size: 11px; color: var(--muted); }
+.team-session .team-member-list { gap: 0; }
+.workbench-content .team-session .team-member { display: flex; flex-direction: column; align-items: stretch; gap: 12px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 16px; }
+.workbench-content .team-session .team-member:last-child { border-bottom: 0; }
+.session-member-heading { display: flex; align-items: center; gap: 9px; }
+.workbench-content .team-session .team-member-main { flex: 1; gap: 3px; }
+.workbench-content .team-session .team-member-main strong { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; overflow-wrap: anywhere; }
+.team-session .team-member-main > span { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.session-lead-badge { font-size: 9px; font-weight: 500; background: #eee6f2; color: #856a94; padding: 1px 5px; border-radius: 4px; }
+.team-session .status-pill { flex: none; font-size: 9px; white-space: nowrap; }
+.workbench-content .team-session .team-member-actions { gap: 7px; flex-wrap: wrap; }
+.session-member-workspace > summary { display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer; color: var(--muted); font-size: 11px; }
+.session-member-workspace[open] > summary { margin-bottom: 10px; }
+.session-member-workspace[open] > summary svg { transform: rotate(180deg); }
+.workbench-content .team-session .team-branch { display: block; color: var(--muted); background: #f5f0f7; border-radius: 5px; padding: 7px 8px; font-size: 10px; }
+.session-workspace-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.workbench-content .team-session .session-workspace-actions .btn { font-size: 11px; padding: 5px 8px; min-height: 30px; }
+.session-project { padding: 17px 16px; display: flex; flex-direction: column; gap: 10px; }
+.session-project > span { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.session-project > code { color: var(--muted); font: 10px/1.7 var(--mono); overflow-wrap: anywhere; }
+.session-project > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; font-size: 11px; border-top: 1px solid var(--line); padding-top: 11px; color: var(--muted); }
+.session-project > div strong { margin-left: auto; color: var(--text); overflow-wrap: anywhere; }
+.session-board-empty { display: flex; align-items: center; gap: 12px; margin: 6px 20px 16px; padding: 14px; border: 1px dashed #d4c3df; border-radius: 9px; background: #faf6fc; color: var(--accent); }
+.session-board-empty strong { font-size: 13px; }
+.session-board-empty p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.workbench-content .team-session .team-board { padding: 8px 16px 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.workbench-content .team-session .team-column { min-height: 160px; padding: 12px; gap: 10px; border: 1px solid #e1d6e7; border-radius: 9px; background: #f7f2fa; }
+.workbench-content .team-session .column-in_progress { background: #fbf3e6; border-color: #ebddc4; }
+.workbench-content .team-session .column-blocked { background: #fcf0eb; border-color: #eddacf; }
+.workbench-content .team-session .column-done { background: #f0f5ea; border-color: #dae3cf; }
+.workbench-content .team-session .team-column-head { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--ink); }
+.team-column-head > span:first-child { display: flex; gap: 6px; align-items: center; }
+.session-column-dot { width: 6px; height: 6px; border-radius: 50%; background: #a88eb8; }
+.column-in_progress .session-column-dot { background: #c79e5f; }
+.column-blocked .session-column-dot { background: #c28b71; }
+.column-done .session-column-dot { background: #87a367; }
+.workbench-content .team-session .team-task { background: #fffdf9; border: 1px solid #e5dce8; border-radius: 8px; padding: 12px; box-shadow: 0 2px 3px #594d6205; }
+.workbench-content .team-session .team-task::before { content: none; }
+.team-session .team-task-title { margin: 7px 0 0; font-size: 13px; font-weight: 550; line-height: 1.5; }
+.team-session .team-task-note { margin: 7px 0 0; font-size: 11px; color: var(--muted); white-space: pre-wrap; }
+.session-task-assignee { display: flex; align-items: center; gap: 5px; margin-top: 12px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.session-task-details { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.session-task-details summary { cursor: pointer; }
+.session-task-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.session-column-empty { text-align: center; margin: auto 0; padding: 24px 0; font-size: 11px; color: var(--muted); }
+@media (min-width: 1700px) { .workbench-content .team-session .team-board { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1250px) {
+  .session-workspace { grid-template-columns: minmax(0, 1fr) 285px; gap: 16px; }
+  .session-stat { padding: 14px; }
+  .session-send-hint { display: none; }
+  .workbench-content .team-session .team-member { padding: 14px; }
+}
+@media (max-width: 1050px) {
+  .session-workspace { grid-template-columns: minmax(0, 1fr); }
+  .session-sidebar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); align-items: start; }
+}
+@media (max-width: 700px) {
+  .workbench-content .team-detail.team-session { padding: 16px; gap: 16px; border-radius: 12px; }
+  .workbench-content .team-session .team-detail-head h2 { font-size: 26px; }
+  .workbench-content .team-session .team-detail-head > div:first-child { flex: 0 0 auto; }
+  .workbench-content .team-session .team-actions { flex-basis: auto; }
+  .session-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .session-stat { padding: 13px; }
+  .session-stat:nth-child(3) { border-left: 0; }
+  .session-stat:nth-child(n+3) { border-top: 1px solid #e7dce7; }
+  .session-stat > strong { font-size: 24px; }
+  .session-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .session-tabs { padding: 0 14px; gap: 18px; }
+  .session-tabs > button { font-size: 12px; }
+  .session-channel-head { padding: 15px 14px 10px; }
+  .workbench-content .team-session .team-log { height: 320px; padding: 4px 14px 14px; }
+  .workbench-content .team-session .team-composer { padding: 14px; }
+  .session-board-empty { margin-inline: 14px; }
+  .workbench-content .team-session .team-board { padding: 6px 14px 14px; }
+  .workbench-content .team-list .team-card { flex-basis: min(300px, 85vw); }
+}
+@media (max-width: 430px) {
+  .workbench-content .team-session .team-board { grid-template-columns: minmax(0, 1fr); }
+  .team-session .session-composer-footer .btn { width: 100%; margin-left: 0; }
+  .session-log-meta > span { display: none; }
+  .session-log-meta time { font-size: 9px; }
+  .session-stat small { font-size: 10px; }
+  .session-stat > strong { gap: 5px; }
+}

@@ -1,0 +1,122 @@
+/* The usage ledger shares the workspace's warm paper, lilac, peach and sage. */
+.usage-dashboard { display: grid; gap: 24px; min-width: 0; }
+.workbench-content .usage-dashboard .workspace-panel { border: 1px solid #d7c9df; border-radius: 16px; padding: 26px; background: var(--paper); box-shadow: 0 4px 18px #594d6206; }
+.usage-eyebrow { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; font-size: 10px; font-weight: 600; letter-spacing: .09em; color: #8a6b99; }
+.workbench-content .usage-dashboard .section-heading { align-items: center; flex-wrap: wrap; margin-bottom: 20px; gap: 12px; }
+.workbench-content .usage-dashboard .section-heading h2 { margin: 0 0 6px; font: 400 26px/1.2 Georgia, serif; color: var(--ink); }
+.workbench-content .usage-dashboard .section-heading p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.usage-updated { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 11px; color: var(--muted); }
+.workbench-content .usage-dashboard .limit-vendors { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.workbench-content .usage-dashboard .limit-vendor { padding: 0; gap: 0; border: 1px solid #d9c6b5; border-radius: 13px; background: #fffcf7; overflow: hidden; box-shadow: 2px 3px 0 #eaded44d; }
+.workbench-content .usage-dashboard .limit-vendor-codex { border-color: #cbd5bc; box-shadow: 2px 3px 0 #dfe5d44d; }
+.workbench-content .usage-dashboard .limit-vendor > header { justify-content: flex-start; padding: 19px 22px; gap: 12px; background: #f6e9dc; border-bottom: 1px solid #e8d6c4; }
+.workbench-content .usage-dashboard .limit-vendor-codex > header { background: #edf1e4; border-bottom-color: #d9e1cc; }
+.usage-vendor-icon { display: grid; place-items: center; width: 43px; height: 43px; flex: none; border: 1px solid #d7bda7; background: #fbf1e6; border-radius: 12px 9px 13px 10px; color: #b07f5e; }
+.limit-vendor-codex .usage-vendor-icon { background: #f6f8ee; color: #748b59; border-color: #c3d0b0; }
+.workbench-content .usage-dashboard .limit-vendor h3 { font: 400 25px/1.2 Georgia, serif; color: #765d4d; margin: 0; }
+.workbench-content .usage-dashboard .limit-vendor-codex h3 { color: #5c7050; }
+.limit-vendor > header > div { min-width: 0; }
+.limit-vendor > header > div > span { display: block; margin-top: 4px; color: #826f65; font-size: 11px; }
+.limit-vendor-codex > header > div > span { color: #74806a; }
+.usage-plan-badge { margin-left: auto; font-size: 10px; line-height: 1.5; text-transform: capitalize; padding: 4px 8px; border: 1px solid #d6c4b4; border-radius: 7px; background: #fffaf1; color: #826950; }
+.limit-vendor-codex .usage-plan-badge { background: #f8faef; border-color: #c8d5b8; color: #667d51; }
+.usage-plan-windows { padding: 20px 22px; gap: 21px; }
+.usage-group-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.usage-source-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 400; color: #8a7792; }
+.usage-source-badge::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #aa92b5; }
+.workbench-content .usage-dashboard .limit-meter { gap: 9px; }
+.workbench-content .usage-dashboard .limit-meter + .limit-meter { border-top: 1px dashed #e4d7e5; padding-top: 20px; }
+.workbench-content .usage-dashboard .limit-meter-head { align-items: center; gap: 12px; font-size: 13px; }
+.workbench-content .usage-dashboard .limit-meter-head > strong { font-weight: 550; }
+.workbench-content .usage-dashboard .usage-percentage { display: flex; align-items: baseline; gap: 5px; color: var(--ink); font: 400 31px/1.2 Georgia, serif; letter-spacing: -.5px; }
+.workbench-content .usage-dashboard .usage-percentage > small { font: 400 10px var(--font); letter-spacing: 0; color: var(--muted); }
+.workbench-content .usage-dashboard .limit-track { height: 10px; border: 1px solid #e0d4e7; border-radius: 5px; background: #eee6f2; }
+.workbench-content .usage-dashboard .limit-track > span { background: #ae91c0; border-radius: 4px; }
+.workbench-content .usage-dashboard .limit-warn .limit-track > span { background: #cca86b; }
+.workbench-content .usage-dashboard .limit-full .limit-track > span { background: #c08875; }
+.workbench-content .usage-dashboard .limit-full .usage-percentage { color: #a46655; }
+.workbench-content .usage-dashboard .limit-expired .limit-track > span { background: #b9afb9; }
+.workbench-content .usage-dashboard .limit-expired .usage-percentage { color: #938593; }
+.workbench-content .usage-dashboard .limit-track-unavailable { border-style: dashed; background: #f7f2f8; }
+.usage-reset { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.usage-reset svg { margin-top: 2px; }
+.usage-observed { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 10px; line-height: 1.6; color: #908194; }
+.usage-limit-status { padding: 2px 6px; border-radius: 4px; background: #f6e8cb; color: #997640; }
+.usage-limit-status.status-full { background: #f7e4da; color: #a46655; }
+.usage-limit-status.status-ok { background: #eaf0df; color: #6d8555; }
+.usage-no-reading { margin: -4px 0 0; padding: 10px 12px; font-size: 11px; line-height: 1.6; background: #f5eff8; color: #85718f; border-radius: 7px; }
+.usage-local-details { border-top: 1px solid #e6dce5; background: #fcf8f1; }
+.usage-local-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; list-style: none; padding: 15px 22px; cursor: pointer; color: #806b89; font-size: 12px; }
+.usage-local-details > summary::-webkit-details-marker { display: none; }
+.usage-local-details > summary > span { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.usage-local-details > summary small { font-size: 10px; color: #9a899f; }
+.usage-local-details > summary:hover { background: #f5edf7; }
+.usage-local-details > summary:focus-visible, .usage-measurement-note summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.usage-local-details[open] > summary > svg { transform: rotate(180deg); }
+.usage-local-details > .limit-group { gap: 20px; padding: 5px 22px 20px; }
+.usage-local-details .limit-computed { gap: 7px; }
+.usage-local-details .limit-computed + .limit-computed { border-top: 1px dashed #dfd1e4; padding-top: 17px; }
+.usage-local-details .limit-meter-head { font-size: 12px; }
+.usage-local-details .limit-meter-head > span { font: 400 20px Georgia, serif; color: var(--ink); }
+.usage-local-details .limit-meter-head small { font: 400 10px var(--font); }
+.usage-local-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 11px; color: var(--muted); }
+.usage-local-details .limit-computed > small { font-size: 10px; line-height: 1.6; }
+.workbench-content .usage-dashboard .limit-breakdown { gap: 0; background: #f1e9f4; border: 1px solid #e5d9e9; border-radius: 7px; margin-top: 4px; }
+.workbench-content .usage-dashboard .limit-breakdown > div { background: none; padding: 9px 10px; gap: 4px; border-radius: 0; min-width: 0; }
+.limit-breakdown > div + div { border-left: 1px solid #e0d2e5; }
+.workbench-content .usage-dashboard .limit-breakdown dt { font-size: 9px; }
+.workbench-content .usage-dashboard .limit-breakdown dd { font-size: 12px; }
+.usage-measurement-note { display: flex; align-items: flex-start; gap: 9px; padding-top: 18px; color: var(--muted); }
+.usage-measurement-note > svg { margin-top: 2px; color: #a58daf; }
+.usage-measurement-note p { margin: 0; font-size: 12px; line-height: 1.7; }
+.usage-measurement-note details { margin-top: 6px; }
+.usage-measurement-note summary { cursor: pointer; color: #8b6e9a; font-size: 11px; }
+.usage-measurement-note details p { margin-top: 8px; max-width: 110ch; font-size: 11px; }
+.workbench-content .usage-dashboard .ops-metrics { gap: 0; border: 1px solid #dccde2; border-radius: 13px; background: #f8efe1; box-shadow: none; overflow: hidden; }
+.workbench-content .usage-dashboard .ops-metrics .metric { padding: 21px 24px; gap: 7px; border-radius: 0; }
+.workbench-content .usage-dashboard .ops-metrics .metric-label { flex-direction: row; justify-content: flex-start; }
+.workbench-content .usage-dashboard .ops-metrics .metric + .metric { border-left: 1px dashed #d7c5db; border-top: 0; }
+.workbench-content .usage-dashboard .ops-metrics .metric-value { padding: 7px 0; font-size: 32px; }
+.workbench-content .usage-dashboard .ops-metrics .metric-note { font-size: 11px; }
+.workbench-content .usage-dashboard .spend-table th { background: #f1e7f5; color: #806789; font-size: 11px; }
+.workbench-content .usage-dashboard .spend-table td { border-bottom: 1px dashed #dfd2e5; color: #766381; }
+.workbench-content .usage-dashboard .spend-table tbody tr:hover { background: #f7f0f9; }
+.workbench-content .usage-dashboard .spend-table-wrap { border: 1px solid #e4d7e9; border-radius: 9px; margin-top: 12px; }
+.workbench-content .usage-dashboard .spend-columns { margin-top: 16px; background: none; }
+.workbench-content .usage-dashboard .spend-column-track { background: repeating-linear-gradient(to top, #f9f4fb 0 34px, #eadef0 34px 35px); max-width: 62px; border-radius: 8px 8px 0 0; }
+.workbench-content .usage-dashboard .spend-column-track > span { border-width: 1px; border-radius: 7px 7px 0 0; }
+.workbench-content .usage-dashboard .automation-callout { border-radius: 12px; background: #f4eddf; padding: 18px 22px; }
+@media (max-width: 1050px) {
+  .workbench-content .usage-dashboard .limit-vendors { gap: 14px; }
+  .usage-plan-windows, .usage-local-details > .limit-group { padding-inline: 16px; }
+  .workbench-content .usage-dashboard .limit-vendor > header, .usage-local-details > summary { padding-inline: 16px; }
+  .usage-local-details > summary small { display: none; }
+  .workbench-content .usage-dashboard .limit-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .limit-breakdown > div:nth-child(3) { border-left: 0; }
+  .limit-breakdown > div:nth-child(n+3) { border-top: 1px solid #e0d2e5; }
+}
+@media (max-width: 900px) {
+  .workbench-content .usage-dashboard .limit-vendors { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .workbench-content .usage-dashboard .workspace-panel { padding: 18px; border-radius: 12px; }
+  .workbench-content .usage-dashboard .section-heading h2 { font-size: 24px; }
+  .workbench-content .usage-dashboard .ops-metrics { grid-template-columns: minmax(0, 1fr); }
+  .workbench-content .usage-dashboard .ops-metrics .metric { padding: 16px 20px; }
+  .workbench-content .usage-dashboard .ops-metrics .metric + .metric { border-left: 0; border-top: 1px dashed #d7c5db; }
+  .workbench-content .usage-dashboard .section-heading > .resource-search { width: 100%; }
+  .workbench-content .usage-dashboard .spend-columns { gap: 5px; }
+  .workbench-content .usage-dashboard .spend-column-value { font-size: 9px; }
+  .workbench-content .usage-dashboard .spend-column-day { font-size: 11px; }
+  .workbench-content .usage-dashboard .spend-column-day small { font-size: 9px; }
+  .usage-local-details .limit-meter-head { flex-wrap: wrap; gap: 4px; }
+  .workbench-content .usage-dashboard .automation-callout { padding: 16px; }
+}
+@media (max-width: 380px) {
+  .workbench-content .usage-dashboard .workspace-panel { padding: 14px; }
+  .workbench-content .usage-dashboard .usage-percentage { font-size: 27px; }
+  .workbench-content .usage-dashboard .limit-vendor > header { gap: 8px; padding: 16px 12px; }
+  .usage-vendor-icon { width: 35px; height: 35px; }
+  .usage-plan-badge { font-size: 9px; padding-inline: 5px; }
+  .usage-plan-windows { padding: 16px 12px; }
+}

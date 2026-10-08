@@ -5,6 +5,7 @@ import type { Agent } from '../domain/types.ts';
 import type { AgentRegistry } from '../domain/registry.ts';
 import { projectName } from '../domain/text.ts';
 import { JsonlTailer } from './jsonlTail.ts';
+import { activityFromEvent } from '../../shared/plainActivity.ts';
 import { normalizeCodexLine, parseCodexSessionMeta, type CodexSessionMeta } from './normalizers.ts';
 import { hasCodexBackend, hasCodexExecProcess, type ProcInfo } from './processScanner.ts';
 import { UsageMeter, codexRolloutModel, codexRolloutUsage } from '../usage/usageMeter.ts';
@@ -20,6 +21,8 @@ interface RolloutState {
   readonly tailer: JsonlTailer;
   readonly meter: UsageMeter;
   activity?: string;
+  /** From the first user request: Codex threads have no title of their own in the rollout. */
+  taskTitle?: string;
   lastEventAt?: number;
   turnOpen: boolean;
   mtimeMs: number;
@@ -175,9 +178,11 @@ export class CodexSessionsCollector {
         state.meter.setTotals(usage.total);
         state.meter.setContext(usage.contextTokens, usage.contextWindow);
       }
-      for (const event of normalizeCodexLine(agentId, line).events) {
+      const normalized = normalizeCodexLine(agentId, line);
+      if (normalized.taskTitle && !state.taskTitle) state.taskTitle = normalized.taskTitle;
+      for (const event of normalized.events) {
         if (event.kind === 'status') state.turnOpen = event.summary === 'turn started';
-        else state.activity = event.summary;
+        else state.activity = activityFromEvent(event);
         state.lastEventAt = event.ts;
         this.registry.pushEvent(event);
       }
@@ -200,7 +205,7 @@ export class CodexSessionsCollector {
       id: `codex:${meta.id}`,
       vendor: 'codex',
       tier: 'C',
-      name: meta.agentNickname ?? (meta.parentThreadId ? `${meta.agentRole ?? 'Subagent'} · ${projectName(meta.cwd)}` : `Codex · ${projectName(meta.cwd)}`),
+      name: meta.agentNickname ?? (meta.parentThreadId ? `${meta.agentRole ?? 'Subagent'} · ${state.taskTitle ?? projectName(meta.cwd)}` : state.taskTitle ?? `Codex · ${projectName(meta.cwd)}`),
       sessionId: meta.id,
       cwd: meta.cwd,
       project: projectName(meta.cwd),

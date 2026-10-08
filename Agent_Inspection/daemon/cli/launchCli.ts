@@ -50,13 +50,21 @@ function run(ticket: CliTicket, onSpawn: (pid: number) => void): Promise<number>
   const env: NodeJS.ProcessEnv = { ...process.env, ...ticket.env };
   // This is the operator's own session: the tower's hooks should see it like any other.
   delete env[MANAGED_ENV_FLAG];
+  const cannotStart = (error: Error): number => {
+    process.stderr.write(`${styleText('red', `Could not start ${ticket.command}: ${error.message}`)}\n`);
+    return 1;
+  };
   return new Promise((resolve) => {
-    const child = spawn(ticket.command, [...ticket.args], { cwd: ticket.cwd, env, stdio: 'inherit' });
+    let child: ReturnType<typeof spawn>;
+    try {
+      // Windows reports some failures (e.g. a file that is not a real executable) by throwing here.
+      child = spawn(ticket.command, [...ticket.args], { cwd: ticket.cwd, env, stdio: 'inherit' });
+    } catch (error) {
+      resolve(cannotStart(error as Error));
+      return;
+    }
     child.once('spawn', () => { if (child.pid) onSpawn(child.pid); });
-    child.once('error', (error) => {
-      process.stderr.write(`${styleText('red', `Could not start ${basename(ticket.command)}: ${error.message}`)}\n`);
-      resolve(1);
-    });
+    child.once('error', (error) => resolve(cannotStart(error)));
     child.once('exit', (code) => resolve(code ?? 1));
   });
 }

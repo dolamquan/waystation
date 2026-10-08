@@ -6,6 +6,7 @@ import { Icon } from './Icon.tsx';
 import { Confirm } from './Modal.tsx';
 import { DAY_NAMES, ScheduleForm } from './ScheduleForm.tsx';
 import { PanelEmpty, SectionTabs, type SectionTab } from './SectionTabs.tsx';
+import { UsageWindows } from './UsageWindows.tsx';
 
 interface OpsViewProps {
   readonly defaultCwd?: string;
@@ -33,6 +34,7 @@ export function OpsView({ defaultCwd, notify, onNewAgent }: OpsViewProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ScheduleFilter>('all');
   const [confirm, setConfirm] = useState<{ title: string; body: string; action: () => Promise<void> }>();
+  const [windowsKey, setWindowsKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,15 +81,16 @@ export function OpsView({ defaultCwd, notify, onNewAgent }: OpsViewProps) {
   return <div className="ops-view ops-workspace">
     <div className="workspace-toolbar">
       <SectionTabs tabs={tabs} value={tab} onChange={setTab} label="Usage and automation sections" panelId="ops-panel" />
-      <button className="btn btn-ghost" disabled={loading} onClick={() => void load()}><Icon name="refresh" size={15} />{loading ? 'Refreshing…' : 'Refresh'}</button>
+      <button className="btn btn-ghost" disabled={loading} onClick={() => { setWindowsKey((k) => k + 1); void load(); }}><Icon name="refresh" size={15} />{loading ? 'Refreshing…' : 'Refresh'}</button>
     </div>
     {error && <div className="detail-load-error" role="alert"><p>Couldn’t load this page. {error}</p><button className="btn" onClick={() => void load()}>Try again</button></div>}
     {!loaded && loading && <div className="workspace-loading" role="status"><Icon name="clock" />Loading usage and schedules…</div>}
     {loaded && <div id="ops-panel" role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label} className="ops-tab-panel" aria-busy={loading}>
-      {tab === 'usage' && <>
+      {tab === 'usage' && <div className="usage-dashboard">
+        <UsageWindows refreshKey={windowsKey} />
         <SpendSection usage={data.usage} />
         <div className="automation-callout"><span className="automation-icon"><Icon name="clock" size={24} /></span><div><h3>Something you do every morning?</h3><p>Put it on the calendar. You can pause it whenever you need.</p></div><button className="btn" onClick={createSchedule}>Add a schedule<Icon name="arrow" size={15} /></button></div>
-      </>}
+      </div>}
 
       {tab === 'schedules' && <section className="ops-section workspace-panel" aria-labelledby="ops-schedules">
         <div className="section-heading"><div><h2 id="ops-schedules">Recurring tasks</h2><p>Tasks that run on the days you choose.</p></div><button className="btn btn-go" onClick={createSchedule} disabled={showNew}><Icon name="plus" size={16} />New schedule</button></div>

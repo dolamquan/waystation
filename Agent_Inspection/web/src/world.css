@@ -438,3 +438,24 @@
 .crew-row-subcount { color: #705789 !important; font-weight: 600; }
 .crew-row-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .world-legend .legend-family { width: 13px; height: 0; border-radius: 0; border-top: 2px dashed #9b7eaf; }
+
+/* Station events: approval bubbles, runaway-guard beacons and cost coins on the desks. */
+.station-approval { filter: drop-shadow(0 3px 4px rgba(37, 34, 56, .22)); }
+.station-approval-btn { cursor: pointer; outline: none; }
+.station-approval-btn rect { stroke-width: 1.2; transition: filter .15s; }
+.station-approval-btn:hover rect { filter: brightness(1.08); }
+.station-approval-btn:focus-visible rect { stroke: #3b2d55; stroke-width: 2.5; }
+.station-approval-go rect { fill: #6da184; stroke: #4e7a62; }
+.station-approval-go text { fill: #fff; }
+.station-approval-deny rect { fill: #f6e1dc; stroke: #b5655a; }
+.station-approval-deny text { fill: #8f3f35; }
+.station-approval-link rect { fill: transparent; stroke: #c7a777; stroke-dasharray: 3 2; }
+.station-approval-link text { fill: #7a5634; text-decoration: underline; }
+.station-approval-busy { cursor: progress; opacity: .55; }
+.station-alarm-warn { --alarm: #e6a23c; }
+.station-alarm-stop { --alarm: #d9534f; }
+.station-alarm-lamp { fill: var(--alarm); }
+.station-alarm-glow { fill: var(--alarm); opacity: .3; animation: alarm-flash 1s steps(1) infinite; }
+.station-alarm-lamp { animation: alarm-lamp 1s steps(1) infinite; }
+@keyframes alarm-flash { 50% { opacity: 0; } }
+@keyframes alarm-lamp { 50% { filter: brightness(.7); } }

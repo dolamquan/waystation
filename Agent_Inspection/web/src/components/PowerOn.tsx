@@ -26,7 +26,7 @@ export function PowerOn({ onReady }: PowerOnProps) {
         <div className="standby-copy">
           <h1>Your team,<br />in one place.</h1>
           <p>Turn your coding sessions into a little crew. Watch them work, see who needs a hand, and guide the mission from one place.</p>
-          <button className="btn btn-go standby-start" onClick={() => setBooting(true)} disabled={booting} aria-label="Turn on Agent Control Tower"><Icon name={booting ? 'activity' : 'planet'} size={18} />{booting ? 'Opening the station…' : 'Enter the station'}<Icon name="arrow" size={18} /></button>
+          <button className="btn btn-go standby-start" onClick={() => setBooting(true)} disabled={booting} aria-label="Enter Waystation"><Icon name={booting ? 'activity' : 'planet'} size={18} />{booting ? 'Opening the station…' : 'Enter the station'}<Icon name="arrow" size={18} /></button>
           <div className="standby-note"><Icon name="shield" size={15} />Connect your local Claude and Codex sessions.</div>
           <div className="welcome-crew"><span className="eyebrow">Session avatar previews</span><div>{CREW.map(character => <div key={character.name}><CrewAvatar character={character} size={42} /></div>)}</div></div>
         </div>

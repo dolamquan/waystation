@@ -38,25 +38,31 @@ export function TeamsView({
   return (
     <div className="teams-layout">
       <nav className="team-list" aria-label="Teams">
-        {teams.map((team) => {
-          const done = team.tasks.filter((task) => task.status === 'done').length;
-          const vendors = [...new Set(team.members.map((m) => (m.vendor === 'claude' ? 'Claude' : 'Codex')))].join(' + ');
-          return (
-            <button
-              key={team.id}
-              className={`team-card ${team.id === selected?.id ? 'team-card-on' : ''}`}
-              aria-current={team.id === selected?.id ? 'true' : undefined}
-              onClick={() => onSelectTeam(team.id)}
-            >
-              <div className="team-card-head">
-                <strong>{team.name}</strong>
-                <span className={`team-status team-${team.status}`}>{TEAM_STATUS_LABEL[team.status]}</span>
-              </div>
-              <span className="small muted team-card-goal">{team.goal}</span>
-              <span className="small muted">{team.members.length} members · {vendors} · {done}/{team.tasks.length} tasks · {timeAgo(team.createdAt, now)}</span>
-            </button>
-          );
-        })}
+        <div className="team-list-heading"><Icon name="crew" size={16} /><strong>Your teams</strong><span className="section-count">{teams.length}</span></div>
+        <div className="team-list-cards">
+          {teams.map((team) => {
+            const done = team.tasks.filter((task) => task.status === 'done').length;
+            const blocked = team.tasks.filter((task) => task.status === 'blocked').length;
+            const vendors = [...new Set(team.members.map((m) => (m.vendor === 'claude' ? 'Claude' : 'Codex')))].join(' + ');
+            const memberCount = `${team.members.length} ${team.members.length === 1 ? 'member' : 'members'}`;
+            return (
+              <button
+                key={team.id}
+                className={`team-card ${team.id === selected?.id ? 'team-card-on' : ''}`}
+                aria-current={team.id === selected?.id ? 'true' : undefined}
+                title={`${team.goal}\nCreated ${timeAgo(team.createdAt, now)}`}
+                onClick={() => onSelectTeam(team.id)}
+              >
+                <div className="team-card-head">
+                  <strong>{team.name}</strong>
+                  <span className={`team-status team-${team.status}`}>{TEAM_STATUS_LABEL[team.status]}</span>
+                </div>
+                <span className="team-card-meta"><span>{memberCount} · {vendors}</span><span>{team.tasks.length ? `${done}/${team.tasks.length} done` : 'Planning'}</span></span>
+                {blocked > 0 && <span className="team-card-blocked"><Icon name="alert" size={13} />{blocked} blocked</span>}
+              </button>
+            );
+          })}
+        </div>
       </nav>
       {selected && (
         <TeamDetail
@@ -65,6 +71,7 @@ export function TeamsView({
           agents={agents}
           teamLogFeed={teamLogFeed}
           now={now}
+          connected={connected}
           notify={notify}
           onSelectAgent={onSelectAgent}
         />

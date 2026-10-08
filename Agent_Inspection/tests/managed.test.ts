@@ -12,16 +12,24 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
     sdkCalls.push({ options: params.options });
     const canUseTool = params.options.canUseTool as (n: string, i: Record<string, unknown>, o: { signal: AbortSignal }) => Promise<unknown>;
     async function* run() {
-      yield { type: 'system', subtype: 'init', session_id: 'sdk-session-1' };
+      yield { type: 'system', subtype: 'init', session_id: 'sdk-session-1', terminal_slash_commands: ['exit'] };
       for await (const msg of params.prompt) {
+        if (msg.message.content === 'learn skills') {
+          yield { type: 'system', subtype: 'commands_changed', commands: [{ name: 'deploy', description: 'Ship it', argumentHint: '<env>' }] };
+        }
         toolResults.push(await canUseTool('Bash', { command: 'ls' }, { signal: new AbortController().signal }));
         yield { type: 'assistant', message: { content: [{ type: 'text', text: `echo: ${msg.message.content}` }] } };
         if (msg.message.content === 'boom') throw new Error('model exploded');
         yield { type: 'result', subtype: 'success', total_cost_usd: 0.0123 };
       }
     }
-    const gen = run() as AsyncGenerator<unknown> & { interrupt: () => Promise<void> };
+    const gen = run() as AsyncGenerator<unknown> & { interrupt: () => Promise<void>; supportedCommands: () => Promise<unknown[]> };
     gen.interrupt = vi.fn(async () => undefined);
+    gen.supportedCommands = vi.fn(async () => [
+      { name: 'compact', description: 'Clear history but keep a summary', argumentHint: '<instructions>' },
+      { name: 'exit', description: 'Exit the REPL', argumentHint: '' },
+      { name: 'review', description: 'Review a pull request', argumentHint: '' },
+    ]);
     return gen;
   },
 }));
@@ -89,6 +97,25 @@ describe('ClaudeRunner (mocked SDK)', () => {
     await until(() => toolResults.some((r) => JSON.stringify(r).includes('No decision')));
     expect(sdkCalls.at(-1)?.options).toMatchObject({ resume: 'old', forkSession: true });
     await b.stop();
+  });
+
+  it('publishes the slash commands the session can run, without terminal-only ones', async () => {
+    // Arrange
+    const { host, last } = makeHost();
+
+    // Act
+    const runner = new ClaudeRunner({ vendor: 'claude', cwd: tempDir(), prompt: 'hello' }, host);
+    await until(() => (last().slashCommands?.length ?? 0) > 0);
+
+    // Assert
+    expect(last().slashCommands).toEqual([
+      { name: 'compact', description: 'Clear history but keep a summary', argumentHint: '<instructions>' },
+      { name: 'review', description: 'Review a pull request', argumentHint: undefined },
+    ]);
+    await runner.send('learn skills');
+    await until(() => last().slashCommands?.some((command) => command.name === 'deploy') ?? false);
+    expect(last().slashCommands).toEqual([{ name: 'deploy', description: 'Ship it', argumentHint: '<env>' }]);
+    await runner.stop();
   });
 
   it('reports SDK errors and exits', async () => {

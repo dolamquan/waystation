@@ -1,8 +1,27 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  claudeCliCommand, claudeMcpConfig, codexCliCommand, resolveClaudeExe,
+  claudeCliCommand, claudeMcpConfig, codexCliCommand, isNativeExe, resolveClaudeExe,
 } from '../daemon/managed/cliCommands.ts';
+
+describe('isNativeExe', () => {
+  it('rejects the placeholder npm leaves when postinstall did not run, and missing files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'claude-exe-'));
+    try {
+      const stub = join(dir, 'stub.exe');
+      const real = join(dir, 'real.exe');
+      writeFileSync(stub, 'echo "Error: claude native binary not installed." >&2\n');
+      writeFileSync(real, Buffer.alloc(2 * 1024 * 1024));
+      expect(isNativeExe(stub)).toBe(false);
+      expect(isNativeExe(real)).toBe(true);
+      expect(isNativeExe(join(dir, 'missing.exe'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 const TEAM_SERVERS = {
   team: { command: 'node.exe', args: ['team-mcp.mjs'], env: { AGENT_TOWER_TEAM_URL: 'http://127.0.0.1:4317' }, inheritEnv: ['AGENT_TOWER_TEAM_TOKEN'] },

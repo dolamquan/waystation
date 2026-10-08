@@ -31,6 +31,11 @@ import { breakerConfigFromEnv } from './guard/breaker.ts';
 import { Library, type LibraryDeps } from './library/index.ts';
 import { SecretStore } from './library/secretStore.ts';
 import { applyLoadout, isEmptyLoadout, parseLoadout } from './library/loadout.ts';
+import { UsageWindows } from './usage/usageWindows.ts';
+import { ClaudeRunner } from './managed/claudeRunner.ts';
+import type { ClaudeControl } from './commands/types.ts';
+import { claudeSdkLimits } from './usage/planLimits.ts';
+import { readClaudePlanUsage } from './usage/claudePlanUsage.ts';
 
 export class UserError extends Error {}
 
@@ -146,6 +151,13 @@ export class Tower {
   readonly ops: AgentOps;
   /** Skills, context docs, MCP servers, plugins, notification channels. */
   readonly library: Library;
+  /** 5-hour and weekly plan windows: real where the vendor reports them, else estimated from local transcripts. */
+  readonly usageWindows = new UsageWindows({
+    claudeProjectsDir: claudePaths.projects,
+    codexSessionsDir: join(paths.codexHome, 'sessions'),
+    liveClaudeLimits: () => claudeSdkLimits.list(),
+    readClaudePlanUsage,
+  });
 
   constructor(dbPath: string = paths.database, options: TowerOptions = {}) {
     this.launchTerminal = options.openTerminal ?? ((target) => openAttachTerminal(target, paths.towerHome));
@@ -254,6 +266,12 @@ export class Tower {
       hooks: { installed: this.hooksOn },
       teams: this.teams.list(),
     };
+  }
+
+  /** Live SDK controls (/model, /mcp, /context…) for a Claude agent launched here; undefined for every other session. */
+  claudeControl(agentId: string): ClaudeControl | undefined {
+    const runner = this.managed.get(agentId);
+    return runner instanceof ClaudeRunner ? runner : undefined;
   }
 
   events(agentId: string): readonly AgentEvent[] {

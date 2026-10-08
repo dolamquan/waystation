@@ -41,6 +41,16 @@ export interface Agent {
   readonly parentId?: string;
   /** Present on subagents: what was asked of them, from the spawn metadata. */
   readonly subagent?: SubagentInfo;
+  /** Claude Code slash commands this session runs when sent as a message (agents launched from Waystation). */
+  readonly slashCommands?: readonly SlashCommandInfo[];
+}
+
+export interface SlashCommandInfo {
+  /** Without the leading slash, e.g. "compact". */
+  readonly name: string;
+  readonly description?: string;
+  /** e.g. "<file>"; empty when the command takes no arguments. */
+  readonly argumentHint?: string;
 }
 
 export interface SubagentInfo {

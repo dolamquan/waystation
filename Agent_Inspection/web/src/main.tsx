@@ -10,6 +10,8 @@ import './ops.css';
 import './library.css';
 import './workbench.css';
 import './workspace.css';
+import './team-session.css';
+import './usage.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

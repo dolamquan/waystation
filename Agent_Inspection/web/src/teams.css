@@ -6,7 +6,6 @@
 .team-card:hover { border-color: var(--line-strong); }
 .team-card-on { border-color: #9fbd99; box-shadow: 0 0 0 3px #e3eedd; }
 .team-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.team-card-goal { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 .team-status { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; padding: 3px 7px; border-radius: 5px; background: #f0f2ed; color: #7a8372; white-space: nowrap; vertical-align: middle; letter-spacing: 0; }
 .team-running { color: #47734b; background: #edf5e9; }
@@ -20,21 +19,15 @@
 .team-goal { margin: 0; font-size: 12px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .team-actions { display: flex; gap: 8px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
 
-.team-budget-meter { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; gap: 14px; align-items: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: #f7f8f4; }
-.team-budget-meter > div:not(.meter) { display: flex; flex-direction: column; font-size: 12px; }
 .meter { height: 6px; border-radius: 3px; background: #e6eae1; overflow: hidden; }
-.meter span { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
-
-.team-subhead { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 13px; font-weight: 600; }
+.meter span { display: block; width: 100%; height: 100%; background: var(--accent); border-radius: 3px; transform-origin: left; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
+@media (prefers-reduced-motion: reduce) { .meter span { transition: none; } }
 
 .team-member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .team-member { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
 .team-member-main { display: flex; flex-direction: column; min-width: 0; }
 .team-branch { font-family: var(--mono); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-member-actions { display: flex; gap: 4px; }
-.vendor-dot { width: 10px; height: 10px; border-radius: 50%; }
-.vendor-dot.vendor-claude { background: var(--claude); }
-.vendor-dot.vendor-codex { background: var(--codex); }
 
 .team-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .team-column { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 8px; background: #f3f5ee; min-height: 70px; }
@@ -48,13 +41,7 @@
 .team-task-note { margin-top: 4px; overflow-wrap: anywhere; }
 
 .team-composer { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 8px; }
-.team-log-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 .team-log { max-height: 460px; overflow-y: auto; }
-.team-log-message .tl-icon { color: var(--accent); }
-.team-log-task .tl-icon { color: var(--warn); }
-.team-log-merge .tl-icon, .team-log-merge .tl-text { color: #2f5f86; }
-.team-log-activity .tl-text { color: var(--muted); font: 10px/1.7 var(--mono); }
-.team-log-system .tl-text { color: var(--muted); }
 
 .diff-view { max-height: 50vh; margin-top: 10px; }
 

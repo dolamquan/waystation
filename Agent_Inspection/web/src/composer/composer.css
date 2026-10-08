@@ -1,0 +1,87 @@
+/* Message composer: slash-command menu, voice input and help, inside the agent details drawer. */
+.agent-composer .composer-field { position: relative; }
+.agent-composer .text-input { width: 100%; resize: vertical; font-family: var(--mono); font-size: 13px; line-height: 1.5; }
+
+.composer-menu {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 5;
+  margin: 0; padding: 5px; list-style: none; max-height: 260px; overflow-y: auto;
+  background: #fffdf9; border: 1px solid #dccfe3; border-radius: 9px; box-shadow: 0 10px 28px rgba(64, 44, 84, .16);
+}
+.composer-menu li {
+  display: grid; grid-template-columns: minmax(110px, auto) 1fr auto; align-items: baseline; gap: 4px 10px;
+  padding: 7px 9px; border-radius: 6px; cursor: pointer; font-size: 12.5px;
+}
+.composer-menu li.composer-option-active { background: #f1e9f6; }
+.composer-command { font-family: var(--mono); color: #5d3f77; font-weight: 600; white-space: nowrap; }
+.composer-command em { font-style: normal; font-weight: 400; color: #9a8aa6; }
+.composer-command-desc { color: #625a6a; line-height: 1.35; }
+.composer-command-tag { font-size: 10.5px; color: #8d5a3c; background: #f8e8dc; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+
+.composer-listening {
+  display: flex; align-items: center; gap: 8px; margin-top: 7px; font-size: 12px; color: #7c608d; font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.composer-rec { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #d0574c; animation: composer-pulse 1.2s ease-in-out infinite; }
+@keyframes composer-pulse { 50% { opacity: .35; } }
+
+.composer-error { margin: 8px 0 0; font-size: 12.5px; color: #a33d33; }
+
+.composer-help { margin-top: 10px; padding: 11px 13px; border-radius: 8px; background: #faf6fb; border: 1px solid #ebe1ef; font-size: 12.5px; color: #554c5d; }
+.composer-help-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.composer-help ul { list-style: none; margin: 4px 0 10px; padding: 0; display: grid; gap: 4px; }
+.composer-help li { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 10px; }
+.composer-help code, .composer-help kbd { font-family: var(--mono); font-size: 11.5px; color: #5d3f77; }
+.composer-help kbd { border: 1px solid #ddd0e4; border-radius: 4px; padding: 0 4px; background: #fff; }
+.composer-help p { margin: 6px 0 0; line-height: 1.5; }
+
+.composer-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.composer-slash { font-family: var(--mono); font-weight: 700; min-width: 35px; }
+.composer-mic-on { color: #fff; background: #c4554a; border-color: #c4554a; }
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-rec { animation: none; }
+}
+@media (max-width: 700px) {
+  .composer-menu li { grid-template-columns: 1fr auto; }
+  .composer-command-desc { grid-column: 1 / -1; }
+}
+
+/* Menu tags by kind, and commands that need Claude Code's terminal. */
+.composer-command-tag.tag-native, .composer-command-tag.tag-send { color: #8d5a3c; background: #f8e8dc; }
+.composer-command-tag.tag-waystation { color: #5d3f77; background: #efe6f6; }
+.composer-command-tag.tag-unavailable { color: #6c6273; background: #eeeaf0; }
+.composer-menu li.composer-option-unavailable .composer-command,
+.composer-menu li.composer-option-unavailable .composer-command-desc { opacity: .6; }
+
+.composer-notice {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 8px; padding: 9px 11px; border-radius: 8px; background: #f7f1fa; border: 1px solid #e6daee; font-size: 12.5px; color: #554c5d;
+}
+.composer-notice .btn { flex: none; }
+.composer-running { margin: 8px 0 0; font-size: 12px; color: #7c608d; font-style: italic; }
+
+/* Answers to /usage, /mcp, /model… */
+.composer-result { margin-top: 10px; border: 1px solid #e3d7e9; border-radius: 9px; background: #fffdfa; padding: 10px 12px; font-size: 12.5px; color: #4f4757; }
+.composer-result-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.composer-result-head strong { font-size: 14px; color: #4b3a5c; }
+.composer-result-head code { font-family: var(--mono); font-size: 11.5px; color: #8a7a96; }
+.composer-result-head .icon-btn { margin-left: auto; }
+.composer-result-section h4 { margin: 10px 0 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #8a7a96; }
+.composer-result ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.composer-result li { padding: 6px 0; border-bottom: 1px dashed #eee5f1; }
+.composer-result li:last-child { border-bottom: 0; }
+.result-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.result-label { font-weight: 600; color: #4b4253; overflow-wrap: anywhere; }
+.result-value { font-family: var(--mono); font-size: 12px; color: #5d3f77; text-align: right; overflow-wrap: anywhere; }
+.result-detail { display: block; margin-top: 2px; color: #7a7182; line-height: 1.4; }
+.result-meter { height: 6px; margin-top: 5px; border-radius: 99px; background: #eee7f2; overflow: hidden; }
+.result-meter span { display: block; height: 100%; border-radius: inherit; background: #6da184; }
+.result-warn .result-meter span { background: #d0a14e; }
+.result-bad .result-meter span { background: #c4554a; }
+.result-ok .result-value { color: #3f7b5c; }
+.result-warn .result-value { color: #9a6a1f; }
+.result-bad .result-value { color: #a33d33; }
+.result-muted .result-label, .result-muted .result-value { color: #8c8394; font-weight: 400; }
+.result-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.result-actions .btn { min-height: 28px; padding: 3px 10px; font-size: 12px; }
+.composer-result-note { margin: 8px 0 0; color: #7a7182; line-height: 1.45; }

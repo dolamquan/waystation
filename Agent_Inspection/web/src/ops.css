@@ -83,3 +83,36 @@
   .ops-row { flex-wrap: wrap; }
   .spend-table th:nth-child(3), .spend-table td:nth-child(3) { display: none; }
 }
+
+/* ---- plan limits (5-hour and weekly windows) ---- */
+.limit-vendors { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.limit-vendor { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-left: 4px solid var(--other); border-radius: 10px; background: var(--panel); min-width: 0; }
+.limit-vendor-claude { border-left-color: var(--claude); }
+.limit-vendor-codex { border-left-color: var(--codex); }
+.limit-vendor header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.limit-vendor h3 { margin: 0; }
+.limit-vendor .status-pill { text-transform: capitalize; }
+.limit-group { display: flex; flex-direction: column; gap: 10px; }
+.limit-group h4 { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.limit-tag { font-size: 10px; font-weight: 500; text-transform: none; letter-spacing: 0; padding: 2px 7px; border-radius: 5px; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.limit-tag-estimate { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--text); }
+.limit-meter, .limit-computed { display: flex; flex-direction: column; gap: 5px; }
+.limit-meter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.limit-meter-head span { font-variant-numeric: tabular-nums; font-weight: 600; }
+.limit-meter small, .limit-computed small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.limit-track { height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--muted) 16%, transparent); overflow: hidden; }
+.limit-track > span { display: block; height: 100%; border-radius: 5px; background: var(--ok); }
+.limit-warn .limit-track > span { background: var(--warn); }
+.limit-full .limit-track > span { background: var(--danger); }
+.limit-full .limit-meter-head span { color: var(--danger); }
+.limit-expired .limit-track > span { background: var(--idle); }
+.limit-none { margin: 0; font-size: 12px; color: var(--muted); }
+.limit-breakdown { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 2px 0 0; }
+.limit-breakdown div { display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; border-radius: 6px; background: color-mix(in srgb, var(--muted) 8%, transparent); }
+.limit-breakdown dt { font-size: 10px; color: var(--muted); }
+.limit-breakdown dd { margin: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 720px) {
+  .limit-vendors { grid-template-columns: 1fr; }
+  .limit-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

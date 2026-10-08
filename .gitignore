@@ -1,0 +1,27 @@
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+daemon.json
+secrets.json
+*.sqlite
+*.db
+
+# Logs and tool artifacts (can contain session tokens in URLs)
+*.log
+.playwright-mcp/
+.waystation-daemon.*
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -6,6 +6,7 @@ import type { ScheduleView } from '../../daemon/ops/agentOps.ts';
 import type { Prerequisite } from '../../daemon/ops/prerequisites.ts';
 import type { LaunchLoadout, ScheduleNotify, ScheduleResource } from '../../daemon/library/types.ts';
 import type { ScheduleRun } from '../../daemon/ops/schedules.ts';
+import type { UsageWindowsReport } from '../../daemon/usage/windowTypes.ts';
 
 export type { Agent, AgentEvent, PendingInterception, TeamLogEntry, TeamMember, TeamTask, TeamView };
 export type { AgentTemplate, Prerequisite, ScheduleView, UsageSummary };
@@ -84,6 +85,13 @@ function bootstrapToken(): string {
   }
 }
 
+/**
+ * `waystation` (npm start) opens the UI with `#token=…&autostart=1` so the welcome screen
+ * is skipped. Read it before bootstrapToken strips the fragment from the address bar.
+ */
+const autostartRequested = /(?:^#|&)autostart=1(?:&|$)/.test(location.hash);
+export const autostart = (): boolean => autostartRequested;
+
 const sessionToken = bootstrapToken();
 
 // Pasting a fresh link into an already-open tab only changes the fragment: reload to pick it up.
@@ -101,6 +109,8 @@ export async function request<T>(method: 'GET' | 'POST', path: string, body?: un
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = (await response.json().catch(() => ({}))) as { error?: string };
+  // The daemon answers an unknown route with a bare "not found": this page is newer than the running Waystation.
+  if (response.status === 404 && data.error === 'not found') throw new ApiError('This needs a newer Waystation. Restart Waystation (Ctrl+C, then npm start) and try again.');
   if (!response.ok) throw new ApiError(data.error ?? `Request failed (${response.status})`);
   return data as T;
 }
@@ -142,6 +152,7 @@ export const api = {
   uninstallHooks: () => request<{ ok: true }>('POST', '/api/hooks/uninstall'),
   // ---- usage, runaway guard, rename, restart, templates, schedules, prerequisites ----
   usage: (days = 7) => request<{ usage: UsageSummary }>('GET', `/api/usage?days=${days}`),
+  usageWindows: () => request<{ windows: UsageWindowsReport }>('GET', '/api/usage/windows'),
   rename: (id: string, name: string) => request<{ ok: true; name: string | null }>('POST', `/api/agents/${enc(id)}/name`, { name }),
   restart: (id: string, body: { model?: string; message?: string }) =>
     request<{ ok: true; agent: Agent }>('POST', `/api/agents/${enc(id)}/restart`, { ...body, confirm: true }),
@@ -160,4 +171,9 @@ export const api = {
   runSchedule: (id: string) => request<{ ok: true; agent: Agent }>('POST', `/api/schedules/${enc(id)}/run`),
   deleteSchedule: (id: string) => request<{ ok: true }>('POST', `/api/schedules/${enc(id)}/delete`, { confirm: true }),
   prerequisites: () => request<{ prerequisites: Prerequisite[] }>('GET', '/api/prerequisites'),
+  command: (id: string, name: string, arg: string) =>
+    request<{ result: import('../../shared/claudeCommands.ts').CommandResult }>('POST', `/api/agents/${enc(id)}/command`, { name, arg }),
+  outputs: (id: string) => request<{ outputs: import('../../daemon/outputs/types.ts').AgentOutputs }>('GET', `/api/agents/${enc(id)}/outputs`),
+  outputDiff: (id: string, path: string) =>
+    request<{ diff: import('../../daemon/outputs/types.ts').FileDiff }>('GET', `/api/agents/${enc(id)}/outputs/diff?path=${encodeURIComponent(path)}`),
 };

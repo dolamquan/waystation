@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { AgentRegistry } from '../daemon/domain/registry.ts';
@@ -41,7 +41,7 @@ describe('ClaudeSessionsCollector', () => {
     expect(agents).toHaveLength(1);
     expect(agents[0]).toMatchObject({
       id: `claude:${SESSION}`, name: 'Fix flaky tests', project: 'My Project', status: 'busy', tier: 'B',
-      currentActivity: 'Bash: npm test', hooked: false, canInstruct: false, source: 'Claude Code · VS Code',
+      currentActivity: 'Running npm test', hooked: false, canInstruct: false, source: 'Claude Code · VS Code',
     });
     expect(registry.recentEvents(`claude:${SESSION}`).map((e) => e.kind)).toEqual(['prompt', 'tool_call']);
     expect(collector.sessionFileFor(SESSION)?.pid).toBe(100);
@@ -71,7 +71,7 @@ describe('ClaudeSessionsCollector', () => {
     collector.noteActivity(SESSION, { agentId: `claude:${SESSION}`, ts: Date.now(), kind: 'tool_call', summary: 'Edit: a.ts' });
     collector.noteActivity('unknown', { agentId: 'x', ts: 1, kind: 'tool_call', summary: 'ignored' });
     await collector.scan();
-    expect(registry.get(`claude:${SESSION}`)?.currentActivity).toBe('Edit: a.ts');
+    expect(registry.get(`claude:${SESSION}`)?.currentActivity).toBe('Editing a.ts');
   });
 
   it('hides sessions owned by managed runners and survives a missing directory', async () => {
@@ -111,7 +111,7 @@ describe('ClaudeSessionsCollector', () => {
     expect(parent?.parentId).toBeUndefined();
     expect(registry.findBySessionId(SESSION)?.id).toBe(`claude:${SESSION}`);
     expect(registry.get(`claude-sub:${SESSION}:s1`)).toMatchObject({
-      name: 'Explore · Map collectors', parentId: `claude:${SESSION}`, canInstruct: false, currentActivity: 'Grep: collector',
+      name: 'Explore · Map collectors', parentId: `claude:${SESSION}`, canInstruct: false, currentActivity: 'Searching for “collector”',
     });
   });
 
@@ -180,8 +180,29 @@ describe('CodexSessionsCollector', () => {
     const [agent] = registry.list();
     expect(agent).toMatchObject({
       id: 'codex:codex-thread', vendor: 'codex', tier: 'C', project: 'api', status: 'busy',
-      currentActivity: 'exec: rg TODO', canInstruct: false, stopBlockedReason: CODEX_STOP_BLOCKED,
+      currentActivity: 'Running rg TODO', canInstruct: false, stopBlockedReason: CODEX_STOP_BLOCKED,
     });
+  });
+
+  it('names a Codex thread after its first request instead of its folder', async () => {
+    // Arrange
+    const now = new Date();
+    const { root, file } = codexFixture(now, 0);
+    const prompt = (message: string) => JSON.stringify({ type: 'event_msg', timestamp: now.toISOString(), payload: { type: 'user_message', message } });
+    appendFileSync(file, `${prompt('<environment_context>cwd</environment_context>')}\n${prompt('add retries to the uploader. Then rerun tests')}\n${prompt('also bump the version')}\n`);
+    const registry = new AgentRegistry();
+    // Act
+    await legacyCodex(registry, () => [codexBackend], root).scan(now.getTime());
+    // Assert
+    expect(registry.get('codex:codex-thread')?.name).toBe('Add retries to the uploader');
+  });
+
+  it('falls back to the folder name when a Codex thread has no request yet', async () => {
+    const now = new Date();
+    const { root } = codexFixture(now, 0);
+    const registry = new AgentRegistry();
+    await legacyCodex(registry, () => [codexBackend], root).scan(now.getTime());
+    expect(registry.get('codex:codex-thread')?.name).toBe('Codex · api');
   });
 
   it('drops everything when no Codex process is running, and ignores stale rollouts', async () => {

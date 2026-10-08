@@ -1,6 +1,6 @@
 ﻿import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { api, request, type Agent, type AgentEvent, type SkillSummary } from '../api.ts';
+import { api, request, type Agent, type AgentEvent, type PendingInterception, type SkillSummary } from '../api.ts';
 import type { ContextDoc } from '../library/loadoutApi.ts';
 import { currentActivity, filterActivity, mergeActivity, readableTime, sessionSource, type ActivityFilter } from '../activity.ts';
 import { STATUS_LABEL, VENDOR_LABEL } from '../format.ts';
@@ -12,6 +12,10 @@ import { DocPicker } from './DocPicker.tsx';
 import { Confirm } from './Modal.tsx';
 import { SkillPicker } from './SkillPicker.tsx';
 import { Icon } from './Icon.tsx';
+import { AgentOutputs } from './AgentOutputs.tsx';
+import { MessageComposer } from '../composer/MessageComposer.tsx';
+import { availableCommands, type WaystationCommand } from '../composer/commands.ts';
+import type { CommandResult } from '../../../shared/claudeCommands.ts';
 
 interface AgentDrawerProps {
   readonly agent: Agent;
@@ -22,17 +26,19 @@ interface AgentDrawerProps {
   readonly onClose: () => void;
   readonly onSelect: (id: string) => void;
   readonly notify: (text: string, kind?: 'ok' | 'error') => void;
+  /** Held tool calls across all agents; the composer answers this agent's oldest one. */
+  readonly pending?: readonly PendingInterception[];
 }
 
-type Tab = 'overview' | 'activity' | 'details';
+type Tab = 'overview' | 'activity' | 'outputs' | 'details';
 type Composer = 'message' | 'followup' | 'skills' | 'docs' | undefined;
 type Pending = { title: string; body: string; label: string; danger?: boolean; action: () => Promise<void> };
 type NumberedEvent = AgentEvent & { readonly seq: number };
 let nextSeq = 0;
 const numbered = (event: AgentEvent): NumberedEvent => ({ ...event, seq: nextSeq++ });
-const TABS: readonly Tab[] = ['overview', 'activity', 'details'];
+const TABS: readonly Tab[] = ['overview', 'activity', 'outputs', 'details'];
 
-export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now, onClose, onSelect, notify }: AgentDrawerProps) {
+export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now, onClose, onSelect, notify, pending = [] }: AgentDrawerProps) {
   const uid = useId();
   const scrollArea = useRef<HTMLDivElement>(null);
   const [events, setEvents] = useState<NumberedEvent[]>([]);
@@ -162,6 +168,39 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
     action: async () => { await run('stop', () => api.stop(agent.id), 'Agent stopped'); },
   });
 
+  const held = pending.filter(item => item.agentId === agent.id).sort((a, b) => a.createdAt - b.createdAt)[0];
+  const composerCommandList = availableCommands({ agent, hasPending: !!held, canIntercept, canOpenCli: canOpenInCli });
+
+  /** Slash commands typed in the composer; returns whether the input can be cleared. */
+  const runCommand = async (name: WaystationCommand, arg: string): Promise<boolean> => {
+    switch (name) {
+      case 'help': return true;
+      case 'approve': return held ? run('decide', () => api.decide(held.id, { behavior: 'allow' }), 'Approved') : false;
+      case 'deny': return held ? run('decide', () => api.decide(held.id, { behavior: 'deny', message: arg || 'Denied by the operator.' }), 'Denied') : false;
+      case 'ask': return held ? run('decide', () => api.decide(held.id, { behavior: 'ask' }), 'Handed back to Claude Code’s prompt') : false;
+      case 'interrupt': return run('interrupt', () => api.interrupt(agent.id), 'Interrupted');
+      case 'intercept': return run('intercept', () => api.intercept(agent.id, arg === 'on'), arg === 'on' ? 'Intercept on' : 'Intercept off');
+      case 'rename': return run('rename', () => api.rename(agent.id, arg), `Renamed to ${arg}`);
+      case 'delegate': return run('delegate', () => api.delegate(agent.id, arg, false), 'Delegated to a new agent');
+      case 'clear-guard': return run('guard', () => api.resetBreaker(agent.id), 'Runaway guard cleared');
+      case 'stop': confirmStop(); return true;
+      case 'cli': confirmCli(); return true;
+    }
+  };
+
+  /** Claude Code commands Waystation answers itself (/usage, /mcp, /model…). */
+  const runNative = async (name: string, arg: string): Promise<CommandResult | undefined> => {
+    setActionError(undefined);
+    try {
+      const { result } = await api.command(agent.id, name, arg);
+      if (result.done) notify(result.done);
+      return result;
+    } catch (error) {
+      notify((error as Error).message, 'error');
+      return undefined;
+    }
+  };
+
   const selectTabWithKeyboard = (e: React.KeyboardEvent<HTMLButtonElement>, current: Tab) => {
     const index = TABS.indexOf(current);
     const next = e.key === 'ArrowRight' ? TABS[(index + 1) % TABS.length]
@@ -186,7 +225,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
       </header>
 
       <nav className="detail-tabs" role="tablist" aria-label="Agent sections">
-        {TABS.map(item => <button key={item} role="tab" id={`${uid}-${item}`} aria-selected={tab === item} aria-controls={`${uid}-panel`} tabIndex={tab === item ? 0 : -1} onClick={() => setTab(item)} onKeyDown={e => selectTabWithKeyboard(e, item)}>{item === 'overview' ? 'Overview' : item === 'activity' ? 'Activity' : 'Details'}</button>)}
+        {TABS.map(item => <button key={item} role="tab" id={`${uid}-${item}`} aria-selected={tab === item} aria-controls={`${uid}-panel`} tabIndex={tab === item ? 0 : -1} onClick={() => setTab(item)} onKeyDown={e => selectTabWithKeyboard(e, item)}>{item === 'overview' ? 'Overview' : item === 'activity' ? 'Activity' : item === 'outputs' ? 'Outputs' : 'Details'}</button>)}
       </nav>
 
       <div ref={scrollArea} className="detail-scroll" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${tab}`} tabIndex={0}>
@@ -199,14 +238,14 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
 
           {!canMessage && !ended && <div className="detail-access-note"><Icon name="info" size={18} /><div><strong>{agent.tier === 'B' && !hooksInstalled ? 'Connect this Claude Code session' : 'This session runs outside Waystation'}</strong><p>{agent.tier === 'B' && !hooksInstalled ? 'Install hooks from the top bar to send messages and review tool calls.' : 'You can follow its activity here. To send a message, use the app where you started it.'}</p><button onClick={() => setTab('activity')}>View activity<Icon name="arrow" size={13} /></button></div></div>}
 
-          {canMessage && composer !== 'followup' && composer !== 'skills' && composer !== 'docs' && <form className="detail-composer" onSubmit={e => {
-            e.preventDefault();
-            void run('message', () => api.instruct(agent.id, message.trim()), 'Message sent').then(ok => { if (ok) setMessage(''); });
-          }}>
-            <label htmlFor={`${uid}-message`}>Send a message</label>
-            <textarea id={`${uid}-message`} className="text-input" rows={3} value={message} onChange={e => setMessage(e.target.value)} placeholder="What would you like this agent to do?" disabled={!!busy} />
-            <div className="composer-footer"><span>{agent.tier === 'B' ? 'Delivered after the next tool call.' : isClaude ? 'Sent to this running session.' : 'Delivered between turns.'}</span><button className="btn btn-go" type="submit" disabled={!!busy || !message.trim()}><Icon name="send" size={15} />{busy === 'message' ? 'Sending…' : 'Send message'}</button></div>
-          </form>}
+          {canMessage && composer !== 'followup' && composer !== 'skills' && composer !== 'docs' && <MessageComposer
+            commands={composerCommandList}
+            hint={agent.tier === 'B' ? 'Delivered after the next tool call.' : isClaude ? 'Sent to this running session.' : 'Delivered between turns.'}
+            busy={!!busy}
+            onSend={text => run('message', () => api.instruct(agent.id, text), 'Message sent')}
+            onRun={runCommand}
+            onNative={runNative}
+            onOpenCli={canOpenInCli ? confirmCli : undefined} />}
 
           {(canOpenInCli || agent.cwd || canMessage) && <div className="detail-action-list">
             {canOpenInCli && <button className="detail-action" onClick={confirmCli} disabled={!!busy}><span className="detail-action-icon"><Icon name="terminal" size={19} /></span><span><strong>{busy === 'cli' ? 'Opening…' : handsOff ? `Continue in ${cliName}` : `Open in ${cliName}`}</strong><small>{handsOff ? `Move this session into the real ${cliName} CLI, with /usage, /model and everything else.` : `Open this conversation in the real ${cliName} CLI, as a copy. This session keeps running.`}</small></span><Icon name="chevronRight" size={16} /></button>}
@@ -252,6 +291,8 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
           {loadError && <div className="detail-load-error" role="alert"><p>Couldn’t load activity. {loadError}</p><button className="btn" onClick={() => setRefresh(x => x + 1)} disabled={loading}>Try again</button></div>}
           {loading && !events.length ? <p className="detail-empty-text">Loading activity…</p> : visibleEvents.length ? <ActivityFeed events={visibleEvents} now={now} /> : !loadError && <div className="detail-feed-empty"><Icon name={search ? 'search' : 'message'} size={25} /><h4>{search ? 'No matches in this session' : filter === 'tools' ? 'No tool calls recorded yet' : 'No messages recorded yet'}</h4><p>{search ? 'Try a different word, or clear the search.' : 'New activity will appear here as it happens.'}</p>{search && <button className="btn" onClick={() => setSearch('')}>Clear search</button>}</div>}
         </section>}
+
+        {tab === 'outputs' && <AgentOutputs agent={agent} now={now} />}
 
         {tab === 'details' && <section className="detail-information">
           <div className="detail-section-heading"><div><h3>About this session</h3><p>Where it’s running and what Waystation can do.</p></div></div>

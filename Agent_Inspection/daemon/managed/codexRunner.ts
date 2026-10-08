@@ -5,11 +5,12 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { MANAGED_ENV_FLAG } from '../config.ts';
 import type { Agent, AgentStatus, EventKind } from '../domain/types.ts';
-import { describeToolInput, projectName, summarize } from '../domain/text.ts';
+import { describeToolInput, projectName, summarize, taskTitle } from '../domain/text.ts';
 import type { ManagedHost, ManagedLaunch, ManagedRunner } from './types.ts';
 import { stopProcessTree } from '../actions/kill.ts';
 import { UsageMeter, codexExecTurnUsage } from '../usage/usageMeter.ts';
 import { codexMcpArgs, codexRemoteMcpArgs, remoteHeaderPlan } from './cliCommands.ts';
+import { activityFromEvent } from '../../shared/plainActivity.ts';
 
 /** Resolve the npm-installed Codex CLI entry so we can spawn it without a shell. */
 export function resolveCodexEntry(): string | undefined {
@@ -101,7 +102,7 @@ export class CodexRunner implements ManagedRunner {
       id: this.id,
       vendor: 'codex',
       tier: 'A',
-      name: this.launch.name ?? `Managed Codex · ${projectName(this.launch.cwd)}`,
+      name: this.launch.name ?? taskTitle(this.launch.prompt) ?? `Managed Codex · ${projectName(this.launch.cwd)}`,
       sessionId: this.threadId,
       pid: this.child?.pid,
       cwd: this.launch.cwd,
@@ -200,7 +201,7 @@ export class CodexRunner implements ManagedRunner {
 
   private event(kind: EventKind, summary: string): void {
     this.lastEventAt = Date.now();
-    if (kind !== 'status' && kind !== 'system') this.activity = summary;
+    if (kind !== 'status' && kind !== 'system') this.activity = activityFromEvent({ kind, summary });
     this.host.onEvent({ agentId: this.id, ts: this.lastEventAt, kind, summary });
     this.publish();
   }

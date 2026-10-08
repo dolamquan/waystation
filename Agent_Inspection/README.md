@@ -1,6 +1,16 @@
-# Agent Control Tower
+# Waystation
 
-One place to see every coding agent running on this machine, and to step in when you need to: intercept a tool call, give an instruction, stop an agent, hand its work to a new agent, or attach a skill.
+**See and steer every coding agent on your machine (Claude Code, Codex and more) from one place.**
+
+![Waystation: live agents as a crew in the station scene, with the workspace sidebar](docs/waystation.png)
+
+## Why Waystation
+
+- **One view across vendors.** Claude Code, Codex, Aider, Gemini CLI, Cursor Agent, OpenCode and Goose sessions all show up together, whether they run in a terminal, VS Code or from Waystation itself.
+- **Intercept and approve tool calls.** Hold an agent's next tool call, then approve it, edit its input, or deny it with an instruction. You can also send messages, stop agents, delegate their work and attach skills.
+- **Mixed Claude + Codex teams.** Members share a task board and message each other. Each one works in its own git worktree sandbox, and you merge their work when you're ready.
+- **Runaway guard and cost estimates.** Each card shows its model, an estimated cost and how full its context is. The guard steps in when an agent loops, keeps failing or goes over a spend limit.
+- **The animated station.** Live sessions appear as a small illustrated crew, with an office for each project folder, so you can tell at a glance who is working, who is waiting and who needs you.
 
 Runs locally on Windows. Node 22+.
 
@@ -8,23 +18,30 @@ Runs locally on Windows. Node 22+.
 
 ```bash
 npm install
-npm start          # builds the UI and starts the daemon on http://127.0.0.1:4317
-npm run open       # opens the UI with this run's access token
+npm start          # builds the UI if needed, starts Waystation, and opens it in your browser
 ```
 
-The daemon prints a link like `http://127.0.0.1:4317/#token=…`. The token changes every time the daemon starts. Press the power button to bring the tower online.
+That's it: the browser opens straight into your workspace. Press Ctrl+C in the terminal to stop Waystation. If Waystation is already running, `npm start` just opens the browser.
 
-To have the tower intercept and instruct the Claude Code sessions you already run, click **Install hooks** in the top bar (see [Hooks](#hooks)).
+- `npm start -- --no-open` starts Waystation without opening a browser. Run `npm run open` later to open it.
+- After `npm link` (or a global install from this folder), the same launcher is available as the `waystation` command.
+- `npm run serve` is the old two-step start: it builds the UI and runs the daemon in the foreground, printing a link like `http://127.0.0.1:4317/#token=…`. Open that link, or run `npm run open`, then click **Enter the station**.
+
+The access token changes every time Waystation starts. The launcher never prints it.
+
+To have Waystation intercept and instruct the Claude Code sessions you already run, click **Install hooks** in the top bar (see [Hooks](#hooks)).
 
 ## Waystation: your animated agent workspace
 
-Click **Enter the station** to see live sessions as a crew of original vector characters: Pip, Mica, Orbit, Sprout, Bolt, and Nova. Character identities stay consistent for each session. Working characters type, waiting characters wave for attention, idle characters stroll, and stopped characters sleep. The scene is a visualization; character movement does not issue agent commands.
+Open the station to see live sessions as a crew of original vector characters: Pip, Mica, Orbit, Sprout, Bolt, and Nova. Character identities stay consistent for each session. Working characters type, waiting characters wave for attention, idle characters stroll, and stopped characters sleep. The scene is a visualization; character movement does not issue agent commands.
 
 Each working folder has its own office. Switch between **folder tabs** above the floor to see only that folder's agents and crew; the selected folder's full path appears below the tabs. Folders with the same name are distinguished by their parent paths. Team members share a table in their team's repository office, including members working in separate worktrees. Sessions without a known folder appear in **Unassigned**.
 
 Agents launched through Waystation keep their name and controls when the background scanner discovers their session transcript. The managed session and its transcript observation share one dashboard entry. Genuine subagents and independent sessions remain separate.
 
 Choose **Moonbase**, **Greenhouse**, or **Deep Sea** to change the environment. Your theme preference is saved in your browser. Use the office crew selector to view a team within the selected office, the deck arrows to see larger crews, and the camera button to zoom or fit the floor. Click a character or a crew row to open the existing agent controls. Folder tabs also work in the full-screen station; use the arrow keys to switch tabs.
+
+Tool calls waiting for your approval and runaway-guard alarms also appear in the station scene, so you can act on them right there. When you come back after a while, the overview opens with a **While you were away** recap of what finished, what failed and who is waiting for you.
 
 **Explore the demo** shows a clearly labeled sample crew without launching agents or enabling live actions. The pause button stops scene animations, and the scene also follows your system's reduced-motion setting.
 
@@ -150,7 +167,7 @@ Open **Teams** in the sidebar and click **New team** to put several agents on on
 
 How a team works:
 
-- **Sandboxes.** Each member gets its own git worktree and branch (`team/<name>-<id>/<member>`), stored in `%LOCALAPPDATA%gent-tower	eams`, so members never overwrite each other or your checkout.
+- **Sandboxes.** Each member gets its own git worktree and branch (`team/<name>-<id>/<member>`), stored in `%LOCALAPPDATA%\agent-tower\teams`, so members never overwrite each other or your checkout.
   - Codex members run with the `workspace-write` sandbox.
   - Claude members cannot use Write/Edit outside their worktree, or on agent and git configuration inside it. Shell commands aren't covered, so treat this as a guard rail, not a security boundary.
 - **Shared channel and task board.** Every member, whatever its model, gets the same `team` MCP tools: `team_roster`, `post_message`, `read_messages`, `list_tasks`, `create_task`, `claim_task`, `update_task`, `handoff`, and `finish_team` (lead only).

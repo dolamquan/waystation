@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
-import type { Agent, TeamView } from '../api.ts';
+import type { Agent, PendingInterception, TeamView } from '../api.ts';
 import { deckRows, layoutDecks, teamAgentIds, type Placement } from '../stationLayout.ts';
 import { useDragPan, useStationScale } from '../useStationViewport.ts';
 import { CREW, WORLD_THEMES, characterFor, subagentsByParent, type WorldTheme } from '../crew.ts';
@@ -7,6 +7,7 @@ import { stationOffices } from '../stationOffices.ts';
 import { STATUS_LABEL, VENDOR_LABEL } from '../format.ts';
 import { CrewAvatar } from './CrewAvatar.tsx';
 import { StationScene } from './StationScene.tsx';
+import type { Notify } from './StationApproval.tsx';
 import { Icon } from './Icon.tsx';
 
 interface AgentWorldProps {
@@ -18,6 +19,9 @@ interface AgentWorldProps {
   readonly onLaunch: () => void;
   readonly teams?: readonly TeamView[];
   readonly onOpenTeam?: (teamId: string) => void;
+  /** Held tool calls, shown as Approve / Deny bubbles over their agents' desks. */
+  readonly pending?: readonly PendingInterception[];
+  readonly notify?: Notify;
 }
 
 const TEAM_FILTER = 'team:';
@@ -35,6 +39,9 @@ export const PREVIEW_CREW: Agent[] = CREW.map((character, i) => ({
   intercepting: false,
   canInstruct: false,
 }));
+
+/** One sample held call, so the demo shows an approval bubble (its buttons only explain themselves). */
+const DEMO_PENDING: readonly PendingInterception[] = [{ id: 'demo-pending', agentId: PREVIEW_CREW[2].id, sessionId: 'demo', toolName: 'Bash', input: { command: 'npm test' }, createdAt: 0, origin: 'hook' }];
 
 interface CrewRowProps {
   readonly agent: Agent;
@@ -96,7 +103,7 @@ function savedTheme(): WorldTheme {
   return 'moonbase';
 }
 
-export function AgentWorld({ agents, selectedId, connected, authError, onSelect, onLaunch, teams = [], onOpenTeam }: AgentWorldProps) {
+export function AgentWorld({ agents, selectedId, connected, authError, onSelect, onLaunch, teams = [], onOpenTeam, pending = [], notify }: AgentWorldProps) {
   const [theme, setTheme] = useState<WorldTheme>(savedTheme);
   const [officeKey, setOfficeKey] = useState<string>();
   const officeId = useId();
@@ -235,7 +242,7 @@ export function AgentWorld({ agents, selectedId, connected, authError, onSelect,
       <div className="world-body" id={`${officeId}-panel`} role={!demo && office ? 'tabpanel' : undefined} aria-labelledby={!demo && office ? `${officeId}-tab-${offices.indexOf(office)}` : undefined}>
         <div className="world-scene-wrap">
           <div className="world-scene-topline"><span className={`world-live ${demo ? 'world-demo' : ''}`}><span className={`connection-dot ${connected && !demo ? 'live' : ''}`} />{demo ? 'DEMO CREW' : connected ? 'LIVE WORKSPACE' : authError ? 'ACCESS TOKEN REQUIRED' : 'CONNECTING'}</span><div className="scene-camera"><span className="world-coordinate">{theme === 'moonbase' ? '25.8° N / 02.6° E' : theme === 'greenhouse' ? '21°C / A LITTLE SUNSHINE' : 'DEPTH 2,400 M / ALL IS QUIET'}</span><button onClick={() => setZoomed(!zoomed)} aria-label={zoomed ? 'Fit station to view' : 'Zoom in on station'} aria-pressed={zoomed} title={zoomed ? 'Fit station to view' : 'Zoom in on station'}><Icon name={zoomed ? 'fit' : 'zoom'} size={14} /></button></div></div>
-          <div ref={viewport} className={`scene-viewport ${zoomed ? 'scene-zoomed' : ''}`}><StationScene deck={deck} allAgents={demo ? PREVIEW_CREW : agents} rows={rows} scale={scale} onOpenTeam={demo ? undefined : onOpenTeam} theme={theme} paused={paused} selectedId={demo ? demoId : selectedId} onSelect={demo ? setDemoId : onSelect} subagents={helpers} /></div>
+          <div ref={viewport} className={`scene-viewport ${zoomed ? 'scene-zoomed' : ''}`}><StationScene deck={deck} allAgents={demo ? PREVIEW_CREW : agents} rows={rows} scale={scale} onOpenTeam={demo ? undefined : onOpenTeam} theme={theme} paused={paused} selectedId={demo ? demoId : selectedId} onSelect={demo ? setDemoId : onSelect} subagents={helpers} pending={demo ? DEMO_PENDING : pending} notify={notify} demo={demo} /></div>
           {!deck.length && <div className="world-empty"><Icon name="planet" size={24} /><h3>{authError ? 'Your station is waiting' : connected ? 'Room for your first explorer' : 'Finding your crew…'}</h3><p>{authError ? 'Open the daemon’s access link to connect your agents.' : connected ? 'Launch an agent and watch it settle into the station.' : 'The crew will arrive when the daemon connects.'}</p>{connected && <button className="btn btn-go" onClick={onLaunch}><Icon name="plus" size={15} />Launch an agent</button>}</div>}
           {preview && demo && <div className="demo-inspector" role="status"><CrewAvatar id={preview.id} status={preview.status} size={38} /><div><strong>{preview.name} · {STATUS_LABEL[preview.status]}</strong><span>A sample session avatar. No agent is running in this demo.</span></div><button className="icon-btn" aria-label="Close demo details" onClick={() => setDemoId(undefined)}><Icon name="close" size={14} /></button></div>}
           <div className="world-scene-footer"><span><Icon name="cursor" size={13} />Click a crewmate to check in · drag to look around · {rows} rows of desks</span><div className="deck-controls"><button aria-label="Previous deck" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 0}><Icon name="chevronLeft" size={14} /></button><span>DECK {String(currentPage + 1).padStart(2, '0')}{pages > 1 ? ` / ${String(pages).padStart(2, '0')}` : ''}</span><button aria-label="Next deck" onClick={() => setPage(currentPage + 1)} disabled={currentPage >= pages - 1}><Icon name="chevronRight" size={14} /></button></div></div>

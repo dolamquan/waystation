@@ -104,7 +104,7 @@ describe('SubagentCollector', () => {
     expect(agent).toMatchObject({
       name: 'Explore · Map collectors', vendor: 'claude', tier: 'C', status: 'busy', parentId: PARENT_ID,
       cwd: CWD, project: 'Demo App', canInstruct: false, intercepting: false, hooked: false,
-      stopBlockedReason: SUBAGENT_STOP_BLOCKED, currentActivity: 'Grep: collector', model: 'claude-sonnet-4-5',
+      stopBlockedReason: SUBAGENT_STOP_BLOCKED, currentActivity: 'Searching for “collector”', model: 'claude-sonnet-4-5',
       subagent: { type: 'Explore', description: 'Map collectors', parentName: 'Parent task' },
     });
     expect(agent?.sessionId).toBeUndefined();

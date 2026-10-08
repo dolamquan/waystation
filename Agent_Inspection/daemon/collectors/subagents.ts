@@ -5,6 +5,7 @@ import type { Agent, AgentStatus } from '../domain/types.ts';
 import type { AgentRegistry } from '../domain/registry.ts';
 import { JsonlTailer } from './jsonlTail.ts';
 import { normalizeClaudeLine } from './normalizers.ts';
+import { activityFromEvent } from '../../shared/plainActivity.ts';
 import { UsageMeter, claudeUsageSample, scanJsonl } from '../usage/usageMeter.ts';
 
 export const SUBAGENT_SOURCE = 'claude-subagents';
@@ -228,7 +229,7 @@ export class SubagentCollector {
     if (state.startedAt === undefined && typeof entry.timestamp === 'string') state.startedAt = Date.parse(entry.timestamp) || undefined;
     const { events } = normalizeClaudeLine(registryId, { ...entry, isSidechain: false });
     for (const event of events) {
-      state.activity = event.summary;
+      state.activity = activityFromEvent(event);
       state.lastEventAt = event.ts;
       this.deps.registry.pushEvent(event);
     }

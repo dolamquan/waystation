@@ -43,8 +43,12 @@ svg { flex: none; vertical-align: middle; }
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; color: #d0e4cf; background: #324537; border: 1px solid #4a604c; border-radius: 10px; flex: none; }
 
 /* Workspace shell */
-.tower { min-height: 100vh; }
-.sidebar { position: fixed; inset: 0 auto 0 0; width: 232px; background: #202d25; color: #ebeee7; padding: 28px 16px 18px; display: flex; flex-direction: column; z-index: 25; }
+/* The sidebar is fixed to the viewport; .tower::before paints its column down the whole page so
+   long pages (and full-page captures) never show blank space below it. Keep the colors in sync
+   with .sidebar (and the .workbench-content override in workbench.css). */
+.tower { position: relative; min-height: 100vh; }
+.tower::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 232px; background: #202d25; pointer-events: none; }
+.sidebar { position: fixed; inset: 0 auto 0 0; overflow-y: auto; width: 232px; background: #202d25; color: #ebeee7; padding: 28px 16px 18px; display: flex; flex-direction: column; z-index: 25; }
 .sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 0 10px; font-size: 17px; font-weight: 600; letter-spacing: -0.4px; }
 .sidebar-brand div > span { display: block; margin-top: 3px; font: 8px var(--mono); letter-spacing: 0.18em; color: #a8b5a6; }
 .workspace-label { display: flex; align-items: center; gap: 10px; margin: 31px 0 28px; padding: 12px 10px; border: 1px solid #3b473e; border-radius: 8px; font-size: 12px; }
@@ -315,6 +319,7 @@ input[type='checkbox'] { accent-color: var(--accent); flex: none; }
 }
 @media (max-width: 900px) {
   .sidebar { width: 204px; padding-left: 12px; padding-right: 12px; }
+  .tower::before { width: 204px; }
   .sidebar-brand { font-size: 15px; padding-left: 5px; gap: 9px; }
   .main-shell { margin-left: 204px; }
   .dashboard-content { padding: 28px 22px 22px; }
@@ -333,7 +338,8 @@ input[type='checkbox'] { accent-color: var(--accent); flex: none; }
   .standby-local { font-size: 8px; }
 }
 @media (max-width: 700px) {
-  .sidebar { position: relative; width: 100%; padding: 18px 20px 12px; }
+  .sidebar { position: relative; width: 100%; padding: 18px 20px 12px; overflow-y: visible; }
+  .tower::before { display: none; }
   .sidebar-brand { font-size: 16px; padding: 0; }
   .sidebar-brand .brand-mark { width: 32px; height: 32px; border-radius: 7px; }
   .sidebar-brand div > span { font-size: 7px; }

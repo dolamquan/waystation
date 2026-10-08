@@ -1,11 +1,15 @@
 {
-  "name": "agent-control-tower",
+  "name": "waystation",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Real-time dashboard to see, intercept, instruct, stop, delegate and skill-up every coding agent on this machine.",
+  "description": "Waystation: see and steer every coding agent on this machine (Claude Code, Codex and more) from one local dashboard. Intercept tool calls, instruct, stop, delegate and run mixed agent teams.",
+  "bin": {
+    "waystation": "scripts/waystation.mjs"
+  },
   "scripts": {
-    "start": "vite build && tsx daemon/index.ts",
+    "start": "node scripts/waystation.mjs",
+    "serve": "vite build && tsx daemon/index.ts",
     "daemon": "tsx daemon/index.ts",
     "daemon:dev": "tsx daemon/index.ts --dev",
     "dev:web": "vite",

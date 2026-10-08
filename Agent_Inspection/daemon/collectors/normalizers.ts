@@ -1,5 +1,5 @@
 import type { AgentEvent, EventKind } from '../domain/types.ts';
-import { describeToolInput, summarize } from '../domain/text.ts';
+import { describeToolInput, summarize, summarizeBlock, taskTitle } from '../domain/text.ts';
 import { isApprovalReview } from '../../shared/approvalReview.ts';
 
 type Json = Record<string, unknown>;
@@ -16,12 +16,17 @@ const toTs = (value: unknown, fallback: number): number => {
   return fallback;
 };
 
+/** Agent replies are what the Outputs tab shows as results, so they keep far more than other summaries. */
+const REPLY_MAX = 4000;
+
 const make = (agentId: string, ts: number, kind: EventKind, summary: string): AgentEvent =>
   ({ agentId, ts, kind, summary });
 
 export interface NormalizedTranscript {
   readonly events: AgentEvent[];
   readonly title?: string;
+  /** A short name derived from a user request; collectors keep the first one as a fallback session name. */
+  readonly taskTitle?: string;
 }
 
 /** Claude Code transcript line (~/.claude/projects/<slug>/<session>.jsonl) -> events. */
@@ -36,11 +41,11 @@ export function normalizeClaudeLine(agentId: string, line: unknown, now = Date.n
   const content = message?.content;
 
   if (entry.type === 'user') {
-    if (typeof content === 'string') return { events: [make(agentId, ts, 'prompt', summarize(content))] };
+    if (typeof content === 'string') return { events: [make(agentId, ts, 'prompt', summarize(content))], taskTitle: taskTitle(content) };
     if (Array.isArray(content)) {
       const text = content.map(asRecord).find((block) => block?.type === 'text');
       if (text && typeof text.text === 'string' && !text.text.startsWith('<')) {
-        return { events: [make(agentId, ts, 'prompt', summarize(text.text))] };
+        return { events: [make(agentId, ts, 'prompt', summarize(text.text))], taskTitle: taskTitle(text.text) };
       }
     }
     return { events: [] };
@@ -53,7 +58,7 @@ export function normalizeClaudeLine(agentId: string, line: unknown, now = Date.n
         return [make(agentId, ts, 'tool_call', describeToolInput(block.name, block.input))];
       }
       if (block?.type === 'text' && typeof block.text === 'string' && block.text.trim()) {
-        return [make(agentId, ts, 'assistant', summarize(block.text))];
+        return [make(agentId, ts, 'assistant', summarizeBlock(block.text, REPLY_MAX))];
       }
       return [];
     });
@@ -78,7 +83,7 @@ export function normalizeCodexLine(agentId: string, line: unknown, now = Date.no
       const text = payload.content.map(asRecord).find((block) => typeof block?.text === 'string');
       if (text) {
         const message = String(text.text);
-        return { events: [make(agentId, ts, isApprovalReview(message) ? 'system' : 'assistant', summarize(message))] };
+        return { events: [make(agentId, ts, isApprovalReview(message) ? 'system' : 'assistant', summarizeBlock(message, REPLY_MAX))] };
       }
     }
     return { events: [] };
@@ -86,10 +91,10 @@ export function normalizeCodexLine(agentId: string, line: unknown, now = Date.no
 
   if (entry.type === 'event_msg') {
     if (payload.type === 'user_message' && typeof payload.message === 'string') {
-      return { events: [make(agentId, ts, 'prompt', summarize(payload.message))] };
+      return { events: [make(agentId, ts, 'prompt', summarize(payload.message))], taskTitle: taskTitle(payload.message) };
     }
     if (payload.type === 'agent_message' && typeof payload.message === 'string') {
-      return { events: [make(agentId, ts, isApprovalReview(payload.message) ? 'system' : 'assistant', summarize(payload.message))] };
+      return { events: [make(agentId, ts, isApprovalReview(payload.message) ? 'system' : 'assistant', summarizeBlock(payload.message, REPLY_MAX))] };
     }
     if (payload.type === 'task_started') return { events: [make(agentId, ts, 'status', 'turn started')] };
     if (payload.type === 'task_complete') return { events: [make(agentId, ts, 'status', 'turn complete')] };

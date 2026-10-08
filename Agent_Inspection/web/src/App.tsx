@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from './api.ts';
+import { api, autostart } from './api.ts';
 import { useTower } from './useTower.ts';
 import { PowerOn } from './components/PowerOn.tsx';
 import { AgentCard } from './components/AgentCard.tsx';
@@ -10,6 +10,7 @@ import { NewAgentDialog } from './components/NewAgentDialog.tsx';
 import { Confirm } from './components/Modal.tsx';
 import { Icon } from './components/Icon.tsx';
 import { AgentWorld } from './components/AgentWorld.tsx';
+import { AwayRecap } from './components/AwayRecap.tsx';
 import { NewTeamDialog } from './components/NewTeamDialog.tsx';
 import { TeamsView } from './components/TeamsView.tsx';
 import { OpsView } from './components/OpsView.tsx';
@@ -22,7 +23,7 @@ type Toast = { id: number; text: string; kind: 'ok' | 'error' };
 type Filter = 'all' | 'claude' | 'codex' | 'other';
 type View = 'fleet' | 'attention' | 'teams' | 'ops' | 'library';
 const VIEW_TITLE: Record<View, { crumb: string; title: string; subtitle: string }> = {
-  fleet: { crumb: 'Overview', title: 'Your workspace', subtitle: 'See what’s running and pick up where you left off.' },
+  fleet: { crumb: 'Overview', title: 'Your workspace', subtitle: 'See and steer every coding agent on this machine — Claude Code, Codex and more — from one place.' },
   attention: { crumb: 'Needs attention', title: 'Needs attention', subtitle: 'Sessions waiting for your input or approval.' },
   teams: { crumb: 'Teams', title: 'Agent teams', subtitle: 'A shared goal, a task board, and room for everyone’s work.' },
   ops: { crumb: 'Usage & schedules', title: 'Usage & schedules', subtitle: 'The numbers so far, and what’s on the calendar.' },
@@ -33,7 +34,7 @@ const TOAST_MS = 4200;
 const CLOCK_MS = 5000;
 
 export function App() {
-  const [powered, setPowered] = useState(false);
+  const [powered, setPowered] = useState(autostart);
   const tower = useTower(powered);
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -162,8 +163,9 @@ export function App() {
               {view === 'ops' && <OpsView defaultCwd={selected?.cwd} notify={notify} onNewAgent={() => setShowNew(true)} />}
               {view === 'library' && <LibraryView notify={notify} />}
               {(view === 'fleet' || view === 'attention') && <>
-              {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={(teamId) => { setView('teams'); setSelectedTeamId(teamId); }} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} />}
+              {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={(teamId) => { setView('teams'); setSelectedTeamId(teamId); }} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} pending={tower.pending} notify={notify} />}
 
+              {view === 'fleet' && tower.connected && <AwayRecap agents={tower.agents} pending={tower.pending} now={now} onSelect={setSelectedId} />}
               <section className="metric-grid fleet-metrics" aria-label="Fleet summary">
                 <div className="metric"><div className="metric-label">Total agents<Icon name="grid" /></div><div className="metric-value">{counts.total.toString().padStart(2, '0')}</div><div className="metric-note">Across your local workspace</div></div>
                 <div className="metric"><div className="metric-label">Working now<Icon name="activity" /></div><div className="metric-value">{counts.busy.toString().padStart(2, '0')}<span className="metric-indicator"><span className="connection-dot live" />{counts.busy ? 'Active' : 'Quiet'}</span></div><div className="metric-note">Agents currently on a task</div></div>
@@ -225,6 +227,7 @@ export function App() {
                   onClose={() => setSelectedId(undefined)}
                   onSelect={setSelectedId}
                   notify={notify}
+                  pending={tower.pending}
                 />
               )}
             </AnimatePresence>
@@ -243,8 +246,8 @@ export function App() {
           <Confirm
             title={hookConfirm === 'install' ? 'Install tower hooks?' : 'Remove tower hooks?'}
             body={hookConfirm === 'install'
-              ? 'Adds Agent Control Tower hooks to ~/.claude/settings.json (a backup is saved first). Hooks fail open: if the tower is not running, Claude Code behaves normally. Already-running sessions may need a restart to pick them up.'
-              : 'Removes only the Agent Control Tower entries from ~/.claude/settings.json. Other hooks are left untouched.'}
+              ? 'Adds Waystation hooks to ~/.claude/settings.json (a backup is saved first). Hooks fail open: if Waystation is not running, Claude Code behaves normally. Already-running sessions may need a restart to pick them up.'
+              : 'Removes only the Waystation entries from ~/.claude/settings.json. Other hooks are left untouched.'}
             confirmLabel={hookConfirm === 'install' ? 'Install' : 'Remove'}
             onConfirm={() => void toggleHooks(hookConfirm)}
             onClose={() => setHookConfirm(undefined)}

@@ -1,0 +1,76 @@
+/* Outputs tab in the agent drawer: results, changed files, folder status and commits. */
+.outputs { display: flex; flex-direction: column; gap: 26px; }
+.outputs > .detail-section-heading { margin: 0; }
+.outputs-section { display: flex; flex-direction: column; gap: 10px; }
+.outputs-section > h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 600; color: #554b5d; }
+.outputs-section .detail-empty-text { margin: 0; }
+.outputs-hint { margin: 0; font-size: 12px; color: #786e80; }
+.outputs-error { margin: 0; font-size: 13px; color: var(--danger); }
+.outputs-scope { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 13px; line-height: 1.5; color: #6c6273; }
+.outputs-scope > svg { flex: none; margin-top: 3px; }
+.outputs-scope code, .outputs-turn-result code { font: 12px var(--mono); background: #f6f1f8; border-radius: 4px; padding: 1px 4px; overflow-wrap: anywhere; }
+.outputs-branch { font: 12px var(--mono); font-weight: 400; color: #6c6273; background: #f6f1f8; border: 1px solid #eadfed; border-radius: 999px; padding: 1px 8px; }
+
+.outputs-badge { flex: none; font-size: 11px; font-weight: 600; line-height: 1.4; padding: 2px 7px; border-radius: 999px; color: #6c537e; background: #f3edf7; border: 1px solid #e6d9ee; }
+.outputs-badge-done { color: var(--ok); background: #eef5ee; border-color: #d4e5d6; }
+.outputs-badge-open { color: var(--warn); background: #fff7e8; border-color: #ecdab4; }
+.outputs-badge-quiet { color: #786e80; background: transparent; border-color: var(--line); font-weight: 500; }
+
+.outputs-turns, .outputs-files, .outputs-status, .outputs-commits, .outputs-chips, .outputs-turn-errors { list-style: none; margin: 0; padding: 0; }
+.outputs-turns { display: flex; flex-direction: column; gap: 12px; }
+.outputs-turn { border: 1px solid #e8e0eb; border-radius: 9px; background: #fff; padding: 13px 15px; display: flex; flex-direction: column; gap: 9px; }
+.outputs-turn-open { border-style: dashed; }
+.outputs-turn-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.outputs-turn-head time { font-size: 12px; color: #786e80; }
+.outputs-turn-prompt { margin: 0; font-size: 14px; color: #6c6273; line-height: 1.5; overflow-wrap: anywhere; }
+.outputs-turn-prompt > span, .outputs-turn-result > span { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #8c7b9b; margin-bottom: 2px; }
+.outputs-turn-result { border-left: 2px solid #c4aed4; padding-left: 11px; }
+.outputs-turn-result p { margin: 0; font-size: 15px; line-height: 1.6; color: #3f3845; white-space: pre-wrap; overflow-wrap: anywhere; }
+.outputs-turn-result a { color: var(--accent); }
+.outputs-turn-meta { margin: 0; font-size: 12px; color: #786e80; }
+.outputs-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.outputs-chips li { font: 12px var(--mono); color: #6c537e; background: #f6f1f8; border: 1px solid #eadfed; border-radius: 5px; padding: 1px 6px; }
+.outputs-turn-errors li { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; color: var(--danger); overflow-wrap: anywhere; }
+.outputs-turn-errors svg { flex: none; margin-top: 3px; }
+
+.outputs-files, .outputs-status { border: 1px solid #e8e0eb; border-radius: 9px; background: #fff; overflow: hidden; }
+.outputs-file + .outputs-file, .outputs-status > li + li { border-top: 1px solid #f0eaf2; }
+.outputs-file-row, .outputs-status-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; width: 100%; padding: 10px 13px; border: 0; background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.outputs-file-row:hover, .outputs-status-row:hover { background: #faf7fb; }
+.outputs-file-row:focus-visible, .outputs-status-row:focus-visible { outline: 2px solid #bfa4d2; outline-offset: -2px; }
+.outputs-file-row > small, .outputs-status-row > small { font-size: 12px; color: #786e80; }
+.outputs-file-row > svg { margin-left: auto; color: #786e80; transition: transform .15s; }
+.outputs-file-row[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.outputs-file-row > .outputs-path { flex: 1 1 100%; }
+.outputs-file-outside .outputs-file-row { cursor: default; opacity: .75; }
+.outputs-file-outside .outputs-file-row:hover { background: transparent; }
+.outputs-path { min-width: 0; font: 13px var(--mono); overflow-wrap: anywhere; }
+.outputs-path strong { font-weight: 600; color: #554b5d; }
+.outputs-path-dir { color: #8c7b9b; }
+.outputs-code { flex: none; width: 26px; font: 600 12px var(--mono); color: #6c537e; }
+
+.outputs-diff { padding: 0 13px 13px; }
+.outputs-diff-note { margin: 0 0 8px; font-size: 13px; color: #6c6273; }
+.outputs-diff-note.outputs-error { padding: 0 13px 13px; color: var(--danger); }
+.outputs-diff pre, .outputs-stat pre { margin: 0; max-height: 420px; overflow: auto; font: 12px/1.55 var(--mono); background: #fbf9fc; border: 1px solid #ece0f4; border-radius: 6px; padding: 10px 0; color: #4b4351; white-space: pre; }
+.outputs-diff pre > span { display: block; padding: 0 11px; min-height: 1.55em; }
+.outputs-diff pre:not(:has(> span)) { padding: 10px 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.outputs-diff-add { background: #e9f5ec; color: #1d5a3c; }
+.outputs-diff-del { background: #fbeceb; color: #8c3a33; }
+.outputs-diff-hunk { color: #6c537e; background: #f3edf7; }
+.outputs-diff-meta { color: #8c7b9b; }
+
+.outputs-stat summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #6c6273; list-style: none; }
+.outputs-stat summary::-webkit-details-marker { display: none; }
+.outputs-stat[open] summary { margin-bottom: 8px; }
+.outputs-stat pre { padding: 10px 11px; }
+
+.outputs-commits { display: flex; flex-direction: column; gap: 8px; }
+.outputs-commits li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; }
+.outputs-commits code { font: 12px var(--mono); color: #6c537e; }
+.outputs-commit-subject { font-size: 14px; color: #3f3845; overflow-wrap: anywhere; }
+.outputs-commits small { grid-column: 2; font-size: 12px; color: #786e80; }
+
+@media (prefers-reduced-motion: reduce) {
+  .outputs-file-row > svg { transition: none; }
+}

@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   // The hook script and `npm run open` read the port + token from here (per-user folder).
   writeFileSync(paths.daemonInfo, JSON.stringify({ port: DAEMON_PORT, token, pid: process.pid, startedAt: Date.now(), dev }));
   const uiPort = dev ? DEV_WEB_PORT : DAEMON_PORT;
-  console.log(`Agent Control Tower is running. Open: http://127.0.0.1:${uiPort}/#token=${token}`);
+  console.log(`Waystation is running. Open: http://127.0.0.1:${uiPort}/#token=${token}`);
   console.log('(or run `npm run open`)');
 
   let shuttingDown = false;
@@ -48,6 +48,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('Failed to start Agent Control Tower:', error);
+  console.error('Failed to start Waystation:', error);
   process.exit(1);
 });

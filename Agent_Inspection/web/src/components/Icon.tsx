@@ -30,6 +30,7 @@ const paths = {
   collapse: 'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7',
   message: 'M21 11a8 8 0 0 1-8 8H7l-5 3 2-6a8 8 0 0 1-1-5 8 8 0 0 1 8-8h2a8 8 0 0 1 8 8ZM7 9h10M7 13h6',
   send: 'm22 2-7 20-4-9L2 9l20-7ZM11 13 22 2',
+  mic: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v4M8 22h8',
   chevronDown: 'm6 9 6 6 6-6',
   copy: 'M9 9h12v12H9zM15 9V3H3v12h6',
   book: 'M12 5v16M12 5Q7 2 2 5v15q5-3 10 1 5-4 10-1V5q-5-3-10 0',
