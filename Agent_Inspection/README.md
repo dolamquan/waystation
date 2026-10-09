@@ -12,12 +12,23 @@
 - **Runaway guard and cost estimates.** Each card shows its model, an estimated cost and how full its context is. The guard steps in when an agent loops, keeps failing or goes over a spend limit.
 - **The animated station.** Live sessions appear as a small illustrated crew, with an office for each project folder, so you can tell at a glance who is working, who is waiting and who needs you.
 
-Runs locally on Windows. Node 22+.
+Runs locally on Windows. Node 22.20+.
 
 ## Quick start
 
+Launch the desktop application from this folder:
+
+```powershell
+npm ci
+npm run desktop
+```
+
+On first launch, **Desktop setup** checks your tools and explains how to connect your own agent accounts. Missing optional tools do not block the station. Closing the window keeps Waystation in the tray; choose **Quit Waystation** to stop it. See the [desktop guide](docs/desktop.md) for configuration, updates, and troubleshooting.
+
+For the browser interface:
+
 ```bash
-npm install
+npm ci
 npm start          # builds the UI if needed, starts Waystation, and opens it in your browser
 ```
 
@@ -246,6 +257,10 @@ tests/          Vitest unit and integration tests (real hook script against a re
 ```
 
 Runtime state (database, token, flags, backups) lives in `%LOCALAPPDATA%\agent-tower`, outside OneDrive. Set `AGENT_TOWER_HOME`, `CLAUDE_HOME` or `CODEX_HOME` to point elsewhere.
+
+The desktop adds `desktop.json` for preferences and `desktop-profile` for its browser profile in that same data directory. Each user supplies their own accounts and integration secrets. A project license has not been selected yet.
+
+Before publishing, use the [publication guide](docs/publication.md). `npm run export:source` prepares a clean source tree without old local captures or Git history.
 
 ## Development
 

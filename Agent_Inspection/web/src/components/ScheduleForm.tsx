@@ -6,6 +6,8 @@ import type { Vendor } from '../models.ts';
 import { Icon } from './Icon.tsx';
 import { LoadoutPicker } from './LoadoutPicker.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
+import { ProjectFolderInput } from './ProjectFolderInput.tsx';
+import { useToolAvailability } from '../useToolAvailability.ts';
 import '../library/schedules.css';
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -45,6 +47,7 @@ function readBase64(file: File): Promise<string> {
 
 /** Create or edit a schedule: when, what, the resources it needs, and who hears about each run. */
 export function ScheduleForm({ defaultCwd, schedule, onDone, notify }: ScheduleFormProps) {
+  const tools = useToolAvailability();
   const [label, setLabel] = useState(schedule?.label ?? '');
   const [vendor, setVendor] = useState<Vendor>(schedule?.launch.vendor ?? 'claude');
   const [model, setModel] = useState(schedule?.launch.model ?? '');
@@ -113,12 +116,12 @@ export function ScheduleForm({ defaultCwd, schedule, onDone, notify }: ScheduleF
         <label>Agent
           <select className="text-input" value={vendor} onChange={(e) => { setVendor(e.target.value as Vendor); setModel(''); }}>
             <option value="claude">Claude</option>
-            <option value="codex">Codex</option>
+            <option value="codex" disabled={tools.codex === false}>Codex</option>
           </select>
         </label>
         <div className="form-field"><span>Model</span><ModelPicker key={vendor} vendor={vendor} value={model} onChange={setModel} /></div>
       </div>
-      <label>Project folder (absolute path)<input className="text-input" value={cwd} onChange={(e) => setCwd(e.target.value)} required placeholder="C:\Users\you\project" /></label>
+      <ProjectFolderInput value={cwd} onChange={setCwd} />
       <label>Task<textarea className="text-input" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} required placeholder="What should the agent do each time?" /></label>
       </fieldset>
       <details className="schedule-options"><summary><Icon name="folder" size={17} /><span>Resources &amp; agent tools<small>Optional · files, links, skills and project context</small></span><Icon name="chevronDown" size={16} /></summary><div>
@@ -136,7 +139,7 @@ export function ScheduleForm({ defaultCwd, schedule, onDone, notify }: ScheduleF
       </div></details>
       <div className="detail-form-actions">
         <button type="button" className="btn btn-ghost" onClick={onDone}>Cancel</button>
-        <button type="submit" className="btn btn-go" disabled={busy || days.length === 0}>{busy ? 'Saving…' : schedule ? 'Save changes' : 'Save schedule'}</button>
+        <button type="submit" className="btn btn-go" disabled={busy || days.length === 0 || (vendor === 'codex' && tools.codex === false)}>{busy ? 'Saving…' : schedule ? 'Save changes' : 'Save schedule'}</button>
       </div>
     </form>
   );

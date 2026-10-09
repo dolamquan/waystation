@@ -5,6 +5,7 @@ import { STATUS_LABEL, timeAgo } from '../format.ts';
 import type { TeamLogItem } from '../useTower.ts';
 import { Icon } from './Icon.tsx';
 import { Confirm, Modal } from './Modal.tsx';
+import { cliUnavailableReason, useToolAvailability } from '../useToolAvailability.ts';
 
 interface TeamDetailProps {
   readonly team: TeamView;
@@ -43,6 +44,8 @@ function memberStatus(member: TeamMember, agents: readonly Agent[]): { label: st
 }
 
 export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, onSelectAgent }: TeamDetailProps) {
+  const tools = useToolAvailability();
+  const operatorCliMissing = cliUnavailableReason(tools, 'claude');
   const sessionId = useId();
   const [tab, setTab] = useState<'conversation' | 'tasks'>('conversation');
   const [log, setLog] = useState<TeamLogEntry[]>([]);
@@ -179,7 +182,7 @@ export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, 
           <details className="session-menu">
             <summary aria-label="More team actions"><Icon name="chevronDown" size={16} />More</summary>
             <div className="session-menu-items">
-              <button className="btn btn-small" disabled={unavailable || disbanded} title="Open a Claude Code session that can read and steer this team" onClick={() => void run('operator', async () => notify((await api.openTeamOperator(team.id)).message))}><Icon name="terminal" size={14} />Open in Claude Code</button>
+              <button className="btn btn-small" disabled={unavailable || disbanded || !!operatorCliMissing} title={operatorCliMissing ?? 'Open a Claude Code session that can read and steer this team'} onClick={() => void run('operator', async () => notify((await api.openTeamOperator(team.id)).message))}><Icon name="terminal" size={14} />Open in Claude Code</button>
               <button className="btn btn-small btn-danger" disabled={unavailable || disbanded} onClick={askDisband}><Icon name="trash" size={14} />Disband team</button>
             </div>
           </details>
@@ -256,12 +259,13 @@ export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, 
               {team.members.map((member) => {
                 const status = memberStatus(member, agents);
                 const agent = agents.find((a) => a.id === member.agentId);
+                const cliMissing = cliUnavailableReason(tools, member.vendor);
                 return (
                   <li key={member.id} className="team-member">
                     <div className="session-member-heading"><span className={`session-member-avatar avatar-${member.vendor}`} aria-hidden="true">{member.name.slice(0, 1).toUpperCase()}</span><div className="team-member-main"><strong>{member.name}{member.role === 'lead' && <span className="session-lead-badge">Lead</span>}</strong><span>{member.vendor === 'claude' ? 'Claude' : 'Codex'}{member.model ? ` · ${member.model}` : ''}</span></div><span className={`status-pill ${status.pill}`}>{member.merged ? 'Merged' : status.label}</span></div>
                     <div className="team-member-actions">{agent && <button className="btn btn-small" onClick={() => onSelectAgent(agent.id)}><Icon name="expand" size={13} />View session</button>}<button className="btn btn-small btn-ghost" disabled={disbanded} onClick={() => messageMember(member)}><Icon name="message" size={14} />Message</button></div>
                     <details className="session-member-workspace"><summary>Workspace &amp; changes<Icon name="chevronDown" size={13} /></summary><code className="team-branch" title={member.worktree}>{member.branch}</code><div className="session-workspace-actions">
-                      {member.terminal ? <button className="btn btn-small" disabled={unavailable || disbanded} title="Bring this member back to the team now" onClick={() => setConfirm({ title: `Take ${member.name} back?`, body: `Close ${member.name}'s CLI tab first if it is still open. Taking it back while that session keeps running would leave two copies of ${member.name} working on the same conversation. The old tab loses team access either way.`, label: 'Take back', action: async () => notify((await api.returnMember(team.id, member.id)).message) })}>Take back</button> : agent?.sessionId && <button className="btn btn-small" disabled={unavailable || disbanded} title={`Continue in ${member.vendor === 'codex' ? 'Codex' : 'Claude Code'}`} onClick={() => askOpenCli(member)}><Icon name="terminal" size={13} />Open CLI</button>}
+                      {member.terminal ? <button className="btn btn-small" disabled={unavailable || disbanded} title="Bring this member back to the team now" onClick={() => setConfirm({ title: `Take ${member.name} back?`, body: `Close ${member.name}'s CLI tab first if it is still open. Taking it back while that session keeps running would leave two copies of ${member.name} working on the same conversation. The old tab loses team access either way.`, label: 'Take back', action: async () => notify((await api.returnMember(team.id, member.id)).message) })}>Take back</button> : agent?.sessionId && <button className="btn btn-small" disabled={unavailable || disbanded || !!cliMissing} title={cliMissing ?? `Continue in ${member.vendor === 'codex' ? 'Codex' : 'Claude Code'}`} onClick={() => askOpenCli(member)}><Icon name="terminal" size={13} />Open CLI</button>}
                       <button className="btn btn-small" disabled={unavailable} onClick={() => openDiff(member)}>{busy === `diff:${member.id}` ? 'Loading…' : 'View changes'}</button><button className="btn btn-small btn-ok" disabled={unavailable || member.merged} onClick={() => askMerge(member)}>{member.merged ? 'Merged' : 'Merge work'}</button>
                     </div></details>
                   </li>

@@ -6,6 +6,7 @@ import { spawn, execFile } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -82,8 +83,8 @@ export function redactToken(text) {
 // Side effects
 // ---------------------------------------------------------------------------
 
-function towerHome() {
-  return process.env.AGENT_TOWER_HOME ?? join(process.env.LOCALAPPDATA ?? '', 'agent-tower');
+export function towerHome() {
+  return process.env.AGENT_TOWER_HOME ?? join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'agent-tower');
 }
 
 function readDaemonInfo() {
@@ -145,15 +146,15 @@ function openBrowser(url) {
 }
 
 /** @param {string} script @param {string[]} args */
-function runNode(script, args) {
+function runNode(script, args, nodePath = process.execPath) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [script, ...args], { cwd: PROJECT_ROOT, stdio: 'inherit' });
+    const child = spawn(nodePath, [script, ...args], { cwd: PROJECT_ROOT, stdio: 'inherit', windowsHide: true });
     child.on('error', reject);
     child.on('exit', (code) => (code === 0 ? resolve(undefined) : reject(new Error(`exited with code ${code}`))));
   });
 }
 
-async function buildUiIfNeeded() {
+export async function buildUiIfNeeded(nodePath = process.execPath) {
   const distMtime = newestMtime(join(PROJECT_ROOT, 'web', 'dist'));
   // The UI bundle also pulls in shared/ and is shaped by its page and build config.
   const inputs = [join(PROJECT_ROOT, 'web', 'src'), join(PROJECT_ROOT, 'shared'), join(PROJECT_ROOT, 'web', 'index.html'), join(PROJECT_ROOT, 'vite.config.ts'), join(PROJECT_ROOT, 'package.json')];
@@ -161,11 +162,11 @@ async function buildUiIfNeeded() {
   const srcMtime = srcMtimes.length ? Math.max(...srcMtimes) : undefined;
   if (!needsBuild(distMtime, srcMtime)) return;
   console.log('Building the Waystation UI…');
-  await runNode(join(PROJECT_ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), ['build']);
+  await runNode(join(PROJECT_ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), ['build'], nodePath);
 }
 
 /** Pipes a child stream to ours line by line, hiding the access token. @param {NodeJS.ReadableStream} input @param {NodeJS.WritableStream} output */
-function forwardRedacted(input, output) {
+export function forwardRedacted(input, output) {
   createInterface({ input }).on('line', (line) => output.write(`${redactToken(line)}\n`));
 }
 

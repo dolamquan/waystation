@@ -3,6 +3,8 @@ import { api, type NewTeamMember, type TeamView } from '../api.ts';
 import { MODEL_SUGGESTIONS, modelListId } from '../models.ts';
 import { Icon } from './Icon.tsx';
 import { Modal } from './Modal.tsx';
+import { ProjectFolderInput } from './ProjectFolderInput.tsx';
+import { useToolAvailability } from '../useToolAvailability.ts';
 
 interface NewTeamDialogProps {
   readonly defaultCwd?: string;
@@ -26,6 +28,7 @@ const nextName = (members: readonly NewTeamMember[]) => {
 };
 
 export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTeamDialogProps) {
+  const tools = useToolAvailability();
   const [name, setName] = useState('');
   const [cwd, setCwd] = useState(defaultCwd ?? '');
   const [goal, setGoal] = useState('');
@@ -80,9 +83,7 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
         <label>Team name
           <input className="text-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Auth refactor" maxLength={60} />
         </label>
-        <label>Project folder (absolute path to a git repository)
-          <input className="text-input" value={cwd} onChange={(e) => setCwd(e.target.value)} placeholder="C:\Users\you\project" required />
-        </label>
+        <ProjectFolderInput value={cwd} onChange={setCwd} label="Project folder (absolute path to a git repository)" />
         <label>Goal
           <textarea className="text-input" value={goal} onChange={(e) => setGoal(e.target.value)} rows={4} required placeholder="What should the team deliver? The lead splits this into tasks." />
         </label>
@@ -111,7 +112,7 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
               />
               <select className="text-input" aria-label={`Member ${index + 1} agent`} value={member.vendor} onChange={(e) => update(index, { vendor: e.target.value as NewTeamMember['vendor'] })}>
                 <option value="claude">Claude</option>
-                <option value="codex">Codex</option>
+                <option value="codex" disabled={tools.codex === false}>Codex</option>
               </select>
               <input
                 className="text-input"
@@ -158,9 +159,11 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
           Each member works in its own git worktree and branch, outside your project folder. Nothing reaches your branch until you review a member's diff and merge it.
         </div>
         {error && <p className="error-text small" role="alert">{error}</p>}
+        {tools.git === false && <p role="status">Teams need Git for their worktrees. Install Git and reopen this form.</p>}
+        {tools.codex === false && members.some((member) => member.vendor === 'codex') && <p role="status">Codex CLI was not found. Choose Claude for those members, or install Codex and reopen this form.</p>}
         <footer className="modal-foot">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-go" disabled={busy}>{busy ? 'Creating worktrees…' : 'Create team'}</button>
+          <button type="submit" className="btn btn-go" disabled={busy || tools.git === false || (tools.codex === false && members.some((member) => member.vendor === 'codex'))}>{busy ? 'Creating worktrees…' : 'Create team'}</button>
         </footer>
       </form>
     </Modal>

@@ -20,6 +20,7 @@ export interface PrerequisiteProbes {
 }
 
 const MIN_NODE_MAJOR = 22;
+const MIN_NODE_MINOR = 20;
 const PROBE_TIMEOUT_MS = 5000;
 
 function runFirstLine(command: string, args: readonly string[]): string | undefined {
@@ -32,6 +33,7 @@ function runFirstLine(command: string, args: readonly string[]): string | undefi
 export function checkPrerequisites(probes: PrerequisiteProbes): Prerequisite[] {
   const run = probes.run ?? runFirstLine;
   const nodeMajor = Number(/^v?(\d+)/.exec(probes.nodeVersion)?.[1] ?? 0);
+  const nodeMinor = Number(/^v?\d+\.(\d+)/.exec(probes.nodeVersion)?.[1] ?? 0);
   const git = run('git', ['--version']);
   const claude = probes.claudeExe();
   const codex = probes.codexEntry();
@@ -39,8 +41,8 @@ export function checkPrerequisites(probes: PrerequisiteProbes): Prerequisite[] {
   const hooks = probes.hooksInstalled();
   return [
     {
-      id: 'node', label: 'Node.js', ok: nodeMajor >= MIN_NODE_MAJOR, detail: probes.nodeVersion,
-      purpose: `Runs the tower (needs ${MIN_NODE_MAJOR} or newer for built-in SQLite).`,
+      id: 'node', label: 'Node.js', ok: nodeMajor > MIN_NODE_MAJOR || (nodeMajor === MIN_NODE_MAJOR && nodeMinor >= MIN_NODE_MINOR), detail: probes.nodeVersion,
+      purpose: 'Runs Waystation and its build tools. Install Node.js 22.20 or newer.',
     },
     {
       id: 'git', label: 'Git', ok: git !== undefined, detail: git ?? 'not found on PATH',
@@ -52,14 +54,14 @@ export function checkPrerequisites(probes: PrerequisiteProbes): Prerequisite[] {
     },
     {
       id: 'codex', label: 'Codex CLI', ok: codex !== undefined, detail: codex ?? 'not installed',
-      purpose: 'Codex agents and team members. Install with: npm install -g @openai/codex',
+      purpose: 'Codex agents and team members. Install with: npm install -g @openai/codex. For a custom installation, set AGENT_TOWER_CODEX_JS or use Desktop setup.',
     },
     {
       id: 'terminal', label: 'Windows Terminal', ok: terminal !== undefined, detail: terminal ?? 'wt.exe not found',
       purpose: 'Terminal consoles and Open in Claude Code / Codex.',
     },
     {
-      id: 'hooks', label: 'Tower hooks', ok: hooks, detail: hooks ? 'installed' : 'not installed',
+      id: 'hooks', label: 'Waystation hooks', ok: hooks, detail: hooks ? 'installed' : 'not installed',
       purpose: 'Intercepting and instructing the Claude Code sessions you start yourself. Use Install hooks in the top bar.',
     },
   ];

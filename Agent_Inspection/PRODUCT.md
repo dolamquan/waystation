@@ -4,7 +4,7 @@
 
 ## Platform
 
-web
+web and Windows desktop (Electron)
 
 ## Users
 Developers who run several AI coding agents (Claude Code, Codex, Aider, Gemini CLI, Cursor Agent, OpenCode, Goose) at once on their own Windows machine, in terminals, VS Code, or launched from Waystation. Teams and other developers are the intended audience. They glance at the station while doing other work and come back to it when an agent needs them.
@@ -16,7 +16,7 @@ Waystation ("Agent Tower") lets a developer see and steer every coding agent on 
 One view across vendors, with real intervention: it can hold an agent's next tool call for approval, run mixed Claude + Codex teams that share a task board in separate git worktrees, and guard against runaway loops and spend. The live agents are shown as an animated illustrated crew in an office per project folder, which a plain dashboard does not do.
 
 ## Operating Context
-Runs locally on Windows, Node 22+, served on localhost with a per-start access token. Agents appear whether they run in a terminal, VS Code, or Waystation itself. Control level varies per agent and is shown as a badge: Full control, Hook control, Observe only. Waystation opens real Claude Code / Codex sessions in Windows Terminal tabs on handoff.
+Runs locally on Windows, Node 22.20+, served on localhost with a per-start access token in a browser or Electron desktop window. The desktop provides setup checks, a tray, native folder selection, and attention notifications. Agents appear whether they run in a terminal, VS Code, or Waystation itself. Control level varies per agent and is shown as a badge: Full control, Hook control, Observe only. Waystation opens real Claude Code / Codex sessions in Windows Terminal tabs on handoff.
 
 ## Capabilities and Constraints
 - Intercept tool calls: Approve, Edit input, Deny + instruct, Let agent ask.

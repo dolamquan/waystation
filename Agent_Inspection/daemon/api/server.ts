@@ -37,6 +37,7 @@ export interface ServerOptions {
   readonly webDist?: string;
   /** Trust the Vite dev server origin. */
   readonly dev?: boolean;
+  readonly instance?: { readonly pid: number; readonly startedAt: number };
 }
 
 class HttpError extends Error {
@@ -74,11 +75,12 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
-function buildRoutes(tower: Tower): Route[] {
+function buildRoutes(tower: Tower, instance?: ServerOptions['instance']): Route[] {
   const r = (method: string, path: string, handler: Handler): Route =>
     ({ method, pattern: new RegExp(`^${path.replace(/:\w+/g, '([^/]+)')}$`), handler });
   const bodyOf = (body: unknown) => (body ?? {}) as Record<string, unknown>;
   return [
+    r('GET', '/api/health', () => ({ app: 'waystation', ...instance })),
     r('GET', '/api/state', () => tower.state()),
     r('GET', '/api/agents/:id/events', ({ params }) => ({ events: tower.events(params[0]) })),
     r('POST', '/api/agents/:id/stop', async ({ params, body }) => {
@@ -231,7 +233,7 @@ function serveStatic(webDist: string, port: number, urlPath: string, res: Server
 
 export function startServer(opts: ServerOptions): Promise<Server> {
   const { tower, port, host, token, webDist, dev = false } = opts;
-  const routes = buildRoutes(tower);
+  const routes = buildRoutes(tower, opts.instance);
   const teamRoutes = buildTeamRoutes(tower);
   const bridgeRoutes = agentRoutes(tower);
   tower.teams.setEndpoint(`http://${host}:${port}`);

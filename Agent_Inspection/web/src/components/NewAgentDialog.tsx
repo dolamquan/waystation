@@ -5,6 +5,8 @@ import type { Vendor } from '../models.ts';
 import { LoadoutPicker, defaultLoadout, isLoadoutEmpty } from './LoadoutPicker.tsx';
 import { Modal } from './Modal.tsx';
 import { ModelPicker } from './ModelPicker.tsx';
+import { ProjectFolderInput } from './ProjectFolderInput.tsx';
+import { useToolAvailability } from '../useToolAvailability.ts';
 
 /** Plugins are Claude-only, so a Codex launch never carries them. */
 function launchLoadout(loadout: LaunchLoadout, vendor: Vendor): LaunchLoadout | undefined {
@@ -21,6 +23,7 @@ interface NewAgentDialogProps {
 }
 
 export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewAgentDialogProps) {
+  const tools = useToolAvailability();
   const [vendor, setVendor] = useState<Vendor>('claude');
   const [cwd, setCwd] = useState(defaultCwd ?? '');
   const [prompt, setPrompt] = useState('');
@@ -130,11 +133,12 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
         )}
         <div className="segmented" role="radiogroup" aria-label="Agent type">
           {(['claude', 'codex'] as const).map((v) => (
-            <button type="button" key={v} role="radio" aria-checked={vendor === v} className={vendor === v ? 'seg-on' : ''} onClick={() => chooseVendor(v)}>
+            <button type="button" key={v} role="radio" aria-checked={vendor === v} disabled={v === 'codex' && tools.codex === false} className={vendor === v ? 'seg-on' : ''} onClick={() => chooseVendor(v)}>
               {v === 'claude' ? 'Claude (Agent SDK)' : 'Codex (codex exec)'}
             </button>
           ))}
         </div>
+        {tools.codex === false && <p className="muted">Codex CLI was not found. Install it or configure its path in Desktop setup to launch Codex agents.</p>}
         <div className="form-pair">
           <label>Name
             <input className="text-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="e.g. Test fixer" />
@@ -144,9 +148,7 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
             <ModelPicker key={`${vendor}:${templateId}`} vendor={vendor} value={model} onChange={setModel} />
           </div>
         </div>
-        <label>Project folder (absolute path)
-          <input className="text-input" value={cwd} onChange={(e) => setCwd(e.target.value)} placeholder="C:\Users\you\project" required />
-        </label>
+        <ProjectFolderInput value={cwd} onChange={setCwd} />
         <label>Task
           <textarea className="text-input" value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5} required placeholder="What should this agent do?" />
         </label>
@@ -182,7 +184,7 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
         <footer className="modal-foot">
           {saveLabel === undefined && <button type="button" className="btn btn-ghost modal-foot-left" onClick={() => setSaveLabel('')}>Save as template</button>}
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-go" disabled={busy}>{busy ? 'Launching…' : 'Launch'}</button>
+          <button type="submit" className="btn btn-go" disabled={busy || (vendor === 'codex' && tools.codex === false)}>{busy ? 'Launching…' : 'Launch'}</button>
         </footer>
       </form>
     </Modal>

@@ -18,23 +18,26 @@ import { LibraryView } from './components/library/LibraryView.tsx';
 import { WorkspaceDoodle, type WorkspaceDoodleKind } from './components/WorkspaceDoodle.tsx';
 import { UpdatesBadge } from './components/library/UpdatesBadge.tsx';
 import { nestSubagents } from './crew.ts';
+import { desktop } from './desktop.ts';
+import { DesktopSetup } from './components/DesktopSetup.tsx';
 
 type Toast = { id: number; text: string; kind: 'ok' | 'error' };
 type Filter = 'all' | 'claude' | 'codex' | 'other';
-type View = 'fleet' | 'attention' | 'teams' | 'ops' | 'library';
+type View = 'fleet' | 'attention' | 'teams' | 'ops' | 'library' | 'setup';
 const VIEW_TITLE: Record<View, { crumb: string; title: string; subtitle: string }> = {
   fleet: { crumb: 'Overview', title: 'Your workspace', subtitle: 'See and steer every coding agent on this machine — Claude Code, Codex and more — from one place.' },
   attention: { crumb: 'Needs attention', title: 'Needs attention', subtitle: 'Sessions waiting for your input or approval.' },
   teams: { crumb: 'Teams', title: 'Agent teams', subtitle: 'A shared goal, a task board, and room for everyone’s work.' },
   ops: { crumb: 'Usage & schedules', title: 'Usage & schedules', subtitle: 'The numbers so far, and what’s on the calendar.' },
   library: { crumb: 'Library', title: 'The library', subtitle: 'Your shelf of skills, notes and useful tools.' },
+  setup: { crumb: 'Desktop setup', title: 'Set up your station', subtitle: 'Connect the tools you use, then make yourself at home.' },
 };
-const VIEW_DOODLE: Record<View, WorkspaceDoodleKind> = { fleet: 'desk', attention: 'notice', teams: 'team', ops: 'planner', library: 'books' };
+const VIEW_DOODLE: Record<View, WorkspaceDoodleKind> = { fleet: 'desk', attention: 'notice', teams: 'team', ops: 'planner', library: 'books', setup: 'desk' };
 const TOAST_MS = 4200;
 const CLOCK_MS = 5000;
 
 export function App() {
-  const [powered, setPowered] = useState(autostart);
+  const [powered, setPowered] = useState(() => Boolean(desktop()) || autostart());
   const tower = useTower(powered);
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -50,6 +53,15 @@ export function App() {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
+    const bridge = desktop();
+    if (!bridge) return;
+    let cancelled = false;
+    void bridge.getSettings().then((settings) => { if (!cancelled && !settings.setupComplete) setView('setup'); }, () => undefined);
+    const unsubscribe = bridge.onNavigate((destination) => { setPowered(true); setView(destination); setSelectedId(undefined); });
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), CLOCK_MS);
     return () => clearInterval(t);
   }, []);
@@ -61,7 +73,7 @@ export function App() {
   }, []);
 
   const scopedAgents = useMemo(
-    () => tower.agents.filter((a) => view === 'fleet' || a.status === 'waiting' || tower.pending.some((p) => p.agentId === a.id)),
+    () => tower.agents.filter((a) => view === 'fleet' || a.status === 'waiting' || (a.breaker && a.breaker.level !== 'ok') || tower.pending.some((p) => p.agentId === a.id)),
     [tower.agents, tower.pending, view],
   );
   const agents = useMemo(
@@ -76,7 +88,7 @@ export function App() {
     total: tower.agents.length,
     busy: tower.agents.filter((a) => a.status === 'busy').length,
     waiting: tower.pending.length,
-    attention: tower.agents.filter((a) => a.status === 'waiting' || tower.pending.some((p) => p.agentId === a.id)).length,
+    attention: tower.agents.filter((a) => a.status === 'waiting' || (a.breaker && a.breaker.level !== 'ok') || tower.pending.some((p) => p.agentId === a.id)).length,
     controlled: tower.agents.filter((a) => a.tier === 'A' || (a.tier === 'B' && tower.hooksInstalled)).length,
   };
 
@@ -111,6 +123,7 @@ export function App() {
                 <button className={view === 'teams' ? 'nav-active' : ''} aria-current={view === 'teams' ? 'page' : undefined} onClick={() => setView('teams')}><Icon name="crew" />Teams<span className="nav-count">{tower.teams.length}</span></button>
                 <button className={view === 'ops' ? 'nav-active' : ''} aria-current={view === 'ops' ? 'page' : undefined} onClick={() => setView('ops')}><Icon name="activity" />Usage &amp; schedules</button>
                 <button className={view === 'library' ? 'nav-active' : ''} aria-current={view === 'library' ? 'page' : undefined} onClick={() => setView('library')}><Icon name="book" />Library<UpdatesBadge /></button>
+                {desktop() && <button className={view === 'setup' ? 'nav-active' : ''} aria-current={view === 'setup' ? 'page' : undefined} onClick={() => setView('setup')}><Icon name="shield" />Desktop setup</button>}
               </nav>
               <div className="sidebar-bottom">
                 <div className="integration-card"><Icon name="link" /><strong>Connect your sessions</strong><p>Use Claude Code hooks to review tools and send instructions.</p><button onClick={() => setHookConfirm(tower.hooksInstalled ? 'uninstall' : 'install')}>{tower.hooksInstalled ? 'Manage hooks' : 'Set up hooks'}<Icon name="arrow" size={15} /></button></div>
@@ -161,6 +174,7 @@ export function App() {
                 </>
               )}
               {view === 'ops' && <OpsView defaultCwd={selected?.cwd} notify={notify} onNewAgent={() => setShowNew(true)} />}
+              {view === 'setup' && <DesktopSetup onDone={() => setView('fleet')} />}
               {view === 'library' && <LibraryView notify={notify} />}
               {(view === 'fleet' || view === 'attention') && <>
               {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={(teamId) => { setView('teams'); setSelectedTeamId(teamId); }} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} pending={tower.pending} notify={notify} />}

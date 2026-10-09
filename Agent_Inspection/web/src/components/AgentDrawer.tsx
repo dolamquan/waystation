@@ -16,6 +16,7 @@ import { AgentOutputs } from './AgentOutputs.tsx';
 import { MessageComposer } from '../composer/MessageComposer.tsx';
 import { availableCommands, type WaystationCommand } from '../composer/commands.ts';
 import type { CommandResult } from '../../../shared/claudeCommands.ts';
+import { cliUnavailableReason, useToolAvailability } from '../useToolAvailability.ts';
 
 interface AgentDrawerProps {
   readonly agent: Agent;
@@ -39,6 +40,7 @@ const numbered = (event: AgentEvent): NumberedEvent => ({ ...event, seq: nextSeq
 const TABS: readonly Tab[] = ['overview', 'activity', 'outputs', 'details'];
 
 export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now, onClose, onSelect, notify, pending = [] }: AgentDrawerProps) {
+  const cliMissing = cliUnavailableReason(useToolAvailability(), agent.vendor);
   const uid = useId();
   const scrollArea = useRef<HTMLDivElement>(null);
   const [events, setEvents] = useState<NumberedEvent[]>([]);
@@ -248,7 +250,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
             onOpenCli={canOpenInCli ? confirmCli : undefined} />}
 
           {(canOpenInCli || agent.cwd || canMessage) && <div className="detail-action-list">
-            {canOpenInCli && <button className="detail-action" onClick={confirmCli} disabled={!!busy}><span className="detail-action-icon"><Icon name="terminal" size={19} /></span><span><strong>{busy === 'cli' ? 'Opening…' : handsOff ? `Continue in ${cliName}` : `Open in ${cliName}`}</strong><small>{handsOff ? `Move this session into the real ${cliName} CLI, with /usage, /model and everything else.` : `Open this conversation in the real ${cliName} CLI, as a copy. This session keeps running.`}</small></span><Icon name="chevronRight" size={16} /></button>}
+            {canOpenInCli && <button className="detail-action" onClick={confirmCli} disabled={!!busy || !!cliMissing}><span className="detail-action-icon"><Icon name="terminal" size={19} /></span><span><strong>{busy === 'cli' ? 'Opening…' : handsOff ? `Continue in ${cliName}` : `Open in ${cliName}`}</strong><small>{cliMissing ?? (handsOff ? `Move this session into the real ${cliName} CLI, with /usage, /model and everything else.` : `Open this conversation in the real ${cliName} CLI, as a copy. This session keeps running.`)}</small></span><Icon name="chevronRight" size={16} /></button>}
             {agent.cwd && <button className={`detail-action ${composer === 'followup' ? 'detail-action-selected' : ''}`} onClick={() => openComposer('followup')} aria-expanded={composer === 'followup'} disabled={!!busy}><span className="detail-action-icon"><Icon name="plus" size={19} /></span><span><strong>Start a follow-up</strong><small>Create another agent for a new task in this project.</small></span><Icon name="chevronRight" size={16} /></button>}
             {agent.cwd && <button className={`detail-action ${composer === 'skills' ? 'detail-action-selected' : ''}`} onClick={() => openComposer('skills')} aria-expanded={composer === 'skills'} disabled={!!busy}><span className="detail-action-icon"><Icon name="book" size={19} /></span><span><strong>Project skills</strong><small>Add reusable instructions for Claude agents.</small></span><Icon name="chevronRight" size={16} /></button>}
             {canMessage && <button className={`detail-action ${composer === 'docs' ? 'detail-action-selected' : ''}`} onClick={() => openComposer('docs')} aria-expanded={composer === 'docs'} disabled={!!busy}><span className="detail-action-icon"><Icon name="list" size={19} /></span><span><strong>Send a context doc</strong><small>Give this agent a Library .md file to read before it continues.</small></span><Icon name="chevronRight" size={16} /></button>}

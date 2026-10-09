@@ -853,6 +853,7 @@ export class Tower {
   /** Called on graceful shutdown: with the tower gone, intercepted sessions go back to normal. */
   releaseAllIntercepts(): void {
     for (const sessionId of this.flags.interceptedSessions()) this.flags.setIntercepting(sessionId, false);
+    for (const pending of this.interceptions.list()) this.interceptions.cancel(pending.id);
   }
 
   /** Show agents with a pending interception as 'waiting' until it is decided. */
