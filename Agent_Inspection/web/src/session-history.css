@@ -1,0 +1,51 @@
+.session-history { min-width: 0; }
+.history-toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin-block: 20px; }
+.history-toolbar .search-field { flex: 1 1 260px; }
+.history-toolbar .search-field input { flex: 1; width: 100%; }
+.workbench-content .sidebar-nav .nav-active[aria-current="page"]:hover { background: #eee1d0; }
+.history-toolbar > label:not(.search-field) { display: grid; gap: 5px; min-width: 0; flex: 0 1 260px; }
+.history-toolbar select { width: 100%; min-width: 0; }
+.session-recovery-note { display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.session-recovery-note > div { flex: 1; }
+.session-recovery-note p { margin: 5px 0 0; }
+.history-list, .message-queue-list, .review-checks ol { list-style: none; margin: 0; padding: 0; }
+.history-row { padding-block: 24px; border-bottom: 1px solid var(--line); }
+.history-row-heading { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.history-row h2 { font-size: 1.35rem; margin: 0; }
+.history-path, .history-request, .queue-message-text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.history-path { font-size: .85rem; margin-block: 6px 12px; }
+.history-request { margin-block: 12px; max-width: 75ch; }
+.history-result { margin-block: 12px; max-width: 75ch; }
+.history-result p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.session-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.session-help { font-size: .85rem; line-height: 1.5; margin-block: 8px; }
+.message-state { display: inline-flex; font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.message-state-review, .review-stale { color: var(--danger, #9f3428); }
+.message-queue { margin: 0 18px 10px; font-size: .9rem; border-top: 1px solid var(--line); padding-top: 10px; }
+.message-queue > summary { cursor: pointer; font-weight: 600; }
+.message-queue > summary span { margin-left: 12px; font-weight: 400; }
+.message-queue-content { max-height: 230px; overflow-y: auto; scrollbar-gutter: stable; padding-right: 8px; }
+.message-queue-row { padding-block: 12px; border-bottom: 1px solid var(--line); }
+.message-queue-row form { display: grid; gap: 8px; }
+.queue-message-text { margin-block: 6px; }
+.queue-confirmation { margin-top: 12px; }
+.queue-delivery-history { margin-top: 12px; }
+.completion-review { padding-bottom: 24px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.review-state { display: grid; gap: 5px; margin-block: 18px; }
+.review-state span { font-size: .85rem; }
+.review-request h4, .review-checks h4 { margin: 24px 0 8px; }
+.review-request p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.review-checks li { padding-block: 12px; border-bottom: 1px solid var(--line); }
+.review-checks li > div { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.review-checks code { overflow-wrap: anywhere; white-space: pre-wrap; }
+.review-checks pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 250px; overflow: auto; font-size: .8rem; }
+.review-form { display: grid; gap: 8px; margin-top: 24px; }
+.review-form > label:not(.check) { font-weight: 600; margin-top: 8px; }
+.review-form .check { align-items: start; line-height: 1.5; margin-top: 10px; }
+@media (max-width: 600px) {
+  .session-recovery-note { align-items: start; flex-wrap: wrap; }
+  .session-recovery-note > div { flex-basis: calc(100% - 40px); }
+  .history-toolbar > label:not(.search-field) { flex: 1 1 140px; }
+  .message-queue { margin-inline: 12px; }
+  .message-queue-content { max-height: 180px; }
+}

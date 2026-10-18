@@ -1,0 +1,30 @@
+{
+  "name": "waystation-terminal-bridge",
+  "displayName": "Waystation Terminal Bridge",
+  "description": "Send Waystation messages to Claude Code in its original local VS Code terminal.",
+  "version": "0.1.0",
+  "publisher": "waystation-local",
+  "private": true,
+  "engines": { "vscode": "^1.96.0" },
+  "categories": ["Other"],
+  "extensionKind": ["ui"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.cjs",
+  "capabilities": { "untrustedWorkspaces": { "supported": false }, "virtualWorkspaces": false },
+  "contributes": {
+    "commands": [{ "command": "waystation.connectTerminals", "title": "Waystation: Connect terminal sessions" }],
+    "configuration": {
+      "title": "Waystation",
+      "properties": {
+        "waystation.terminalBridge.enabled": {
+          "type": "boolean", "default": true, "scope": "application",
+          "description": "Allow the authenticated local Waystation daemon to submit messages to idle Claude Code sessions in this window's terminals. Keep their input empty when sending from Waystation."
+        },
+        "waystation.terminalBridge.dataDirectory": {
+          "type": "string", "default": "", "scope": "application",
+          "description": "Waystation data directory. Empty uses AGENT_TOWER_HOME or the default local application data folder."
+        }
+      }
+    }
+  }
+}

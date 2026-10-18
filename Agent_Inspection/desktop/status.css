@@ -1,0 +1,7 @@
+@font-face { font-family: 'Source Sans 3'; src: url('../web/public/fonts/SourceSans3-variable.woff2') format('woff2'); font-weight: 200 900; font-display: swap; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fffcf5; color: #493f51; font: 18px/1.6 'Source Sans 3', sans-serif; }
+main { max-width: 42ch; padding: 48px; }
+h1 { margin: 0 0 16px; font: 36px/1.2 Georgia, serif; }
+p { margin: 0 0 12px; }
+.note { color: #776a7e; font-size: 15px; }
+::selection { background: #e7dcef; }

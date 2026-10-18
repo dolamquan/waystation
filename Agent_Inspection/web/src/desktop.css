@@ -1,0 +1,34 @@
+.desktop-setup { max-width: 940px; padding-bottom: 24px; }
+.desktop-intro { max-width: 70ch; margin: 0 0 28px; font-size: 17px; line-height: 1.6; }
+.desktop-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 0 0 32px; }
+.desktop-entry > span { color: var(--muted); }
+.desktop-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 12px; }
+.desktop-section-heading h2 { margin: 0; font: 25px/1.3 Georgia, serif; }
+.desktop-checks { list-style: none; padding: 0; margin: 0 0 32px; }
+.desktop-checks > li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 14px; padding: 19px 0; border-bottom: 1px solid var(--line); }
+.desktop-checks > li > svg { color: var(--accent); margin-top: 3px; }
+.desktop-checks strong { font-size: 16px; }
+.desktop-checks p { max-width: 70ch; margin: 4px 0 7px; line-height: 1.55; }
+.desktop-checks small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.desktop-checks details { margin-top: 12px; }
+.desktop-checks summary, .desktop-paths > summary { cursor: pointer; font-weight: 600; }
+.desktop-check-status { color: var(--muted); padding-top: 2px; font-size: 13px; }
+.desktop-check-status.ready { color: #386547; }
+.desktop-paths { padding: 20px 0; border-block: 1px solid var(--line); }
+.desktop-paths > summary { font-size: 17px; }
+.desktop-paths > p { max-width: 70ch; margin: 16px 0 24px; }
+.desktop-path-list { display: flex; flex-direction: column; gap: 20px; }
+.desktop-path-list .form-field { gap: 7px; }
+.desktop-path-list small { color: var(--muted); }
+.desktop-path-field { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.desktop-path-field .text-input { width: 100%; flex: 1; min-width: 0; }
+.desktop-path-field .btn { flex: none; }
+.desktop-preferences { margin-top: 28px; }
+.desktop-preferences > label { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.desktop-preferences p { max-width: 70ch; margin: 12px 0; }
+.desktop-preferences code { overflow-wrap: anywhere; }
+.desktop-setup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
+.desktop-feedback { color: #386547; }
+.desktop-path-note { color: var(--muted); }
+.desktop-setup input[type='checkbox'] { accent-color: var(--accent); width: 17px; height: 17px; }
+@media (max-width: 1000px) { .desktop-checks > li { gap: 10px; } .desktop-intro { font-size: 16px; } .desktop-setup-actions .btn { white-space: normal; } }

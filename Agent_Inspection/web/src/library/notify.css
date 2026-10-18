@@ -1,0 +1,22 @@
+/* Notifications panel (Library → Notifications). Builds on ops.css rows and lists. */
+.notify-view { gap: 28px; }
+.notify-entry { align-items: flex-start; }
+.notify-unread { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.notify-mark { flex: none; display: inline-flex; padding-top: 2px; color: var(--muted); }
+.notify-success .notify-mark { color: var(--ok); }
+.notify-warning .notify-mark { color: var(--warn); }
+.notify-error .notify-mark { color: var(--danger); }
+.notify-body { margin: 2px 0; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: auto; }
+.notify-deliveries { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.notify-ok { color: var(--ok); }
+.notify-failed { color: var(--danger); overflow-wrap: anywhere; }
+.notify-channel-item { display: flex; flex-direction: column; gap: 8px; }
+.notify-kinds { gap: 4px; }
+.notify-guide { display: flex; gap: 6px; align-items: flex-start; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.notify-guide svg { flex: none; margin-top: 2px; }
+.notify-clear { display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.notify-form select.text-input { height: 40px; }
+@media (max-width: 640px) {
+  .notify-channel-item .ops-row { flex-wrap: wrap; }
+  .notify-channel-item .ops-row-actions { flex-wrap: wrap; }
+}

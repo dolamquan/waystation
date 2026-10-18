@@ -1,0 +1,33 @@
+/* "While you were away" recap card on the Overview page */
+.away-recap { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px 14px; margin-bottom: 24px; box-shadow: 0 5px 18px #263b260a; }
+.recap-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.recap-head h2 { margin: 4px 0 2px; font-size: 16px; font-weight: 600; letter-spacing: -.25px; }
+.recap-head p { margin: 0; }
+.recap-head > .icon-btn { flex: none; }
+.recap-cost { color: var(--text); font-variant-numeric: tabular-nums; }
+.recap-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 18px; margin-top: 14px; }
+.recap-group { min-width: 0; }
+.recap-group-title { display: flex; align-items: center; gap: 7px; color: #687164; font-size: 12px; margin-bottom: 6px; }
+.recap-group-title > .section-count { margin-left: 2px; }
+.recap-group-waiting .recap-group-title > svg { color: var(--waiting); }
+.recap-group-trouble .recap-group-title > svg { color: var(--danger); }
+.recap-group-finished .recap-group-title > svg { color: var(--ok); }
+.recap-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.recap-line { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "dot who time" ". detail detail"; align-items: center; column-gap: 9px; text-align: left; border: 1px solid transparent; border-radius: 7px; background: #f8f9f5; padding: 7px 10px; cursor: pointer; transition: background .15s, border-color .15s; }
+.recap-line:hover { background: #f0f3eb; border-color: #d3dccb; }
+.recap-dot { grid-area: dot; width: 7px; height: 7px; border-radius: 50%; background: var(--idle); }
+.recap-waiting .recap-dot { background: var(--waiting); }
+.recap-trouble .recap-dot { background: var(--danger); }
+.recap-finished .recap-dot { background: var(--ok); }
+.recap-who { grid-area: who; display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.recap-who strong { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recap-who small { font: 10px var(--mono); color: #7b8475; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recap-detail { grid-area: detail; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recap-trouble .recap-detail { color: var(--danger); }
+.recap-time { grid-area: time; font-size: 10px; color: #919888; white-space: nowrap; }
+.recap-more { padding: 4px 10px 0; }
+
+@media (max-width: 700px) {
+  .away-recap { padding: 14px 14px 12px; }
+  .recap-groups { grid-template-columns: minmax(0, 1fr); }
+}
