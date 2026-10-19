@@ -7,6 +7,7 @@ import type { Prerequisite } from '../../daemon/ops/prerequisites.ts';
 import type { LaunchLoadout, ScheduleNotify, ScheduleResource } from '../../daemon/library/types.ts';
 import type { ScheduleRun } from '../../daemon/ops/schedules.ts';
 import type { UsageWindowsReport } from '../../daemon/usage/windowTypes.ts';
+import type { PreviewView } from '../../daemon/preview/types.ts';
 
 export type { Agent, AgentEvent, PendingInterception, TeamLogEntry, TeamMember, TeamTask, TeamView };
 export type { AgentTemplate, Prerequisite, ScheduleView, UsageSummary };
@@ -218,4 +219,8 @@ export const api = {
   outputs: (id: string) => request<{ outputs: import('../../daemon/outputs/types.ts').AgentOutputs }>('GET', `/api/agents/${enc(id)}/outputs`),
   outputDiff: (id: string, path: string) =>
     request<{ diff: import('../../daemon/outputs/types.ts').FileDiff }>('GET', `/api/agents/${enc(id)}/outputs/diff?path=${encodeURIComponent(path)}`),
+  preview: (id: string) => request<{ preview: PreviewView }>('GET', `/api/agents/${enc(id)}/preview`),
+  startPreview: (id: string) => request<{ preview: PreviewView }>('POST', `/api/agents/${enc(id)}/preview/start`),
+  stopPreview: (id: string) => request<{ preview: PreviewView }>('POST', `/api/agents/${enc(id)}/preview/stop`),
+  openPreview: (id: string) => request<{ ok: true }>('POST', `/api/agents/${enc(id)}/preview/open`),
 };

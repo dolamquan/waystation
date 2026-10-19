@@ -40,6 +40,7 @@ import { SessionHistory } from './sessions/history.ts';
 import { MANAGED_SOURCE, TowerCli } from './towerCli.ts';
 import { TowerTeams } from './towerTeams.ts';
 import { UserError } from './userError.ts';
+import { PreviewManager } from './preview/manager.ts';
 
 export { UserError };
 
@@ -105,6 +106,8 @@ export class Tower {
   readonly ops: AgentOps;
   /** Skills, context docs, MCP servers, plugins, notification channels. */
   readonly library: Library;
+  /** Live previews of what agents built, one per project folder. */
+  readonly previews = new PreviewManager();
   /** 5-hour and weekly plan windows: real where the vendor reports them, else estimated from local transcripts. */
   readonly usageWindows = new UsageWindows({
     claudeProjectsDir: claudePaths.projects,
@@ -235,7 +238,7 @@ export class Tower {
     this.codex.stop();
     this.processes.stop();
     this.teams.shutdown();
-    await this.managed.stopAll();
+    await Promise.all([this.managed.stopAll(), this.previews.stopAll()]);
     this.ops.stop();
     this.store.close();
   }

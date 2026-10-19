@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
 import type { AgentEvent } from '../domain/types.ts';
+import { HELD_PREFIX, PATCH_FILE, WRITE_TOOLS } from '../../shared/fileEdits.ts';
 import type { ChangedFile, OutputTurn } from './types.ts';
 
 /**
@@ -8,11 +9,7 @@ import type { ChangedFile, OutputTurn } from './types.ts';
  * with newlines collapsed and clipped at 200 characters, so paths are recovered from that text.
  */
 
-const WRITE_TOOLS: ReadonlySet<string> = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
-const HELD_PREFIX = /^⏸\s*/;
 const CLIPPED = '…';
-/** A patch header's path runs until the next patch line ("@@", "***", "+x", "-x") or the end. */
-const PATCH_FILE = /\*\*\* (?:(?:Update|Add|Delete) File|Move to):\s*(.+?)(?=\s+(?:@@|\*\*\*|[+-])|\s*$)/g;
 const TURN_DONE = /^(?:turn complete|finished its turn)/i;
 const MAX_TURNS = 100;
 const MAX_TURN_ERRORS = 5;

@@ -14,6 +14,7 @@ import { Confirm } from './Modal.tsx';
 import { SkillPicker } from './SkillPicker.tsx';
 import { Icon } from './Icon.tsx';
 import { AgentOutputs } from './AgentOutputs.tsx';
+import { AgentPreview } from './AgentPreview.tsx';
 import { MessageQueuePanel } from './MessageQueuePanel.tsx';
 import { MessageComposer } from '../composer/MessageComposer.tsx';
 import { availableCommands, type WaystationCommand } from '../composer/commands.ts';
@@ -31,22 +32,29 @@ interface AgentDrawerProps {
   readonly notify: (text: string, kind?: 'ok' | 'error') => void;
   /** Held tool calls across all agents; the composer answers this agent's oldest one. */
   readonly pending?: readonly PendingInterception[];
+  /** Changes each time the operator asks to see this agent's results: the drawer opens on Preview. */
+  readonly previewRequest?: number;
 }
 
-type Tab = 'chat' | 'controls' | 'activity' | 'outputs' | 'details';
+type Tab = 'chat' | 'preview' | 'controls' | 'activity' | 'outputs' | 'details';
 type Composer = 'message' | 'followup' | 'skills' | 'docs' | undefined;
 type Pending = { title: string; body: string; label: string; danger?: boolean; action: () => Promise<void> };
 type NumberedEvent = AgentEvent & { readonly seq: number };
 let nextSeq = 0;
 const numbered = (event: AgentEvent): NumberedEvent => ({ ...event, seq: nextSeq++ });
-const TABS: readonly Tab[] = ['chat', 'controls', 'activity', 'outputs', 'details'];
+const TABS: readonly Tab[] = ['chat', 'preview', 'controls', 'activity', 'outputs', 'details'];
+const TAB_LABEL: Readonly<Record<Tab, string>> = {
+  chat: 'Chat', preview: 'Preview', controls: 'Controls', activity: 'Activity', outputs: 'Review', details: 'Details',
+};
 
-export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now, onClose, onSelect, notify, pending = [] }: AgentDrawerProps) {
+export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now, onClose, onSelect, notify, pending = [], previewRequest }: AgentDrawerProps) {
   const cliMissing = cliUnavailableReason(useToolAvailability(), agent.vendor);
   const uid = useId();
   const scrollArea = useRef<HTMLDivElement>(null);
   const [events, setEvents] = useState<NumberedEvent[]>([]);
-  const [tab, setTab] = useState<Tab>('chat');
+  const [tab, setTab] = useState<Tab>(previewRequest ? 'preview' : 'chat');
+  // "Ready to look" on the station floor asks an already-open drawer to switch to its preview.
+  useEffect(() => { if (previewRequest) setTab('preview'); }, [previewRequest]);
   const [composer, setComposer] = useState<Composer>();
   const [task, setTask] = useState('');
   const [stopOriginal, setStopOriginal] = useState(false);
@@ -240,7 +248,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
       </header>
 
       <nav className="detail-tabs" role="tablist" aria-label="Agent sections">
-        {TABS.map(item => <button key={item} role="tab" id={`${uid}-${item}`} aria-selected={tab === item} aria-controls={`${uid}-panel`} tabIndex={tab === item ? 0 : -1} onClick={() => setTab(item)} onKeyDown={e => selectTabWithKeyboard(e, item)}>{item === 'chat' ? 'Chat' : item === 'controls' ? 'Controls' : item === 'activity' ? 'Activity' : item === 'outputs' ? 'Review' : 'Details'}</button>)}
+        {TABS.map(item => <button key={item} role="tab" id={`${uid}-${item}`} aria-selected={tab === item} aria-controls={`${uid}-panel`} tabIndex={tab === item ? 0 : -1} onClick={() => setTab(item)} onKeyDown={e => selectTabWithKeyboard(e, item)}>{TAB_LABEL[item]}</button>)}
       </nav>
 
       <div ref={scrollArea} className={`detail-scroll ${tab === 'chat' ? 'detail-chat-panel' : ''}`} role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${tab}`} tabIndex={0}>
@@ -313,6 +321,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
           {loading && !events.length ? <p className="detail-empty-text">Loading activity…</p> : visibleEvents.length ? <ActivityFeed events={visibleEvents} now={now} /> : !loadError && <div className="detail-feed-empty"><Icon name={search ? 'search' : 'message'} size={25} /><h4>{search ? 'No matches in this session' : filter === 'tools' ? 'No tool calls recorded yet' : 'No messages recorded yet'}</h4><p>{search ? 'Try a different word, or clear the search.' : 'New activity will appear here as it happens.'}</p>{search && <button className="btn" onClick={() => setSearch('')}>Clear search</button>}</div>}
         </section>}
 
+        {tab === 'preview' && <AgentPreview agent={agent} notify={notify} onReview={() => setTab('outputs')} />}
         {tab === 'outputs' && <AgentOutputs agent={agent} now={now} />}
 
         {tab === 'details' && <section className="detail-information">

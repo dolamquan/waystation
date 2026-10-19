@@ -35,6 +35,9 @@ interface StationSceneProps {
   readonly notify?: Notify;
   /** Sample crew: bubble buttons only explain themselves, never call the daemon. */
   readonly demo?: boolean;
+  /** Agents that just finished a turn that changed files: their desk holds up a "Ready to look" card. */
+  readonly ready?: ReadonlySet<string>;
+  readonly onLook?: (id: string) => void;
 }
 
 const MAX_SUBAGENT_MINIS = 3;
@@ -68,6 +71,23 @@ function SubagentCrew({ parent, helpers, index, selectedId, onSelect }: { parent
 }
 
 
+/** A finished turn changed files: the crew member holds up a card inviting the operator to see the result. */
+function ReadyCard({ agent, x, y, onLook }: { agent: Agent; x: number; y: number; onLook?: (id: string) => void }) {
+  const look = () => onLook?.(agent.id);
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <g className="station-ready" role="button" tabIndex={0} aria-label={`${agent.name} finished a change. Ready to look`}
+        onClick={look} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); look(); } }}>
+        <title>{`${agent.name} finished a change.\nOpen the live preview to see it.`}</title>
+        <rect className="station-ready-card" x="-50" y="-18" width="102" height="28" rx="8" />
+        <path className="station-ready-tail" d="m-6 9.5 6 7 6-7" />
+        <path className="station-ready-sparkle" d="M-36-4q1.5-4.5 3-6 1.5 1.5 3 6-1.5 1.5-3 6-1.5-4.5-3-6Z" />
+        <text x="7" y="0" textAnchor="middle" fontSize="10" fontWeight="700">Ready to look</text>
+      </g>
+    </g>
+  );
+}
+
 /** Runaway guard stepped in: a flashing beacon on the monitor, amber for a warning, red once it constrains or stops. */
 function BreakerBeacon({ breaker }: { breaker: NonNullable<Agent['breaker']> }) {
   return (
@@ -91,7 +111,7 @@ function CostMeter({ costUsd }: { costUsd?: number }) {
   );
 }
 
-function Workstation({ agent, index, selected, helperCount = 0, parentName, held = false, onSelect }: { agent?: Agent; index: number; selected: boolean; helperCount?: number; parentName?: string; held?: boolean; onSelect?: (id: string) => void }) {
+function Workstation({ agent, index, selected, helperCount = 0, parentName, held = false, ready = false, onSelect }: { agent?: Agent; index: number; selected: boolean; helperCount?: number; parentName?: string; held?: boolean; ready?: boolean; onSelect?: (id: string) => void }) {
   const { x, y } = slotPosition(index);
   const character = agent ? characterFor(agent.id) : undefined;
   const alarm = agent && breakerAlarm(agent);
@@ -129,13 +149,13 @@ function Workstation({ agent, index, selected, helperCount = 0, parentName, held
       {agent && <CostMeter costUsd={agent.usage?.costUsd} />}
       {alarm && <BreakerBeacon breaker={alarm} />}
       {agent?.status === 'waiting' && !held && <g className="station-ask" transform="translate(15 -100)"><rect x="-45" y="-15" width="92" height="24" rx="7" fill="#ffe4b4" stroke="#b98d52" /><path d="m-5 9 5 6 5-6" fill="#ffe4b4" /><text textAnchor="middle" y="1" fill="#7a5634" fontSize="9" fontWeight="600">A little help?</text></g>}
-      {agent && <g className="station-hover-card" transform="translate(-78 -134)"><rect width="190" height="40" rx="8" fill="#fbf8f1" stroke="#b5a5d3" /><text x="12" y="17" fill="#4d425f" fontSize="10" fontWeight="600">{agent.project.slice(0, 22)}</text><text x="12" y="31" fill="#7d708d" fontSize="9">Click to open this session’s controls</text></g>}
+      {agent && !ready && <g className="station-hover-card" transform="translate(-78 -134)"><rect width="190" height="40" rx="8" fill="#fbf8f1" stroke="#b5a5d3" /><text x="12" y="17" fill="#4d425f" fontSize="10" fontWeight="600">{agent.project.slice(0, 22)}</text><text x="12" y="31" fill="#7d708d" fontSize="9">Click to open this session’s controls</text></g>}
     </g>
   );
 }
 
 /** The floor is vector art; only the crew represents live daemon sessions. */
-export function StationScene({ agents = [], allAgents = agents, deck, rows: rowsOverride, scale, theme, selectedId, paused = false, onSelect, onOpenTeam, subagents, pending = [], notify, demo = false }: StationSceneProps) {
+export function StationScene({ agents = [], allAgents = agents, deck, rows: rowsOverride, scale, theme, selectedId, paused = false, onSelect, onOpenTeam, subagents, pending = [], notify, demo = false, ready, onLook }: StationSceneProps) {
   const uid = useId().replace(/:/g, '');
   const placements: readonly Placement[] = deck ?? agents.slice(0, SLOTS_PER_DECK).map((agent, slot) => ({ kind: 'agent', slot, agent }));
   const rows = rowsOverride ?? deckRows(placements);
@@ -214,7 +234,7 @@ export function StationScene({ agents = [], allAgents = agents, deck, rows: rows
         const helpers = agent ? subagents?.get(agent.id) : undefined;
         return (
           <Fragment key={agent?.id ?? `vacant-${slot}`}>
-            <Workstation agent={agent} index={slot} held={!!agent && !!pendingFor(agent.id, pending)} helperCount={helpers?.length} parentName={agent?.parentId ? allAgents.find(parent => parent.id === agent.parentId)?.name ?? positions.get(agent.parentId)?.agent.name : undefined} selected={!!agent && (agent.id === selectedId || !!helpers?.some(helper => helper.id === selectedId))} onSelect={onSelect} />
+            <Workstation agent={agent} index={slot} held={!!agent && !!pendingFor(agent.id, pending)} ready={!!agent && !!ready?.has(agent.id)} helperCount={helpers?.length} parentName={agent?.parentId ? allAgents.find(parent => parent.id === agent.parentId)?.name ?? positions.get(agent.parentId)?.agent.name : undefined} selected={!!agent && (agent.id === selectedId || !!helpers?.some(helper => helper.id === selectedId))} onSelect={onSelect} />
             {agent && helpers && helpers.length > 0 && <SubagentCrew parent={agent} helpers={helpers} index={slot} selectedId={selectedId} onSelect={onSelect} />}
           </Fragment>
         );
@@ -224,8 +244,9 @@ export function StationScene({ agents = [], allAgents = agents, deck, rows: rows
       <g className="station-approvals">{items.map(({ slot, placement }) => {
         if (placement?.kind !== 'agent') return null;
         const bubble = deskBubble(placement.agent, pending);
-        if (!bubble || bubble.kind === 'ask') return null;
         const { x, y } = slotPosition(slot);
+        if (!bubble && ready?.has(placement.agent.id)) return <ReadyCard key={`ready-${placement.agent.id}`} agent={placement.agent} x={x + 15} y={y - 100} onLook={onLook} />;
+        if (!bubble || bubble.kind === 'ask') return null;
         return <StationApproval key={bubble.item.id} agent={placement.agent} item={bubble.item} question={bubble.kind === 'question'} x={x + 15} y={y - 85} demo={demo} notify={notify} onSelect={onSelect} />;
       })}</g>
     </svg>

@@ -21,6 +21,7 @@ import { nestSubagents } from './crew.ts';
 import { desktop } from './desktop.ts';
 import { DesktopSetup } from './components/DesktopSetup.tsx';
 import { SessionHistory } from './components/SessionHistory.tsx';
+import { unseenReady } from './readyToLook.ts';
 
 type Toast = { id: number; text: string; kind: 'ok' | 'error' };
 type Filter = 'all' | 'claude' | 'codex' | 'other';
@@ -54,6 +55,9 @@ export function App() {
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [sort, setSort] = useState<'recent' | 'name'>('recent');
   const [now, setNow] = useState(Date.now());
+  /** When the operator last opened each agent: a "Ready to look" card hides once its result has been seen. */
+  const [lookedAt, setLookedAt] = useState<Readonly<Record<string, number>>>({});
+  const [previewRequest, setPreviewRequest] = useState<{ readonly id: string; readonly seq: number }>();
 
   useEffect(() => {
     const bridge = desktop();
@@ -87,6 +91,16 @@ export function App() {
     [scopedAgents, filter, query, sort],
   );
   const selected = tower.agents.find((a) => a.id === selectedId) ?? (historicalAgent?.id === selectedId ? historicalAgent : undefined);
+  const ready = useMemo(() => unseenReady(tower.turns.ready, lookedAt, selectedId), [tower.turns.ready, lookedAt, selectedId]);
+  // Opening an agent (any way) counts as seeing its newest result.
+  const readyAt = selectedId ? tower.turns.ready.get(selectedId) : undefined;
+  useEffect(() => {
+    if (selectedId && readyAt !== undefined) setLookedAt((seen) => ((seen[selectedId] ?? 0) >= readyAt ? seen : { ...seen, [selectedId]: readyAt }));
+  }, [selectedId, readyAt]);
+  const lookAt = useCallback((id: string) => {
+    setSelectedId(id);
+    setPreviewRequest((request) => ({ id, seq: (request?.seq ?? 0) + 1 }));
+  }, []);
   const counts = {
     total: tower.agents.length,
     busy: tower.agents.filter((a) => a.status === 'busy').length,
@@ -182,7 +196,7 @@ export function App() {
               {view === 'library' && <LibraryView notify={notify} />}
               {view === 'history' && <SessionHistory now={now} notify={notify} onOpen={agent => { setHistoricalAgent(agent); setSelectedId(agent.id); }} />}
               {(view === 'fleet' || view === 'attention') && <>
-              {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={(teamId) => { setView('teams'); setSelectedTeamId(teamId); }} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} pending={tower.pending} notify={notify} />}
+              {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={(teamId) => { setView('teams'); setSelectedTeamId(teamId); }} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} pending={tower.pending} notify={notify} ready={ready} onLook={lookAt} />}
 
               {view === 'fleet' && tower.connected && <AwayRecap agents={tower.agents} pending={tower.pending} now={now} onSelect={setSelectedId} />}
               <section className="metric-grid fleet-metrics" aria-label="Fleet summary">
@@ -243,10 +257,11 @@ export function App() {
                   hooksInstalled={tower.hooksInstalled}
                   lastEvent={tower.lastEvent}
                   now={now}
-                  onClose={() => setSelectedId(undefined)}
+                  onClose={() => { setSelectedId(undefined); setPreviewRequest(undefined); }}
                   onSelect={setSelectedId}
                   notify={notify}
                   pending={tower.pending}
+                  previewRequest={previewRequest?.id === selected.id ? previewRequest.seq : undefined}
                 />
               )}
             </AnimatePresence>

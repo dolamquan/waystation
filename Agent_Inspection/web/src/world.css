@@ -211,6 +211,15 @@
 .monitor-cursor { animation: cursor-blink 1.2s steps(1) infinite; }
 .station-busy .monitor-code { animation: screen-code 4s ease-in-out infinite; animation-delay: var(--crew-delay); }
 .station-ask { animation: ask-bob 2.5s ease-in-out infinite; }
+/* "Ready to look": pops up once, then bobs gently until the operator opens the result. */
+.station-ready { cursor: pointer; outline: none; animation: ready-pop .45s cubic-bezier(.3, 1.6, .5, 1) both, ready-bob 2.8s ease-in-out .45s infinite; }
+.station-ready-card { fill: #e3f2e7; stroke: #4f9068; stroke-width: 1.5; }
+.station-ready-tail { fill: #e3f2e7; stroke: #4f9068; stroke-width: 1.5; stroke-linejoin: round; }
+.station-ready-sparkle { fill: #f1c95a; stroke: #b58b2a; stroke-width: .8; animation: star-twinkle 1.8s ease-in-out infinite; }
+.station-ready text { fill: #245c3b; pointer-events: none; }
+.station-ready:hover .station-ready-card, .station-ready:focus-visible .station-ready-card { fill: #d2ecd9; stroke-width: 2.2; }
+@keyframes ready-pop { from { transform: translateY(14px) scale(.6); opacity: 0; } }
+@keyframes ready-bob { 50% { transform: translateY(-4px); } }
 .world-star { animation: star-twinkle 7s ease-in-out infinite; }
 .antenna-light { animation: cursor-blink 3s steps(1) infinite; }
 .world-bubble { animation: bubble-rise 12s ease-in-out infinite; }

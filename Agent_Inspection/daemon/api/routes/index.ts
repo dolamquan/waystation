@@ -3,6 +3,7 @@ import { docRoutes } from './docs.ts';
 import { integrationRoutes } from './integrations.ts';
 import { notifyAgentRoutes, notifyRoutes } from './notify.ts';
 import { outputRoutes } from './outputs.ts';
+import { previewRoutes } from './preview.ts';
 import { commandRoutes } from './commands.ts';
 import type { Route } from './route.ts';
 import { scheduleRoutes } from './schedules.ts';
@@ -14,7 +15,7 @@ import { sessionRoutes } from './sessions.ts';
 export function libraryRoutes(tower: Tower): Route[] {
   return [
     ...skillRoutes(tower), ...docRoutes(tower), ...integrationRoutes(tower), ...notifyRoutes(tower), ...scheduleRoutes(tower),
-    ...usageWindowRoutes(tower), ...outputRoutes(tower), ...commandRoutes(tower), ...sessionRoutes(tower),
+    ...usageWindowRoutes(tower), ...outputRoutes(tower), ...previewRoutes(tower), ...commandRoutes(tower), ...sessionRoutes(tower),
   ];
 }
 

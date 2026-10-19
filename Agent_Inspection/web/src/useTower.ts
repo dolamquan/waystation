@@ -3,6 +3,7 @@ import { uniqueAgents } from '../../daemon/domain/agentIdentity.ts';
 import {
   WS_PROTOCOL, token, type Agent, type AgentEvent, type PendingInterception, type TeamLogEntry, type TeamView,
 } from './api.ts';
+import { EMPTY_TURN_WATCH, watchAgents, watchEvent, type TurnWatch } from './readyToLook.ts';
 
 export interface TeamLogItem {
   readonly seq: number;
@@ -22,6 +23,8 @@ export interface TowerState {
   /** Recent team log entries, numbered so bursts arriving between renders are never dropped. */
   readonly teamLogFeed: readonly TeamLogItem[];
   readonly authError: boolean;
+  /** Agents that just finished a turn that changed files ("Ready to look"). */
+  readonly turns: TurnWatch;
 }
 
 type Message =
@@ -33,18 +36,23 @@ type Message =
   | { type: 'team_log'; entry: TeamLogEntry };
 
 const RECONNECT_MS = 1500;
-const INITIAL: TowerState = { connected: false, agents: [], pending: [], hooksInstalled: false, authError: false, teams: [], teamLogFeed: [] };
+const INITIAL: TowerState = { connected: false, agents: [], pending: [], hooksInstalled: false, authError: false, teams: [], teamLogFeed: [], turns: EMPTY_TURN_WATCH };
+
+function withAgents(state: TowerState, incoming: Agent[]): Pick<TowerState, 'agents' | 'turns'> {
+  const agents = uniqueAgents(incoming);
+  return { agents, turns: watchAgents(state.turns, state.agents, agents, Date.now()) };
+}
 
 function reduce(state: TowerState, msg: Message): TowerState {
   switch (msg.type) {
     case 'snapshot':
-      return { ...state, agents: uniqueAgents(msg.agents), pending: msg.pending, hooksInstalled: msg.hooks.installed, teams: msg.teams ?? [] };
+      return { ...state, ...withAgents(state, msg.agents), pending: msg.pending, hooksInstalled: msg.hooks.installed, teams: msg.teams ?? [] };
     case 'agents':
-      return { ...state, agents: uniqueAgents(msg.agents), hooksInstalled: msg.hooks.installed };
+      return { ...state, ...withAgents(state, msg.agents), hooksInstalled: msg.hooks.installed };
     case 'pending':
       return { ...state, pending: msg.pending };
     case 'event':
-      return { ...state, lastEvent: msg.event };
+      return { ...state, lastEvent: msg.event, turns: watchEvent(state.turns, msg.event) };
     case 'teams':
       return { ...state, teams: msg.teams };
     case 'team_log':

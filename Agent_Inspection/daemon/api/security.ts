@@ -45,6 +45,8 @@ export function contentSecurityPolicy(port: number): string {
     "style-src 'self' 'unsafe-inline'",
     `connect-src 'self' ws://127.0.0.1:${port} ws://localhost:${port}`,
     "img-src 'self' data:",
+    // The Preview tab shows the operator's own app, which always runs on a loopback port.
+    'frame-src http://localhost:* http://127.0.0.1:*',
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "form-action 'self'",
