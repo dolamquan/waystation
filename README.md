@@ -20,6 +20,14 @@ Approve their tool calls, send them instructions, and run mixed Claude + Codex t
 
 <img src="Agent_Inspection/docs/screenshots/welcome.png" alt="Waystation welcome screen: 'Your team, in one place.'" width="900" />
 
+<br />
+
+<a href="video/promo/out/waystation-promo.mp4">
+  <img src="Agent_Inspection/docs/promo-poster.jpg" alt="Watch the Waystation promo video (50 seconds)" width="900" />
+</a>
+
+<sub>▶ <a href="video/promo/out/waystation-promo.mp4"><b>Watch the 50-second promo</b></a></sub>
+
 </div>
 
 <br />
