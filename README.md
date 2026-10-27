@@ -23,10 +23,10 @@ Approve their tool calls, send them instructions, and run mixed Claude + Codex t
 <br />
 
 <a href="video/promo/out/waystation-promo.mp4">
-  <img src="Agent_Inspection/docs/promo-poster.jpg" alt="Watch the Waystation promo video (50 seconds)" width="900" />
+  <img src="Agent_Inspection/docs/promo.gif" alt="Waystation promo video (click for the full-quality version)" width="900" />
 </a>
 
-<sub>▶ <a href="video/promo/out/waystation-promo.mp4"><b>Watch the 50-second promo</b></a></sub>
+<sub>▶ <a href="video/promo/out/waystation-promo.mp4"><b>Watch the full-quality promo</b></a></sub>
 
 </div>
 
