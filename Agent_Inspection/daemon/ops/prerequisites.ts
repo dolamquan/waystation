@@ -57,6 +57,10 @@ export function checkPrerequisites(probes: PrerequisiteProbes): Prerequisite[] {
       purpose: 'Codex agents and team members. Install with: npm install -g @openai/codex. For a custom installation, set AGENT_TOWER_CODEX_JS or use Desktop setup.',
     },
     {
+      id: 'copilot', label: 'GitHub Copilot SDK', ok: true, detail: 'Bundled with Waystation',
+      purpose: 'Copilot agents, teams, schedules and account usage. Connect your account in the Copilot panel above.',
+    },
+    {
       id: 'terminal', label: 'Windows Terminal', ok: terminal !== undefined, detail: terminal ?? 'wt.exe not found',
       purpose: 'Terminal consoles and Open in Claude Code / Codex.',
     },

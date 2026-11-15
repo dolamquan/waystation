@@ -1,4 +1,5 @@
-export type Vendor = 'claude' | 'codex' | 'other';
+import type { ManagedVendor } from '../../shared/agentProviders.ts';
+export type Vendor = ManagedVendor | 'other';
 
 /**
  * A: launched by the tower (full control)
@@ -12,6 +13,10 @@ export type AgentStatus = 'busy' | 'idle' | 'waiting' | 'stopped' | 'unknown';
 export interface Agent {
   readonly id: string;
   readonly vendor: Vendor;
+  /** Discovery provider identity; vendor remains the integration/control family. */
+  readonly providerId?: string;
+  readonly providerLabel?: string;
+  readonly observation?: { readonly processName: string; readonly created: string; readonly host: 'cli' | 'editor' };
   readonly tier: Tier;
   readonly name: string;
   readonly sessionId?: string;
@@ -22,12 +27,19 @@ export interface Agent {
   readonly source: string;
   readonly currentActivity?: string;
   readonly startedAt?: number;
+  /**
+   * When a process last opened this session (Codex: its thread lock was created). Later than startedAt for a
+   * resumed thread; console linking uses it to tell which console a resumed thread runs in.
+   */
+  readonly openedAt?: number;
   readonly lastEventAt?: number;
   readonly hooked: boolean;
   readonly intercepting: boolean;
   /** Present when the Stop action is disabled; explains why. */
   readonly stopBlockedReason?: string;
   readonly canInstruct: boolean;
+  /** Negotiated adapter capabilities; absent for native integrations. */
+  readonly capabilities?: { readonly resume: boolean; readonly model?: boolean };
   /** The original Claude CLI process is connected through the local VS Code terminal bridge. */
   readonly terminalConnected?: boolean;
   /** Model the agent is running, when known (launch override, transcript or session metadata). */
@@ -74,6 +86,10 @@ export interface TokenCounts {
 
 export interface AgentUsage {
   readonly tokens: TokenCounts;
+  /** False when only context occupancy was reported; zeros are not usage measurements. */
+  readonly tokensReported?: boolean;
+  /** Latest raw reading when ACP reporting scope is unknown. Never included in totals. */
+  readonly reportedTokens?: TokenCounts;
   /** List-price estimate; absent when the model has no known price (e.g. Codex). */
   readonly costUsd?: number;
   /** Tokens in the most recent request's context window, and the window size. */

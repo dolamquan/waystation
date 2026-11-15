@@ -1,3 +1,4 @@
+import { isManagedVendor } from '../shared/agentProviders.ts';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,8 +12,11 @@ import { InterceptionManager } from './hooks/interceptions.ts';
 import { SessionFlags } from './hooks/sessionFlags.ts';
 import { hooksInstalled, installHooks, uninstallHooks } from './hooks/installer.ts';
 import { ClaudeSessionsCollector } from './collectors/claudeSessions.ts';
-import { CodexSessionsCollector } from './collectors/codexSessions.ts';
+import { CodexSessionsCollector, threadLockHeld } from './collectors/codexSessions.ts';
 import { ProcessCollector } from './collectors/observedProcesses.ts';
+import { DiscoveryCatalog } from './collectors/discoveryCatalog.ts';
+import { CopilotAccount } from './managed/copilotAccount.ts';
+import { ProviderRegistry } from './managed/providerRegistry.ts';
 import { ManagedAgents, validateLaunch } from './managed/managedAgents.ts';
 import { resolveCodexEntry } from './managed/codexRunner.ts';
 import { resolveClaudeExe } from './managed/cliCommands.ts';
@@ -20,13 +24,21 @@ import type { ManagedLaunch } from './managed/types.ts';
 import type { TeamManager } from './teams/teamManager.ts';
 import { killRefusal, lookupProcess, stopProcessTree } from './actions/kill.ts';
 import { VSCodeBridge } from './actions/vscodeBridge.ts';
+import { PtyManager } from './pty/ptyManager.ts';
+import { createConsoleStore } from './pty/consoleStore.ts';
+import { spawnNodePty } from './pty/nodePtySpawn.ts';
+import { ConsoleAttention } from './pty/consoleAttention.ts';
+import { ConsoleAgentLinker } from './pty/consoleAgentLink.ts';
+import { isConsoleKind } from './pty/types.ts';
 import { attachSkillToProject, listSkills, skillInstruction } from './actions/skills.ts';
 import {
-  PROJECT_ROOT, manualAttachCommand, openAttachTerminal, openLauncherTerminal, type TerminalTarget,
+  PROJECT_ROOT, defaultLauncherCommand, manualAttachCommand, openAttachTerminal, openLauncherTerminal, type LauncherCommand, type TerminalTarget,
 } from './actions/terminal.ts';
 import { CliHandoffs } from './actions/cliHandoffs.ts';
 import { AgentOps } from './ops/agentOps.ts';
 import { breakerConfigFromEnv } from './guard/breaker.ts';
+import { ContentionTracker, type FileContention } from './guard/contention.ts';
+import { moveToWorktree, type MoveResult } from './actions/moveToWorktree.ts';
 import { Library, type LibraryDeps } from './library/index.ts';
 import { SecretStore } from './library/secretStore.ts';
 import { applyLoadout, isEmptyLoadout, parseLoadout } from './library/loadout.ts';
@@ -39,20 +51,32 @@ import { MessageQueue, QueueError } from './sessions/messageQueue.ts';
 import { SessionHistory } from './sessions/history.ts';
 import { MANAGED_SOURCE, TowerCli } from './towerCli.ts';
 import { TowerTeams } from './towerTeams.ts';
+import { ChannelManager } from './channels/channelManager.ts';
+import { CHANNEL_CLI_SCRIPT } from './channels/skillInstall.ts';
+import { scanProcesses } from './collectors/processScanner.ts';
 import { UserError } from './userError.ts';
 import { PreviewManager } from './preview/manager.ts';
+import { BrowserTiles } from './browser/browserTiles.ts';
+import { FactoryEngine, type FactoryHost } from './factory/engine.ts';
 
 export { UserError };
 
 export interface TowerOptions {
+  /** Isolated execution for factory integration tests; production uses managed providers. */
+  readonly factoryHost?: FactoryHost;
+  readonly factoryRoot?: string;
   /** Where library files live. Tests point these at temp folders. */
   readonly libraryPaths?: Partial<LibraryDeps['paths']>;
   /** Secrets file; defaults to the real one, or memory when the database is in memory. */
   readonly secretsFile?: string;
+  /** Where the console board remembers its consoles; defaults to the real file, or none for an in-memory database. */
+  readonly consolesFile?: string;
   /** Opens a console tab for an agent or team. Tests replace it so no real terminal starts. */
   readonly openTerminal?: (target: TerminalTarget) => Promise<void>;
   /** Opens a tab running the real CLI for a ticket. Tests replace it so no real terminal starts. */
   readonly openLauncher?: (ticketId: string, title: string) => Promise<void>;
+  /** The command an in-app console runs for a ticket. Tests replace it with a harmless one. */
+  readonly launcherCommand?: (ticketId: string) => LauncherCommand;
 }
 
 function isolated(label: string, fn: () => void): void {
@@ -66,6 +90,7 @@ function isolated(label: string, fn: () => void): void {
 const MAX_INSTRUCTION_CHARS = 8000;
 const HOOKS_REFRESH_MS = 5000;
 const PRUNE_EVERY_MS = 60 * 60 * 1000;
+const CONTENTION_REFRESH_MS = 30_000;
 /** How long a finished managed agent stays visible before it is removed. */
 const MANAGED_LINGER_MS = 5 * 60 * 1000;
 
@@ -79,17 +104,34 @@ const installerPaths = {
 export class Tower {
   readonly registry = new AgentRegistry();
   readonly interceptions = new InterceptionManager();
+  /** Files that agents in the same checkout both wrote recently. */
+  readonly contention = new ContentionTracker((agentId) => this.registry.get(agentId));
   readonly flags = new SessionFlags();
   readonly terminals = new VSCodeBridge(claudePaths.sessions, () => { void this.claude.scan(); });
+  /** The console board's real terminals (Claude Code, Codex or a shell), one pseudo-terminal each. */
+  readonly consoles: PtyManager;
+
+  /** Publish agents and their console ownership together, after discovery has finished linking them. */
+  async consoleBoardSnapshot() {
+    await this.consoleLinks.run();
+    return { consoles: this.consoles.list(), agents: this.registry.list() };
+  }
+  /** Shows a Claude Code console's own hook events (working, needs you, ready) on its card. */
+  private readonly consoleAttention: ConsoleAttention;
+  /** Records which registry agent runs in which console, from the process tree. */
+  private readonly consoleLinks: ConsoleAgentLinker;
   readonly store: TowerStore;
   readonly messageQueue: MessageQueue;
   readonly history: SessionHistory;
+  readonly discovery: DiscoveryCatalog;
+  readonly providers: ProviderRegistry;
+  readonly copilotAccount = new CopilotAccount();
   private shuttingDown = false;
   private readonly delivering = new Set<string>();
   private readonly recovering = new Set<string>();
   readonly teams: TeamManager;
   private hooksOn = hooksInstalled(claudePaths.settings);
-  private readonly processes = new ProcessCollector(this.registry);
+  private readonly processes = new ProcessCollector(this.registry, () => this.discovery.list());
   private readonly claude: ClaudeSessionsCollector;
   private readonly codex: CodexSessionsCollector;
   private readonly managed: ManagedAgents;
@@ -106,8 +148,13 @@ export class Tower {
   readonly ops: AgentOps;
   /** Skills, context docs, MCP servers, plugins, notification channels. */
   readonly library: Library;
+  /** Operator-made groups of running sessions (any vendor) whose members message each other. */
+  readonly channels: ChannelManager;
   /** Live previews of what agents built, one per project folder. */
   readonly previews = new PreviewManager();
+  readonly browsers: BrowserTiles;
+  /** Persistent requests, workflow gates and revision-bound validation. */
+  readonly factory: FactoryEngine;
   /** 5-hour and weekly plan windows: real where the vendor reports them, else estimated from local transcripts. */
   readonly usageWindows = new UsageWindows({
     claudeProjectsDir: claudePaths.projects,
@@ -119,6 +166,24 @@ export class Tower {
   constructor(dbPath: string = paths.database, options: TowerOptions = {}) {
     this.launchTerminal = options.openTerminal ?? ((target) => openAttachTerminal(target, paths.towerHome));
     this.store = new TowerStore(dbPath);
+    // An in-memory tower (tests) must not read or write the operator's real saved consoles.
+    const consolesFile = options.consolesFile ?? (dbPath === ':memory:' ? undefined : paths.consolesFile);
+    this.consoles = new PtyManager(spawnNodePty, Date.now, consolesFile ? createConsoleStore(consolesFile) : undefined);
+    this.consoleAttention = new ConsoleAttention({
+      consoles: this.consoles,
+      sessionPid: async (sessionId) => (this.claude.sessionFileFor(sessionId) ?? await this.claude.readSessionFile(sessionId))?.pid,
+      parents: async () => new Map((await scanProcesses()).map((proc) => [proc.pid, proc.ppid] as const)),
+    });
+    this.consoleLinks = new ConsoleAgentLinker({
+      agents: () => this.registry.list(),
+      consoles: this.consoles,
+      processes: async () => (await scanProcesses()).map((proc) => {
+        const startedAt = Date.parse(proc.created);
+        return { pid: proc.pid, ppid: proc.ppid, ...(Number.isNaN(startedAt) ? {} : { startedAt }) };
+      }),
+    });
+    this.providers = new ProviderRegistry();
+    this.discovery = new DiscoveryCatalog(this.store, () => this.providers.discoveryRules());
     this.history = new SessionHistory(this.store);
     this.messageQueue = new MessageQueue(this.store, agentId => {
       if (!this.shuttingDown) this.registry.pushEvent({ agentId, ts: Date.now(), kind: 'system', summary: 'Message queue updated' });
@@ -138,7 +203,16 @@ export class Tower {
       },
       audit: (action, target, detail) => this.store.audit(action, target, detail),
     });
+    // Sign-ins are kept only for the real station; isolated test stations stay ephemeral.
+    this.browsers = new BrowserTiles(this.library.automation.canvas, undefined,
+      dbPath === ':memory:' ? {} : { profileFile: join(paths.towerHome, 'browser-profile.json') });
     this.managed = new ManagedAgents({
+      usageBaseline: (vendor, sessionId) => this.store.loadRecords<{ id: string; tokens: import('./domain/types.ts').TokenCounts }>('provider_usage_totals')
+        .find(entry => entry.id === `${vendor}:${sessionId}`)?.tokens ?? { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 },
+      onUsage: sample => {
+        this.store.saveRecord('provider_usage', sample);
+        if (sample.sessionId && sample.cumulative) this.store.saveRecord('provider_usage_totals', { id: `${sample.vendor}:${sample.sessionId}`, tokens: sample.cumulative });
+      },
       // Team bookkeeping runs inside the runners' event pumps: an error there must never kill the agent.
       onAgent: (agent) => {
         if (this.cli.isHandedOff(agent.id)) return;
@@ -158,9 +232,9 @@ export class Tower {
         return decision;
       },
     }, {
-      prepare: (launch) => this.library.notifier.attachDefaults(launch),
+      prepare: (launch) => this.library.automation.attachDefaults(this.library.notifier.attachDefaults(launch)),
       failed: (launch) => { if (launch.agentId) this.library.notifier.revoke(launch.agentId); },
-    });
+    }, this.providers);
     this.claude = new ClaudeSessionsCollector({
       registry: this.registry,
       hooksInstalled: () => this.hooksOn,
@@ -174,9 +248,19 @@ export class Tower {
       store: this.store,
       managed: this.managed,
       notifier: this.library.notifier,
+      prepareMcp: (launch) => this.library.automation.attachDefaults(launch),
       cliSessions: this.cliSessions,
       hooksOn: () => this.hooksOn,
       launchCliTab: options.openLauncher ?? ((ticketId, title) => openLauncherTerminal(ticketId, title, paths.towerHome)),
+      // The same launcher command line as the terminal tab, run in a pseudo-terminal on the board.
+      isShuttingDown: () => this.shuttingDown,
+      endConsole: (consoleId) => { this.consoles.setAgentId(consoleId, undefined); this.consoles.kill(consoleId); },
+      launchCliConsole: async (ticketId, vendor, title, agentId, onExit) => {
+        const command = (options.launcherCommand ?? ((id) => defaultLauncherCommand(id, paths.towerHome)))(ticketId);
+        const info = await this.consoles.createFromCommand({ ...command, name: title, kind: isConsoleKind(vendor) ? vendor : 'shell', agentId, onExit: () => { if (!this.shuttingDown) onExit(); } });
+        return info.id;
+      },
+      isTeamMember: (agentId) => this.teams.list().some((team) => team.members.some((member) => member.agentId === agentId)),
       requireAgent: (agentId) => this.requireAgent(agentId),
       queueHookMessage: (agentId, sessionId, text) => this.queueHookMessage(agentId, sessionId, text),
       openTeamMember: (agentId, vendor) => this.teamOps.openMember(agentId, vendor),
@@ -186,6 +270,21 @@ export class Tower {
       library: this.library, cliSessions: this.cliSessions, cli: this.cli,
     });
     this.teams = this.teamOps.manager;
+    this.factory = new FactoryEngine(this.store, options.factoryHost ?? {
+      launch: input => {
+        const agent = this.managed.launch(input).snapshot();
+        this.history.remember(agent); this.history.rememberLaunch(agent.id, input);
+        this.store.audit('factory_agent_launch', agent.id, { vendor: input.vendor, cwd: input.cwd });
+        return agent;
+      },
+      agent: id => this.registry.get(id),
+      events: id => this.store.eventsFor(id),
+      stop: id => this.managed.get(id)?.stop() ?? Promise.resolve(),
+      // `ops` is created below; the factory only asks once work starts.
+      gate: (vendor, cwd) => this.ops.automatedLaunchBlock(vendor, cwd),
+    }, options.factoryRoot ?? join(paths.towerHome, 'factory'));
+    this.registry.on('agents', () => { if (!this.shuttingDown) this.consoleLinks.request(); });
+    this.consoles.on('changed', () => { if (!this.shuttingDown) this.consoleLinks.request(); });
     this.registry.on('agents', agents => {
       if (!this.shuttingDown) this.history.sync(agents, id => this.teams.list().find(team => team.members.some(member => member.agentId === id))?.id);
     });
@@ -209,9 +308,23 @@ export class Tower {
         hooksInstalled: () => this.hooksOn,
       },
       breaker: breakerConfigFromEnv(),
+      quota: async () => (await this.usageWindows.report()).vendors,
     });
     this.registry.on('event', (event) => isolated('runaway guard', () => this.ops.onEvent(event)));
+    this.registry.on('event', (event) => { if (!this.shuttingDown) isolated('file contention', () => this.contention.observe(event)); });
+    // An agent stopping can end a conflict.
+    this.registry.on('agents', () => { if (!this.shuttingDown) isolated('file contention', () => this.contention.refresh()); });
+    this.channels = new ChannelManager({
+      agent: (agentId) => this.registry.get(agentId),
+      agents: () => this.registry.list(),
+      processes: () => scanProcesses(),
+      // Channel mail takes the same path as the operator's own messages: runner, hook inbox or terminal.
+      instruct: (agentId, text) => this.instruct(agentId, text),
+      audit: (action, target, detail) => this.store.audit(action, target, detail),
+    }, this.store, { cliScript: CHANNEL_CLI_SCRIPT });
   }
+
+  async refreshDiscovery(): Promise<void> { this.providers.refresh(); await this.processes.scan(); }
 
   async start(): Promise<void> {
     await this.processes.start();
@@ -221,24 +334,34 @@ export class Tower {
     pruneAttachments(paths.attachmentsDir);
     this.cliSessions.start();
     this.timers = [
+      setInterval(() => this.providers.refresh(), 10_000),
       setInterval(() => { this.hooksOn = hooksInstalled(claudePaths.settings); }, HOOKS_REFRESH_MS),
       setInterval(() => this.store.pruneOlderThan(Date.now() - timings.eventRetentionMs), PRUNE_EVERY_MS),
+      setInterval(() => this.contention.refresh(), CONTENTION_REFRESH_MS),
     ];
     this.ops.start();
+    this.factory.start();
   }
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
+    this.library.agentPlatform.shutdown();
+    await this.library.agentEvaluations.shutdown();
+    await this.library.agentRuns.shutdown();
+    await this.library.agentSandboxes.shutdown();
+    await this.factory.shutdown();
     this.history.shutdown();
     for (const session of this.history.list(this.registry.list())) this.holdMessages(session.id, 'Waystation stopped. Review this message before sending it.');
     this.terminals.close();
+    this.consoleLinks.stop();
+    this.consoles.shutdown();
     this.timers.forEach(clearInterval);
     this.cliSessions.stop();
     this.claude.stop();
     this.codex.stop();
     this.processes.stop();
     this.teams.shutdown();
-    await Promise.all([this.managed.stopAll(), this.previews.stopAll()]);
+    await Promise.all([this.managed.stopAll(), this.previews.stopAll(), this.copilotAccount.stop(), this.browsers.shutdown()]);
     this.ops.stop();
     this.store.close();
   }
@@ -249,7 +372,40 @@ export class Tower {
       pending: this.interceptions.list(),
       hooks: { installed: this.hooksOn },
       teams: this.teams.list(),
+      contention: this.contention.list(),
     };
+  }
+
+  /** Tells every agent on a contested file who else is writing it. */
+  async notifyContention(rawPath: unknown): Promise<{ sent: string[]; skipped: string[] }> {
+    const entry = this.contention.list().find((candidate) => candidate.path === rawPath);
+    if (!entry) throw new UserError('Those agents are no longer editing that file together.');
+    const agents = entry.agents.flatMap(({ agentId }) => { const agent = this.registry.get(agentId); return agent ? [agent] : []; });
+    const sent: string[] = [];
+    const skipped: string[] = [];
+    for (const agent of agents) {
+      const others = agents.filter((other) => other.id !== agent.id).map((other) => other.name).join(', ');
+      const text = `Heads up from the operator: ${others} also edited ${entry.path} in the last few minutes, in the same checkout. Re-read the file before changing it again, and don't overwrite their edits. If your changes conflict, stop and say so.`;
+      try {
+        if (!agent.canInstruct) throw new UserError('cannot receive messages');
+        await this.instruct(agent.id, text);
+        sent.push(agent.name);
+      } catch (error) {
+        skipped.push(`${agent.name} (${(error as Error).message})`);
+      }
+    }
+    this.store.audit('contention_notify', entry.path, { sent, skipped });
+    return { sent, skipped };
+  }
+
+  moveToWorktree(agentId: string): Promise<MoveResult> {
+    return moveToWorktree({
+      agent: (id) => this.registry.get(id),
+      launch: (raw) => this.launch(raw),
+      stopAgent: (id) => this.stopAgent(id),
+      handoffContext: (id) => this.handoffContext(id),
+      audit: (action, target, detail) => this.store.audit(action, target, detail),
+    }, agentId);
   }
 
   /** Live SDK controls (/model, /mcp, /context…) for a Claude agent launched here; undefined for every other session. */
@@ -377,7 +533,8 @@ export class Tower {
       const view = this.history.list(this.registry.list()).find(session => session.id === agentId)!;
       if (!view.canResume) throw new UserError(view.resumeBlockedReason);
       if (!record.agent.sessionId || !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,199}$/.test(record.agent.sessionId)) throw new UserError('The saved conversation id is invalid.');
-      if (record.agent.vendor === 'codex' && existsSync(join(paths.codexHome, 'thread-writer-locks', `${record.agent.sessionId}.lock`))) {
+      const codexLock = join(paths.codexHome, 'thread-writer-locks', `${record.agent.sessionId}.lock`);
+      if (record.agent.vendor === 'codex' && existsSync(codexLock) && await threadLockHeld(codexLock)) {
         throw new UserError('This Codex conversation is still open in another client. Close it there before resuming it here.');
       }
       if (record.agent.pid && await lookupProcess(record.agent.pid)) throw new UserError('The previous process may still be running. Close its original session before resuming.');
@@ -508,13 +665,14 @@ export class Tower {
   }
 
   /** Launches a managed agent. `raw.loadout` (skills, docs, MCP servers, plugins, notify channels) is optional. */
-  launch(raw: unknown): Agent {
+  launch(raw: unknown, trusted?: Pick<ManagedLaunch, 'agentId' | 'mcpServers' | 'env'>): Agent {
     let launch: ManagedLaunch;
     let notes: readonly string[] = [];
     const rawLoadout = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).loadout : undefined;
     let loadout;
     try {
       launch = validateLaunch(raw);
+      if (trusted) launch = { ...launch, ...trusted };
       loadout = parseLoadout(rawLoadout);
       if (!isEmptyLoadout(loadout)) {
         // Providers key per-agent state (notify tokens, generated plugin folders) on the agent id.
@@ -549,7 +707,7 @@ export class Tower {
     const context = canResume ? '' : this.handoffContext(agentId);
     this.store.audit('delegate', agentId, { prompt, stopOriginal: body.stopOriginal === true });
     const launched = this.launch({
-      vendor: 'claude',
+      vendor: isManagedVendor(agent.vendor) ? agent.vendor : 'claude',
       cwd: agent.cwd,
       prompt: context ? `${context}\n\nNew task: ${prompt}` : prompt,
       name: `Delegated from ${agent.name}`.slice(0, 80),
@@ -624,7 +782,13 @@ export class Tower {
   disbandTeam(teamId: string, removeWorktrees: boolean) { return this.teamOps.disband(teamId, removeWorktrees); }
 
   /** Continue a managed agent's own session in the real Claude Code / Codex CLI. Team members rejoin when it closes. */
-  openCli(agentId: string) { return this.cli.open(agentId); }
+  openCli(agentId: string) {
+    if (this.managed.launchOf(agentId)?.toolPolicy) throw new UserError('This agent uses enforced tool restrictions. Continue in Waystation; a terminal handoff cannot preserve those restrictions.');
+    return this.cli.open(agentId);
+  }
+
+  /** Like openCli, but the CLI runs in a console on the board instead of an external terminal tab. */
+  openCliInConsole(agentId: string) { return this.cli.open(agentId, 'console'); }
 
   cliStarted(ticketId: string, raw: unknown): void { this.cli.started(ticketId, raw); }
 
@@ -637,6 +801,7 @@ export class Tower {
     // A Waystation agent open in the terminal reports through the hooks: show it on its own card.
     const agentId = this.cli.parkedIdForSession(sessionId) ?? `claude:${sessionId}`;
     if (input.hook_event_name === 'SessionEnd') this.flags.forget(sessionId);
+    if (this.hooksOn) void this.consoleAttention.handle(input);
     const event = hookToEvent(agentId, input);
     if (event) {
       this.registry.pushEvent(event);

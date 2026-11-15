@@ -9,6 +9,8 @@ export const TOWER_HOME = process.env.AGENT_TOWER_HOME ?? join(LOCAL_APP_DATA, '
 export const paths = {
   towerHome: TOWER_HOME,
   daemonInfo: join(TOWER_HOME, 'daemon.json'),
+  channelsInfo: join(TOWER_HOME, 'channels.json'),
+  mcpInfo: join(TOWER_HOME, 'mcp.json'),
   interceptDir: join(TOWER_HOME, 'intercept'),
   hooksInstallDir: join(TOWER_HOME, 'hooks'),
   backupsDir: join(TOWER_HOME, 'backups'),
@@ -29,6 +31,8 @@ export const paths = {
   loadoutsDir: join(TOWER_HOME, 'loadouts'),
   /** Secret values (MCP tokens, webhook URLs, SMTP passwords). Never returned by the API. */
   secretsFile: join(TOWER_HOME, 'secrets.json'),
+  /** Console board specs (kind, folder, name) so consoles can be offered back after a restart. */
+  consolesFile: join(TOWER_HOME, 'consoles.json'),
   claudeHome: process.env.CLAUDE_HOME ?? join(homedir(), '.claude'),
   codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex'),
 } as const;
@@ -58,3 +62,6 @@ export const timings = {
 
 /** Env var set on agents launched by the tower so the global hook ignores them. */
 export const MANAGED_ENV_FLAG = 'AGENT_TOWER_MANAGED';
+
+/** Env var naming a managed agent's own id, so tools it runs (the channel CLI) can say which session they speak for. */
+export const AGENT_ID_ENV = 'WAYSTATION_AGENT_ID';

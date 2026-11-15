@@ -38,7 +38,7 @@ function rosterLines(state: TeamState, self: TeamMember): string {
 }
 
 function toolNames(state: TeamState, member: TeamMember): string {
-  const base = 'team_roster, post_message, read_messages, list_tasks, create_task, claim_task, update_task, handoff';
+  const base = 'team_roster, post_message, read_messages, list_tasks, create_task, claim_task, update_task, handoff, register_output';
   if (member.role !== 'lead') return base;
   return `${base}${state.requirePlanApproval ? ', submit_plan' : ''}, finish_team`;
 }
@@ -60,6 +60,8 @@ ${rosterLines(state, member)}
 Your sandbox: ${member.worktree} is your own git worktree on branch ${member.branch}. Only create or edit files there. Each teammate has a separate copy of the project and you will not see their edits until the operator merges branches, so agree on interfaces and file ownership through messages. Do not run git commands that change state (commit, checkout, rebase, reset): just leave your edits in the worktree. The tower commits them when the operator merges your branch, and sandboxed members cannot write git metadata anyway.
 
 ${playbook(state, member)}
+
+Deliverables: before marking a task done or completing your assignment, use register_output for final reports, images, tables, and other files the operator should open. Give each a readable title and description. It saves a copy and creates a preview/download card; a file path in a message alone is not a deliverable. Code changes are reviewed through branch diffs. ${member.role === 'lead' ? 'In finish_team, summarize the result and any remaining limitations.' : 'Report the result and any remaining limitations to the lead.'}
 
 Team rules:
 - Every message wakes its recipient and spends the team budget. Do not send acknowledgements, thanks, or status chatter that needs no reply.

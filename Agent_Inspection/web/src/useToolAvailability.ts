@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.ts';
-type ToolAvailability = Partial<Record<'git' | 'codex' | 'claude' | 'terminal', boolean>>;
+import { managedProvider, type ManagedVendor } from '../../shared/agentProviders.ts';
+type ToolAvailability = Partial<Record<ManagedVendor | 'git' | 'terminal', boolean>>;
 
-export function cliUnavailableReason(tools: ToolAvailability, vendor: 'claude' | 'codex' | 'other'): string | undefined {
+export function cliUnavailableReason(tools: ToolAvailability, vendor: ManagedVendor | 'other'): string | undefined {
+  if (managedProvider(vendor)?.cli === false) return 'Use this provider’s managed session in Waystation. CLI handoff is not available.';
   if (tools.terminal === false) return 'Install Windows Terminal to open agent sessions in a terminal.';
-  if (vendor !== 'other' && tools[vendor] === false) return `Install or configure ${vendor === 'codex' ? 'Codex CLI' : 'Claude Code'} to open this session in a terminal.`;
+  if (vendor !== 'other' && tools[vendor] === false) return `Install or configure ${managedProvider(vendor)?.label} to open this session in a terminal.`;
   return undefined;
 }
 

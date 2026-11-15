@@ -58,6 +58,25 @@ export function launcherTerminalArgs(ticketId: string, title: string, paths: Ter
   return tabArgs(title, paths, [ticketId]);
 }
 
+/** What runs the launcher for a ticket, wherever it is shown: the same program, arguments and folder as the terminal tab. */
+export interface LauncherCommand {
+  readonly file: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+}
+
+export function launcherCommand(ticketId: string, paths: TerminalPaths): LauncherCommand {
+  if (!TICKET_ID.test(ticketId)) throw new TerminalError('That ticket cannot be opened in a terminal.');
+  const unsafe = Object.values(paths).find((path) => UNSAFE_PATH.test(path));
+  if (unsafe) throw new TerminalError(`The path ${unsafe} contains characters the launcher cannot be given.`);
+  return { file: paths.nodePath, args: ['--import', 'tsx', paths.script, ticketId, '--home', paths.towerHome], cwd: paths.projectRoot };
+}
+
+/** The launcher command for a ticket with the tower's default paths, for running inside an in-app console. */
+export function defaultLauncherCommand(ticketId: string, towerHome: string): LauncherCommand {
+  return launcherCommand(ticketId, defaultPaths(towerHome, LAUNCH_SCRIPT));
+}
+
 function tabArgs(title: string, paths: TerminalPaths, scriptArgs: readonly string[]): string[] {
   const unsafe = Object.values(paths).find((path) => UNSAFE_PATH.test(path));
   if (unsafe) throw new TerminalError(`The path ${unsafe} contains characters Windows Terminal cannot pass on.`);

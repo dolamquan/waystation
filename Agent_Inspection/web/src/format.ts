@@ -17,7 +17,7 @@ export const TIER_LABEL: Record<Agent['tier'], { label: string; hint: string }> 
   C: { label: 'Observe only', hint: 'Watched from logs/processes. Stop may be available; instructions are not.' },
 };
 
-export const VENDOR_LABEL: Record<Agent['vendor'], string> = { claude: 'Claude', codex: 'Codex', other: 'Agent' };
+export const VENDOR_LABEL: Record<Agent['vendor'], string> = { claude: 'Claude', codex: 'Codex', copilot: 'GitHub Copilot', other: 'Agent' };
 
 /** "claude-opus-5-5" → "Opus 5.5"; other ids stay as they are. */
 export function shortModel(model: string | undefined): string | undefined {

@@ -15,8 +15,11 @@ export function teamRoutes(tower: Tower): Route[] {
   return [
     r('GET', '/api/teams', () => ({ teams: tower.teams.list() })),
     r('POST', '/api/teams', async ({ body }) => ({ ok: true, ...(await teams.create(body)) })),
+    r('GET', '/api/teams/:id/outputs/:output', async ({ params }) => teams.output(params[0], params[1])),
+    r('POST', '/api/teams/:id/outputs/:output/reveal', async ({ params }) => { await teams.revealOutput(params[0], params[1]); return { ok: true }; }),
     r('GET', '/api/teams/:id/log', async ({ params }) => ({ entries: await teams.log(params[0]) })),
     r('POST', '/api/teams/:id/message', async ({ params, body }) => ({ ok: true, message: await teams.message(params[0], bodyOf(body)) })),
+    r('POST', '/api/teams/:id/members', async ({ params, body }) => ({ ok: true, ...(await teams.addMember(params[0], bodyOf(body))) })),
     r('POST', '/api/teams/:id/pause', async ({ params }) => {
       await teams.pause(params[0]);
       return { ok: true };

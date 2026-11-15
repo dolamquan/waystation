@@ -5,6 +5,7 @@ import { UserError, type Tower } from '../../tower.ts';
 import { runAgentCommand, type CommandDeps } from '../../commands/agentCommands.ts';
 import { CommandError } from '../../commands/types.ts';
 import { bodyOf, r, type Route } from './route.ts';
+import { providerUsageReport } from './usageWindows.ts';
 
 /** Claude Code's ~/.claude.json (moves with CLAUDE_CONFIG_DIR). */
 const claudeUserConfig = (): string => join(process.env.CLAUDE_CONFIG_DIR ?? homedir(), '.claude.json');
@@ -14,7 +15,7 @@ export function commandRoutes(tower: Tower): Route[] {
   const deps: CommandDeps = {
     agent: (id) => tower.registry.get(id),
     control: (id) => tower.claudeControl(id),
-    usageWindows: () => tower.usageWindows.report(),
+    usageWindows: () => providerUsageReport(tower),
     restartWithModel: (id, model) => tower.ops.restartAgent(id, { model }),
     claudeHome: paths.claudeHome,
     userConfigFile: claudeUserConfig(),

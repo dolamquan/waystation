@@ -15,12 +15,16 @@ export interface AuditEntry {
 
 /** Tables holding one JSON document per row. A closed set: the name is interpolated into SQL. */
 export type RecordTable =
-  'templates' | 'schedules' | 'context_docs' | 'mcp_servers' | 'plugin_prefs' | 'notify_channels' | 'notifications'
-  | 'message_queue' | 'session_history' | 'completion_reviews';
+  | 'connector_accounts' | 'connector_grants' | 'connector_approvals'
+  | 'templates' | 'schedules' | 'context_docs' | 'mcp_servers' | 'plugin_prefs' | 'notify_channels' | 'notifications'
+  | 'message_queue' | 'session_history' | 'completion_reviews' | 'discovery_rules' | 'provider_usage' | 'provider_usage_totals'
+  | 'channels' | 'factory_definitions' | 'factory_items' | 'canvas_tiles' | 'architecture_documents' | 'brain_connections' | 'architecture_credentials' | 'agent_memory_records' | 'agent_runs' | 'agent_capabilities' | 'agent_service_connections' | 'agent_environments' | 'agent_deployments' | 'agent_conversations' | 'agent_triggers' | 'agent_trace_events' | 'agent_secrets' | 'agent_datasets' | 'agent_evaluators' | 'agent_experiments' | 'agent_sandboxes' | 'settings' | 'remote_devices' | 'sketch_boards';
 
 const RECORD_TABLES: readonly RecordTable[] = [
+  'connector_accounts', 'connector_grants', 'connector_approvals',
   'templates', 'schedules', 'context_docs', 'mcp_servers', 'plugin_prefs', 'notify_channels', 'notifications',
-  'message_queue', 'session_history', 'completion_reviews',
+  'message_queue', 'session_history', 'completion_reviews', 'discovery_rules', 'provider_usage', 'provider_usage_totals',
+  'channels', 'factory_definitions', 'factory_items', 'canvas_tiles', 'architecture_documents', 'brain_connections', 'architecture_credentials', 'agent_memory_records', 'agent_runs', 'agent_capabilities', 'agent_service_connections', 'agent_environments', 'agent_deployments', 'agent_conversations', 'agent_triggers', 'agent_trace_events', 'agent_secrets', 'agent_datasets', 'agent_evaluators', 'agent_experiments', 'agent_sandboxes', 'settings', 'remote_devices', 'sketch_boards',
 ];
 
 interface UsageTotals {
@@ -94,6 +98,7 @@ export class TowerStore {
     for (const table of RECORD_TABLES) {
       this.db.exec(`CREATE TABLE IF NOT EXISTS ${table} (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL)`);
     }
+    this.db.exec("CREATE INDEX IF NOT EXISTS agent_trace_run_seq ON agent_trace_events (json_extract(json, '$.runId'), json_extract(json, '$.seq'))");
     const columns = this.db.prepare('PRAGMA table_info(events)').all() as Array<{ name: string }>;
     if (!columns.some(column => column.name === 'details_json')) this.db.exec('ALTER TABLE events ADD COLUMN details_json TEXT');
     // Body-only log entries carry their recipient and message id in columns (added after the table first shipped).
@@ -110,7 +115,7 @@ export class TowerStore {
    */
   recordUsage(agent: Agent, now = Date.now()): void {
     const usage = agent.usage;
-    if (!usage) return;
+    if (!usage || usage.tokensReported === false) return;
     const row = this.db.prepare('SELECT json FROM usage_totals WHERE agent_id = ?').get(agent.id) as { json: string } | undefined;
     const stored = row ? parseJson<UsageTotals>(row.json) : undefined;
     const totals: UsageTotals = { tokens: usage.tokens, costUsd: usage.costUsd };
@@ -157,6 +162,13 @@ export class TowerStore {
     };
   }
 
+  /** Today's (local day) estimated spend per project folder name, for the fleet spend cap. */
+  spendByProject(now = Date.now()): Array<{ project: string; costUsd: number }> {
+    return this.db.prepare(
+      'SELECT project, SUM(cost_usd) AS costUsd FROM usage_daily WHERE day = ? GROUP BY project',
+    ).all(localDay(now)) as unknown as Array<{ project: string; costUsd: number }>;
+  }
+
   // ---- names, templates, schedules ---------------------------------------------------------
 
   agentNames(): Map<string, string> {
@@ -189,6 +201,15 @@ export class TowerStore {
       const parsed = parseJson<T>(row.json);
       return parsed === undefined ? [] : [parsed];
     });
+  }
+
+  loadRecord<T>(table: RecordTable, id: string): T | undefined {
+    const row = this.db.prepare(`SELECT json FROM ${table} WHERE id = ?`).get(id) as { json: string } | undefined;
+    return row ? parseJson<T>(row.json) : undefined;
+  }
+  agentTrace<T>(runId: string, after: number, limit = 200): T[] {
+    const rows = this.db.prepare("SELECT json FROM agent_trace_events WHERE json_extract(json, '$.runId') = ? AND json_extract(json, '$.seq') > ? ORDER BY json_extract(json, '$.seq') LIMIT ?").all(runId, after, limit) as { json: string }[];
+    return rows.flatMap(row => { const value = parseJson<T>(row.json); return value === undefined ? [] : [value]; });
   }
 
   saveTeam(team: TeamState): void {
@@ -260,6 +281,7 @@ export class TowerStore {
   }
 
   pruneOlderThan(cutoffTs: number): void {
+    this.db.prepare('DELETE FROM provider_usage WHERE updated_at < ?').run(cutoffTs);
     this.db.prepare('DELETE FROM events WHERE ts < ? AND agent_id NOT IN (SELECT id FROM session_history)').run(cutoffTs);
     // Tool-by-tool activity ages out like agent events; the team channel is kept while the team exists.
     this.db.prepare("DELETE FROM team_log WHERE ts < ? AND (kind = 'activity' OR team_id NOT IN (SELECT id FROM teams))").run(cutoffTs);

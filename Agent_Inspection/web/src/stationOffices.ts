@@ -12,7 +12,7 @@ export interface StationOffice {
 const UNASSIGNED = 'unassigned';
 
 /** Compare Windows folders regardless of case, separators or trailing slashes. */
-function folder(path: string | undefined): { key: string; path: string } | undefined {
+export function folder(path: string | undefined): { key: string; path: string } | undefined {
   if (!path?.trim()) return undefined;
   const windows = /^[a-z]:[\\/]|^[\\/]{2}/i.test(path.trim()) || path.includes('\\');
   const slashed = path.trim().replace(/\\/g, '/');
@@ -26,6 +26,18 @@ function folder(path: string | undefined): { key: string; path: string } | undef
   let normalized = prefix + parts.join('/');
   if (/^[a-z]:$/i.test(normalized)) normalized += '/';
   return { key: `folder:${windows ? normalized.toLowerCase() : normalized}`, path: normalized };
+}
+
+/** The shortest path suffix that tells this folder apart from every other path in `allPaths`; 'Unassigned' without a path. */
+export function officeName(path: string | undefined, allPaths: readonly string[]): string {
+  const parts = path?.split('/').filter(Boolean) ?? [];
+  let name = 'Unassigned';
+  // Show enough of the parent path to distinguish folders with the same name.
+  for (let length = 1; length <= parts.length; length++) {
+    name = parts.slice(-length).join('/');
+    if (allPaths.filter(other => other.split('/').filter(Boolean).slice(-length).join('/').toLowerCase() === name.toLowerCase()).length === 1) break;
+  }
+  return path === '/' ? '/' : name;
 }
 
 /** Each working folder gets an office. Team worktrees share their repository's table. */
@@ -59,15 +71,5 @@ export function stationOffices(agents: readonly Agent[], teams: readonly TeamVie
   for (const agent of agents) officeFor(agentFolder(agent)).agents.push(agent);
   for (const team of floorTeams) officeFor(teamFolders.get(team.id)).teams.push(team);
   const paths = [...offices.values()].flatMap(office => office.path ? [office.path] : []);
-  return [...offices.values()].map(office => {
-    const parts = office.path?.split('/').filter(Boolean) ?? [];
-    let name = 'Unassigned';
-    // Show enough of the parent path to distinguish folders with the same name.
-    for (let length = 1; length <= parts.length; length++) {
-      name = parts.slice(-length).join('/');
-      if (paths.filter(path => path.split('/').filter(Boolean).slice(-length).join('/').toLowerCase() === name.toLowerCase()).length === 1) break;
-    }
-    if (office.path === '/') name = '/';
-    return { ...office, name };
-  }).sort((a, b) => Number(a.key === UNASSIGNED) - Number(b.key === UNASSIGNED) || a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
+  return [...offices.values()].map(office => ({ ...office, name: officeName(office.path, paths) })).sort((a, b) => Number(a.key === UNASSIGNED) - Number(b.key === UNASSIGNED) || a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
 }

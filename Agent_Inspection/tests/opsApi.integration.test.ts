@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { tempDir } from './helpers.ts';
+import { makeAgent, tempDir } from './helpers.ts';
 
 const PORT = 47_322;
 const TOKEN = 'ops-token-0123456789abcdef';
@@ -151,6 +151,34 @@ describe('operator features through the API', () => {
     expect((await api('POST', `/api/schedules/${schedule.json.schedule.id}/delete`, { confirm: true })).status).toBe(200);
 
     const prereqs = await api('GET', '/api/prerequisites');
-    expect(prereqs.json.prerequisites.map((p: { id: string }) => p.id)).toEqual(['node', 'git', 'claude', 'codex', 'terminal', 'hooks']);
+    expect(prereqs.json.prerequisites.map((p: { id: string }) => p.id)).toEqual(['node', 'git', 'claude', 'codex', 'copilot', 'terminal', 'hooks']);
+  });
+
+  it('saves the fleet spend cap and reports spend against it', async () => {
+    const saved = await api('POST', '/api/spend-cap', { dailyUsd: '1000', projects: { web: 3 }, quotaPausePercent: 90, constrainRunning: false });
+    expect(saved.status).toBe(200);
+    expect(saved.json.config).toEqual({ dailyUsd: 1000, projects: { web: 3 }, quotaPausePercent: 90, constrainRunning: false });
+    const { json } = await api('GET', '/api/spend-cap');
+    expect(json.status.scopes.map((scope: { scope: string }) => scope.scope)).toEqual(['fleet', 'project']);
+    expect(json.status.scopes[0].spentUsd).toBeGreaterThanOrEqual(0);
+    const bad = await api('POST', '/api/spend-cap', { dailyUsd: -1 });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error).toMatch(/daily cap/);
+  });
+  it('lists files two agents in one checkout both wrote, and tells them', async () => {
+    const cwd = tempDir();
+    const first = makeAgent({ id: 'claude:contend-1', name: 'Pip', cwd, status: 'busy', canInstruct: false, sessionId: 'contend-1' });
+    const second = makeAgent({ id: 'claude:contend-2', name: 'Mica', cwd, status: 'busy', canInstruct: false, sessionId: 'contend-2' });
+    tower.registry.upsert('test', first);
+    tower.registry.upsert('test', second);
+    tower.registry.pushEvent({ agentId: first.id, ts: Date.now(), kind: 'tool_call', summary: 'Edit: src/shared.ts' });
+    tower.registry.pushEvent({ agentId: second.id, ts: Date.now(), kind: 'tool_call', summary: 'Write: src/shared.ts' });
+    const entry = tower.state().contention.find((item) => item.path.endsWith('shared.ts'));
+    expect(entry?.agents.map((agent) => agent.agentId).sort()).toEqual([first.id, second.id]);
+    const told = await api('POST', '/api/contention/notify', { path: entry?.path });
+    expect(told.status).toBe(200);
+    expect(told.json.skipped).toHaveLength(2);
+    expect((await api('POST', '/api/contention/notify', { path: 'C:\nowhere.ts' })).status).toBe(400);
+    expect((await api('POST', '/api/agents/missing/move-to-worktree', {})).status).toBe(400);
   });
 });

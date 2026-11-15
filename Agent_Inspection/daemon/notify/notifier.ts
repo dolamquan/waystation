@@ -186,6 +186,7 @@ export class Notifier extends EventEmitter implements NotifySender, LoadoutProvi
 
   /** Give every daemon-managed launch a local notify tool unless channels were explicitly attached. */
   attachDefaults(launch: ManagedLaunch): ManagedLaunch {
+    if (launch.toolPolicy) return launch;
     // Standalone runners cannot post notifications before the daemon has an HTTP endpoint.
     if (!this.endpoint) return launch;
     const existing = launch.mcpServers?.notify;
@@ -247,5 +248,6 @@ export class Notifier extends EventEmitter implements NotifySender, LoadoutProvi
 
   revoke(agentId: string): void {
     this.tokens.revoke(agentId);
+    this.emit('revoke', agentId);
   }
 }

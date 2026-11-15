@@ -1,3 +1,4 @@
+import { isManagedVendor } from '../../../shared/agentProviders.ts';
 import { AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { api, type Agent } from '../api.ts';
@@ -21,8 +22,8 @@ export function AgentManage({ agent, notify }: AgentManageProps) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
-  const vendor = agent.vendor === 'codex' ? 'codex' : 'claude';
-  const canRestart = agent.tier === 'A' && !agent.inTerminal && !!agent.sessionId && agent.vendor !== 'other';
+  const vendor = isManagedVendor(agent.vendor) ? agent.vendor : 'claude';
+  const canRestart = agent.tier === 'A' && !agent.inTerminal && !!agent.sessionId && agent.vendor !== 'other' && agent.capabilities?.resume !== false;
 
   const run = async (fn: () => Promise<unknown>, ok: string): Promise<boolean> => {
     setBusy(true);
@@ -50,9 +51,12 @@ export function AgentManage({ agent, notify }: AgentManageProps) {
   return (
     <section className="detail-manage" aria-label="Agent settings">
       <AgentMeta agent={agent} />
-      {usage && (
+      {usage && usage.tokensReported === false && <p className="detail-usage-note">{usage.reportedTokens
+        ? `Latest agent reading: ${formatTokens(usage.reportedTokens.input)} input, ${formatTokens(usage.reportedTokens.output)} output tokens. Reporting scope is unspecified, so these are not added to usage totals.`
+        : 'The agent has not reported token usage. Context occupancy appears separately.'}</p>}
+      {usage && usage.tokensReported !== false && (
         <p className="detail-usage-note">
-          {usage.costUsd !== undefined ? `About ${formatUsd(usage.costUsd)} at list price` : 'No list price for this model'}
+          {usage.costUsd !== undefined ? `About ${formatUsd(usage.costUsd)} at list price` : agent.vendor === 'copilot' ? 'Copilot subscription usage; no dollar estimate' : 'No list price for this model'}
           {' · '}{formatTokens(usage.tokens.output)} output, {formatTokens(usage.tokens.input + usage.tokens.cacheRead + usage.tokens.cacheWrite5m + usage.tokens.cacheWrite1h)} input tokens
         </p>
       )}
@@ -89,11 +93,11 @@ export function AgentManage({ agent, notify }: AgentManageProps) {
 
       {panel === 'restart' && (
         <form className="detail-manage-form" onSubmit={(e) => { e.preventDefault(); setConfirmRestart(true); }}>
-          <p>Stops this agent and starts it again on the same conversation, so it keeps everything it knew. Optionally switch its model.</p>
-          <div className="form-field">
+          <p>Stops this agent and starts it again on the same conversation, so it keeps everything it knew.{agent.capabilities?.model !== false && ' Optionally switch its model.'}</p>
+          {agent.capabilities?.model === false ? <p>This agent manages its model in its own CLI; ACP model selection is unavailable.</p> : <div className="form-field">
             <span>Model</span>
             <ModelPicker key={vendor} vendor={vendor} value={model} onChange={setModel} emptyLabel={`Keep current (${shortModel(agent.model) ?? 'default'})`} />
-          </div>
+          </div>}
           <label>First message after the restart (optional)
             <textarea className="text-input" rows={2} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Continue where you left off." />
           </label>

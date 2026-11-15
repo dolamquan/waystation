@@ -1,9 +1,10 @@
+import { providerLabel, managedProvider } from '../../../shared/agentProviders.ts';
 ﻿import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api, request, type Agent, type AgentEvent, type PendingInterception, type SkillSummary } from '../api.ts';
 import type { ContextDoc } from '../library/loadoutApi.ts';
 import { currentActivity, filterActivity, mergeActivity, readableTime, sessionSource, type ActivityFilter } from '../activity.ts';
-import { STATUS_LABEL, VENDOR_LABEL } from '../format.ts';
+import { STATUS_LABEL } from '../format.ts';
 import { ActivityFeed } from './ActivityFeed.tsx';
 import { AgentConversation } from './AgentConversation.tsx';
 import { AgentManage } from './AgentManage.tsx';
@@ -121,7 +122,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
 
   const isClaude = agent.vendor === 'claude';
   const ended = agent.status === 'stopped';
-  const canIntercept = !ended && isClaude && (agent.tier === 'A' || (agent.tier === 'B' && hooksInstalled));
+  const canIntercept = !ended && !!managedProvider(agent.vendor)?.intercept && (agent.tier === 'A' || (agent.tier === 'B' && hooksInstalled));
   const canMessage = agent.canInstruct && !ended;
   const stopReason = agent.stopBlockedReason ?? (ended ? 'This session has already ended.' : undefined);
   const messages = useMemo(() => filterActivity(events, 'messages'), [events]);
@@ -166,10 +167,10 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
     },
   });
 
-  const cliName = agent.vendor === 'codex' ? 'Codex' : 'Claude Code';
+  const cliName = providerLabel(agent);
   // Agents launched here move into the CLI; sessions running elsewhere (your own) open as a copy.
   const handsOff = agent.tier === 'A';
-  const canOpenInCli = !ended && !agent.inTerminal && !!agent.sessionId && agent.vendor !== 'other' && (handsOff || !!agent.cwd);
+  const canOpenInCli = !ended && !agent.inTerminal && !!agent.sessionId && !!managedProvider(agent.vendor)?.cli && (handsOff || !!agent.cwd);
   const confirmCli = () => setConfirm(handsOff ? {
     title: `Continue in ${cliName}?`,
     body: `Waystation stops its copy of this agent and opens the same conversation in ${cliName} in a new terminal tab, where you use it like any ${cliName} session (/usage, /model and so on). The agent must be idle. Team members rejoin their team when you close that session.`,
@@ -242,9 +243,9 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
         <div className="detail-header-top"><button className="icon-btn" onClick={onClose} aria-label="Close details"><Icon name="close" size={18} /></button></div>
         <div className="detail-identity">
           <span className="detail-avatar"><CrewAvatar id={agent.id} status={agent.status} size={48} animated={false} /></span>
-          <div><h2>{agent.name}</h2><p>{VENDOR_LABEL[agent.vendor]}<span>·</span>{sessionSource(agent)}</p></div>
+          <div><h2>{agent.name}</h2><p>{providerLabel(agent)}<span>·</span>{sessionSource(agent)}</p></div>
         </div>
-        <div className="detail-status"><span className={`status-pill pill-${agent.inTerminal ? 'waiting' : agent.status}`}>{agent.inTerminal ? 'In your terminal' : STATUS_LABEL[agent.status]}</span><span className="detail-access-label"><Icon name={agent.tier === 'C' ? 'info' : 'shield'} size={14} />{agent.tier === 'A' ? 'Managed session' : agent.terminalConnected ? 'VS Code terminal connected' : agent.tier === 'B' && hooksInstalled ? 'Hooks connected' : 'Activity only'}</span><span className="detail-header-project"><Icon name="folder" size={14} />{agent.project || 'Unknown project'}</span></div>
+        <div className="detail-status"><span className={`status-pill pill-${agent.inTerminal ? 'waiting' : agent.status}`}>{agent.inTerminal ? 'In your terminal' : STATUS_LABEL[agent.status]}</span><span className="detail-access-label"><Icon name={agent.tier === 'C' ? 'info' : 'shield'} size={14} />{agent.tier === 'A' ? 'Managed session' : agent.terminalConnected ? 'VS Code terminal connected' : agent.tier === 'B' && hooksInstalled ? 'Hooks connected' : agent.observation ? 'Process only' : 'Activity only'}</span><span className="detail-header-project"><Icon name="folder" size={14} />{agent.project || 'Unknown project'}</span></div>
       </header>
 
       <nav className="detail-tabs" role="tablist" aria-label="Agent sections">
@@ -253,7 +254,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
 
       <div ref={scrollArea} className={`detail-scroll ${tab === 'chat' ? 'detail-chat-panel' : ''}`} role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${tab}`} tabIndex={0}>
         <section className="detail-chat" hidden={tab !== 'chat'}>
-          <AgentConversation events={messages} name={agent.name} now={now} active={tab === 'chat'} loading={loading} error={loadError} status={currentActivity(agent, newest)} onRetry={() => setRefresh(x => x + 1)} outputRef={setCommandOutput} />
+          <AgentConversation observeOnly={!!agent.observation} events={messages} name={agent.name} now={now} active={tab === 'chat'} loading={loading} error={loadError} status={currentActivity(agent, newest)} onRetry={() => setRefresh(x => x + 1)} outputRef={setCommandOutput} />
           <div className="chat-compose-area">
             {held && <div className="chat-approval" role="status"><Icon name="shield" size={16} /><span>A tool call is waiting for approval.</span><button className="btn btn-small" onClick={() => void runCommand('approve', '')} disabled={!!busy}>Approve</button><button className="btn btn-small" onClick={() => void runCommand('ask', '')} disabled={!!busy}>Let agent ask</button></div>}
             {composer === 'docs' && <section className="detail-skill-panel"><div className="detail-form-heading"><h3>Choose a context doc</h3><button className="icon-btn" onClick={() => setComposer(undefined)} aria-label="Close context docs"><Icon name="close" size={15} /></button></div><p>The agent reads it before it carries on. Manage docs in the Library.</p><DocPicker onPick={pickDoc} /></section>}
@@ -269,8 +270,8 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
             onRun={runCommand}
             onNative={runNative}
             onOpenCli={canOpenInCli ? confirmCli : undefined} />}
-            <MessageQueuePanel agent={agent} />
-            {!canMessage && <div className="chat-readonly"><Icon name="info" size={17} /><p>{ended ? 'This session has ended. Start a follow-up from Controls to continue.' : agent.inTerminal ? `Send messages in your ${cliName} terminal. You can follow the conversation here.` : agent.tier === 'B' && !hooksInstalled ? 'Install hooks from the top bar to send messages to this Claude Code session.' : 'To send a message, use the app where you started this session.'}</p></div>}
+            {!agent.observation && <MessageQueuePanel agent={agent} />}
+            {!canMessage && <div className="chat-readonly"><Icon name="info" size={17} /><p>{ended ? agent.observation ? 'This detected process has ended. Reopen the agent in its original app.' : 'This session has ended. Start a follow-up from Controls to continue.' : agent.inTerminal ? `Send messages in your ${cliName} terminal. You can follow the conversation here.` : agent.tier === 'B' && !hooksInstalled ? 'Install hooks from the top bar to send messages to this Claude Code session.' : 'To send a message, use the app where you started this session.'}</p></div>}
           </div>
         </section>
         {tab === 'controls' && <div className="detail-overview">
@@ -280,7 +281,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
           <AgentManage agent={agent} notify={notify} />
           {agent.inTerminal && <div className="detail-access-note"><Icon name="terminal" size={18} /><div><strong>Open in your terminal</strong><p>Work with it there in {cliName}. When you close that terminal, it comes back here and waits for instructions. Only Stop ends it.</p></div></div>}
 
-          {!canMessage && !ended && <div className="detail-access-note"><Icon name="info" size={18} /><div><strong>{agent.tier === 'B' && !hooksInstalled ? 'Connect this Claude Code session' : 'This session runs outside Waystation'}</strong><p>{agent.tier === 'B' && !hooksInstalled ? 'Install hooks from the top bar to send messages and review tool calls.' : 'You can follow its activity here. To send a message, use the app where you started it.'}</p><button onClick={() => setTab('activity')}>View activity<Icon name="arrow" size={13} /></button></div></div>}
+          {!canMessage && !ended && <div className="detail-access-note"><Icon name="info" size={18} /><div><strong>{agent.tier === 'B' && !hooksInstalled ? 'Connect this Claude Code session' : 'This session runs outside Waystation'}</strong><p>{agent.tier === 'B' && !hooksInstalled ? 'Install hooks from the top bar to send messages and review tool calls.' : agent.observation ? 'Process visibility only. Messages, tool approvals, model usage and team tasks need a provider integration. Use the original app to work with this agent.' : 'You can follow its activity here. To send a message, use the app where you started it.'}</p><button onClick={() => setTab('activity')}>View activity<Icon name="arrow" size={13} /></button></div></div>}
 
           {(canOpenInCli || agent.cwd || canMessage) && <div className="detail-action-list">
             {canOpenInCli && <button className="detail-action" onClick={confirmCli} disabled={!!busy || !!cliMissing}><span className="detail-action-icon"><Icon name="terminal" size={19} /></span><span><strong>{busy === 'cli' ? 'Opening…' : handsOff ? `Continue in ${cliName}` : `Open in ${cliName}`}</strong><small>{cliMissing ?? (handsOff ? `Move this session into the real ${cliName} CLI, with /usage, /model and everything else.` : `Open this conversation in the real ${cliName} CLI, as a copy. This session keeps running.`)}</small></span><Icon name="chevronRight" size={16} /></button>}
@@ -318,7 +319,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
           <div className="detail-activity-filters" aria-label="Activity type">{(['messages', 'tools', 'all'] as const).map(item => <button key={item} aria-pressed={filter === item} onClick={() => setFilter(item)}>{item === 'messages' ? 'Messages' : item === 'tools' ? 'Tool calls' : 'Everything'}</button>)}</div>
           <label className="detail-activity-search"><Icon name="search" size={16} /><input aria-label="Search activity" placeholder="Search this session" value={search} onChange={e => setSearch(e.target.value)} />{search && <button aria-label="Clear activity search" onClick={() => setSearch('')}><Icon name="close" size={14} /></button>}</label>
           {loadError && <div className="detail-load-error" role="alert"><p>Couldn’t load activity. {loadError}</p><button className="btn" onClick={() => setRefresh(x => x + 1)} disabled={loading}>Try again</button></div>}
-          {loading && !events.length ? <p className="detail-empty-text">Loading activity…</p> : visibleEvents.length ? <ActivityFeed events={visibleEvents} now={now} /> : !loadError && <div className="detail-feed-empty"><Icon name={search ? 'search' : 'message'} size={25} /><h4>{search ? 'No matches in this session' : filter === 'tools' ? 'No tool calls recorded yet' : 'No messages recorded yet'}</h4><p>{search ? 'Try a different word, or clear the search.' : 'New activity will appear here as it happens.'}</p>{search && <button className="btn" onClick={() => setSearch('')}>Clear search</button>}</div>}
+          {loading && !events.length ? <p className="detail-empty-text">Loading activity…</p> : visibleEvents.length ? <ActivityFeed events={visibleEvents} now={now} /> : !loadError && <div className="detail-feed-empty"><Icon name={search ? 'search' : 'message'} size={25} /><h4>{search ? 'No matches in this session' : filter === 'tools' ? 'No tool calls recorded yet' : 'No messages recorded yet'}</h4><p>{search ? 'Try a different word, or clear the search.' : agent.observation ? 'Process discovery does not expose conversation or tool activity. Use the original app to view it.' : 'New activity will appear here as it happens.'}</p>{search && <button className="btn" onClick={() => setSearch('')}>Clear search</button>}</div>}
         </section>}
 
         {tab === 'preview' && <AgentPreview agent={agent} notify={notify} onReview={() => setTab('outputs')} />}
@@ -326,7 +327,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
 
         {tab === 'details' && <section className="detail-information">
           <div className="detail-section-heading"><div><h3>About this session</h3><p>Where it’s running and what Waystation can do.</p></div></div>
-          <dl className="detail-facts"><div><dt>Provider</dt><dd>{VENDOR_LABEL[agent.vendor]}</dd></div><div><dt>Connection</dt><dd>{sessionSource(agent)}</dd></div><div><dt>Started</dt><dd>{readableTime(agent.startedAt, now)}</dd></div><div><dt>Last activity</dt><dd>{readableTime(agent.lastEventAt, now)}</dd></div>{agent.pid && <div><dt>Process ID</dt><dd>{agent.pid}</dd></div>}</dl>
+          <dl className="detail-facts"><div><dt>Provider</dt><dd>{providerLabel(agent)}</dd></div><div><dt>Connection</dt><dd>{sessionSource(agent)}</dd></div><div><dt>Started</dt><dd>{readableTime(agent.startedAt, now)}</dd></div><div><dt>Last activity</dt><dd>{readableTime(agent.lastEventAt, now)}</dd></div>{agent.pid && <div><dt>Process ID</dt><dd>{agent.pid}</dd></div>}</dl>
           <section className="detail-folder"><div className="detail-section-heading"><h3>Project folder</h3>{agent.cwd && <button onClick={() => {
             if (!navigator.clipboard) { notify('Clipboard access is unavailable in this browser.', 'error'); return; }
             void navigator.clipboard.writeText(agent.cwd!).then(() => notify('Folder path copied'), () => notify('Could not copy the path. You can select it below.', 'error'));
@@ -337,7 +338,7 @@ export function AgentDrawer({ agent, agents = [], hooksInstalled, lastEvent, now
         </section>}
       </div>
 
-      {tab !== 'chat' && <footer className="detail-footer"><span className={`connection-dot ${!ended ? 'live' : ''}`} /><span>{ended ? 'Session ended' : 'Activity updates automatically'}</span><span>{VENDOR_LABEL[agent.vendor]}</span></footer>}
+      {tab !== 'chat' && <footer className="detail-footer"><span className={`connection-dot ${!ended ? 'live' : ''}`} /><span>{ended ? 'Session ended' : agent.observation ? 'Process presence updates automatically' : 'Activity updates automatically'}</span><span>{providerLabel(agent)}</span></footer>}
       <AnimatePresence>{confirm && <Confirm title={confirm.title} body={confirm.body} confirmLabel={confirm.label} danger={confirm.danger} onConfirm={() => void confirm.action()} onClose={() => setConfirm(undefined)} />}</AnimatePresence>
     </motion.aside>
   );

@@ -1,3 +1,6 @@
+import { managedProvider } from '../../../shared/agentProviders.ts';
+import { useProviders } from '../useProviders.ts';
+import { CopilotAccountPanel } from './CopilotAccountPanel.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { api, type AgentTemplate } from '../api.ts';
 import type { LaunchLoadout } from '../library/loadoutApi.ts';
@@ -23,6 +26,7 @@ interface NewAgentDialogProps {
 }
 
 export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewAgentDialogProps) {
+  const { providers, error: providerError } = useProviders();
   const tools = useToolAvailability();
   const [vendor, setVendor] = useState<Vendor>('claude');
   const [cwd, setCwd] = useState(defaultCwd ?? '');
@@ -85,7 +89,7 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
         agentName: name.trim() || undefined,
         instructions: instructions.trim() || undefined,
         prompt: prompt.trim() || undefined,
-        intercept: vendor === 'claude' && intercept,
+        intercept: !!managedProvider(vendor)?.intercept && intercept,
         loadout: launchLoadout(loadout, vendor),
       });
       setTemplates((list) => [...list, template]);
@@ -108,7 +112,7 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
         name: name.trim() || undefined,
         model: model.trim() || undefined,
         appendSystemPrompt: instructions.trim() || undefined,
-        intercept: vendor === 'claude' && intercept,
+        intercept: !!managedProvider(vendor)?.intercept && intercept,
         loadout: launchLoadout(loadout, vendor),
       });
       notify(`Launched ${agent.name}`);
@@ -131,14 +135,17 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
             </select>
           </label>
         )}
-        <div className="segmented" role="radiogroup" aria-label="Agent type">
-          {(['claude', 'codex'] as const).map((v) => (
-            <button type="button" key={v} role="radio" aria-checked={vendor === v} disabled={v === 'codex' && tools.codex === false} className={vendor === v ? 'seg-on' : ''} onClick={() => chooseVendor(v)}>
-              {v === 'claude' ? 'Claude (Agent SDK)' : 'Codex (codex exec)'}
+        <div className="segmented" role="radiogroup" aria-label="Agent type" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 10rem), 1fr))' }}>
+          {providers.map(({ id: v, launchLabel, available }) => (
+            <button type="button" key={v} role="radio" aria-checked={vendor === v} disabled={available === false || v === 'codex' && tools.codex === false} className={vendor === v ? 'seg-on' : ''} onClick={() => chooseVendor(v)}>
+              {launchLabel}
             </button>
           ))}
         </div>
+        {providerError && <p role="status">Could not refresh configured agents. {providerError}</p>}
+        {managedProvider(vendor)?.adapter === 'acp' && <p className="muted">Uses this agent’s configured sign-in. Tool approvals and conversation recovery depend on its ACP capabilities; account quotas are not supplied by ACP.</p>}
         {tools.codex === false && <p className="muted">Codex CLI was not found. Install it or configure its path in Desktop setup to launch Codex agents.</p>}
+        {vendor === 'copilot' && <CopilotAccountPanel compact />}
         <div className="form-pair">
           <label>Name
             <input className="text-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="e.g. Test fixer" />
@@ -168,7 +175,7 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
           <summary>Skills, docs &amp; tools (optional)</summary>
           <LoadoutPicker vendor={vendor} value={loadout} onChange={setLoadout} />
         </details>
-        {vendor === 'claude' && (
+        {managedProvider(vendor)?.intercept && (
           <label className="check">
             <input type="checkbox" checked={intercept} onChange={(e) => setIntercept(e.target.checked)} />
             Start in Intercept mode (approve each tool call that needs permission)
@@ -184,7 +191,7 @@ export function NewAgentDialog({ defaultCwd, onClose, onLaunched, notify }: NewA
         <footer className="modal-foot">
           {saveLabel === undefined && <button type="button" className="btn btn-ghost modal-foot-left" onClick={() => setSaveLabel('')}>Save as template</button>}
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-go" disabled={busy || (vendor === 'codex' && tools.codex === false)}>{busy ? 'Launching…' : 'Launch'}</button>
+          <button type="submit" className="btn btn-go" disabled={busy || !managedProvider(vendor) || managedProvider(vendor)?.available === false || (vendor === 'codex' && tools.codex === false)}>{busy ? 'Launching…' : 'Launch'}</button>
         </footer>
       </form>
     </Modal>

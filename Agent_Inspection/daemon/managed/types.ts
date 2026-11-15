@@ -1,3 +1,4 @@
+import type { ManagedVendor } from '../../shared/agentProviders.ts';
 import type { Agent, AgentEvent, InterceptionDecision, PendingInterception } from '../domain/types.ts';
 import type { ReadGuard } from './writeGuard.ts';
 
@@ -18,7 +19,7 @@ export interface RemoteMcpServer {
 }
 
 export interface ManagedLaunch {
-  readonly vendor: 'claude' | 'codex';
+  readonly vendor: ManagedVendor;
   readonly cwd: string;
   /** First instruction. Empty only when resuming a session: the agent then waits, idle, for one. */
   readonly prompt: string;
@@ -30,6 +31,8 @@ export interface ManagedLaunch {
   readonly fork?: boolean;
   readonly appendSystemPrompt?: string;
   readonly intercept?: boolean;
+  /** Architecture agents: enforce conversation only, or require operator review for every tool. */
+  readonly toolPolicy?: 'chat-only' | 'review-tools';
   /** Model override, e.g. "claude-sonnet-5-5" or a Codex model name. */
   readonly model?: string;
   /** Extra stdio MCP servers (the team bridge, library MCP servers, the notify bridge). */
@@ -50,6 +53,8 @@ export interface ManagedLaunch {
 }
 
 export interface ManagedHost {
+  readonly usageBaseline?: (vendor: string, sessionId: string) => import('../domain/types.ts').TokenCounts;
+  readonly onUsage?: (sample: import('../usage/usageBlocks.ts').UsageEntry & { readonly id: string; readonly vendor: ManagedVendor; readonly sessionId?: string; readonly cumulative?: import('../domain/types.ts').TokenCounts }) => void;
   readonly onAgent: (agent: Agent) => void;
   readonly onEvent: (event: AgentEvent) => void;
   readonly onExit: (agentId: string) => void;

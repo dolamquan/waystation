@@ -50,6 +50,7 @@ describe('plan review: planning phase', () => {
     expect(call(lead, 'submit_plan', { rationale: 'one task' }).isError).toBe(false);
     teams.approvePlan(team.id);
     call(lead, 'update_task', { taskId: 't1', status: 'done' });
+    call(lead, 'read_messages'); // the approval notice: finish_team waits for unread mail
     expect(listedWhilePlanning).toContain('finish_team');
     expect(call(lead, 'finish_team', { summary: 'done' }).isError).toBe(false);
     expect(view().status).toBe('done');

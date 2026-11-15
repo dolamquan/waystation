@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TowerStore } from '../daemon/store/db.ts';
@@ -8,6 +9,78 @@ import { tempDir } from './helpers.ts';
 afterEach(cleanup);
 
 const RUNNING = { requirePlanApproval: false };
+
+describe('finishing while the team is still talking', () => {
+  it('refuses finish_team while a teammate is mid-turn or the lead has unread mail', async () => {
+    const { runners, call, idle, view } = await startCoreTeam(RUNNING);
+    const [lead] = runners;
+    call(lead, 'create_task', { title: 'Greeting', assignee: 'api' });
+    const api = runners[1];
+    call(api, 'update_task', { taskId: 't1', status: 'done', note: 'greet.txt added' });
+    idle(api);
+    call(lead, 'read_messages');
+
+    // The lead asks a question, which wakes api; finishing now would drop its answer.
+    call(lead, 'post_message', { to: 'api', text: 'what is in greet.txt?' });
+    expect(api.status).toBe('busy');
+    const early = call(lead, 'finish_team', { summary: 'done' });
+    expect(early.isError).toBe(true);
+    expect(early.text).toMatch(/api is still working/);
+    expect(view().status).toBe('running');
+
+    // The answer arrives while the lead is still in its turn: it must read it first.
+    call(api, 'post_message', { to: 'lead', text: 'hello from worker' });
+    idle(api);
+    const unread = call(lead, 'finish_team', { summary: 'done' });
+    expect(unread.isError).toBe(true);
+    expect(unread.text).toMatch(/unread/);
+
+    expect(call(lead, 'read_messages').text).toContain('hello from worker');
+    expect(call(lead, 'finish_team', { summary: 'done' }).isError).toBe(false);
+    expect(view().status).toBe('done');
+  });
+});
+
+describe('adding a member to an existing team', () => {
+  it('creates its worktree, tells the lead, and lets teammates reach it', async () => {
+    const { teams, team, runners, call, idle, view, runnerFor } = await startCoreTeam(RUNNING);
+    const [lead] = runners;
+
+    // Added while the lead is mid-turn: the notice waits in its mailbox.
+    const { member, message } = await teams.addMember(team.id, { name: 'docs', vendor: 'codex', model: 'gpt-5.5-codex', focus: 'README' });
+    expect(member).toMatchObject({ name: 'docs', role: 'worker', vendor: 'codex', merged: false });
+    expect(member.branch).toBe(view().members[0].branch.replace(/\/lead$/, '/docs'));
+    expect(existsSync(join(member.worktree, '.git'))).toBe(true);
+    expect(message).toMatch(/docs joined/);
+    expect(view().members.map((m) => m.name)).toEqual(['lead', 'api', 'ui', 'docs']);
+
+    // Its turn ends: it is woken with the news, and the roster it can query is live.
+    expect(lead.sent).toEqual([]);
+    idle(lead);
+    expect(lead.sent.at(-1)).toMatch(/docs \(worker, codex gpt-5\.5-codex\) joined the team/);
+    expect(call(lead, 'team_roster').text).toContain('docs: worker, codex');
+
+    // The newcomer launches with its first message, on its own worktree and token.
+    call(lead, 'create_task', { title: 'Write README', assignee: 'docs' });
+    const docs = runnerFor('docs')!;
+    expect(docs.launch).toMatchObject({ vendor: 'codex', cwd: member.worktree, model: 'gpt-5.5-codex' });
+    expect(docs.launch.prompt).toContain('lead assigned you t1: Write README');
+    call(docs, 'update_task', { taskId: 't1', status: 'done', note: 'README written' });
+    expect(view().tasks[0]).toMatchObject({ assignee: 'docs', status: 'done' });
+  });
+
+  it('rejects a second lead, a duplicate name, a full team and a disbanded team', async () => {
+    const { teams, team } = await startCoreTeam(RUNNING);
+    await expect(teams.addMember(team.id, { name: 'boss', role: 'lead', vendor: 'claude' })).rejects.toThrow(/one lead/);
+    await expect(teams.addMember(team.id, { name: 'api', vendor: 'claude' })).rejects.toThrow(/already/);
+    await teams.addMember(team.id, { name: 'w4', vendor: 'claude' });
+    await teams.addMember(team.id, { name: 'w5', vendor: 'claude' });
+    await teams.addMember(team.id, { name: 'w6', vendor: 'claude' });
+    await expect(teams.addMember(team.id, { name: 'w7', vendor: 'claude' })).rejects.toThrow(/at most 6/);
+    await teams.disband(team.id, { removeWorktrees: true });
+    await expect(teams.addMember(team.id, { name: 'late', vendor: 'claude' })).rejects.toThrow(/disbanded/);
+  });
+});
 
 describe('session continuity', () => {
   it('saves the session id a member reports and continues it after a crash', async () => {

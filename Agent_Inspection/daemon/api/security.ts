@@ -42,6 +42,7 @@ export function contentSecurityPolicy(port: number): string {
   return [
     "default-src 'self'",
     "script-src 'self'",
+    "worker-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     `connect-src 'self' ws://127.0.0.1:${port} ws://localhost:${port}`,
     "img-src 'self' data:",

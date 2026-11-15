@@ -175,6 +175,7 @@ export function toView(state: TeamState): TeamView {
   const queued = members.map((m) => [m.id, unreadFor(state, m.id).map((message) => message.id)] as const);
   return {
     id, name, goal, repoRoot, baseBranch, status, statusReason, createdAt, members, tasks, budget, summary, archivedAt,
+    outputs: state.outputs ?? [],
     requirePlanApproval: state.requirePlanApproval ?? false,
     pending: Object.fromEntries(queued.map(([memberId, ids]) => [memberId, ids.length])),
     pendingIds: Object.fromEntries(queued),

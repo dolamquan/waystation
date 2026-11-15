@@ -1,3 +1,4 @@
+import { isManagedVendor, managedProvider } from '../../shared/agentProviders.ts';
 import type { Agent, AgentEvent } from '../domain/types.ts';
 import type { AgentRegistry } from '../domain/registry.ts';
 import type { TowerStore, UsageSummary } from '../store/db.ts';
@@ -16,6 +17,13 @@ import { checkPrerequisites, type Prerequisite, type PrerequisiteProbes } from '
 import { LibraryInputError, type NotifySender } from '../library/types.ts';
 import { parseLoadout } from '../library/loadout.ts';
 import { paths } from '../config.ts';
+import { localDay } from '../store/db.ts';
+import { projectName } from '../domain/text.ts';
+import type { VendorWindows } from '../usage/windowTypes.ts';
+import {
+  DEFAULT_SPEND_CAP, automatedLaunchBlock, evaluateSpend, exceededFor, overReason, quotaPressure, validateSpendCap,
+  type SpendCapConfig, type SpendStatus,
+} from '../guard/spendCap.ts';
 
 export interface AgentOpsDeps {
   readonly registry: AgentRegistry;
@@ -36,7 +44,12 @@ export interface AgentOpsDeps {
   readonly resourcesDir?: string;
   /** Clock for schedule run timing (tests). */
   readonly now?: () => number;
+  /** Vendor plan windows, for deferring automated launches near a quota (Usage windows). */
+  readonly quota?: () => Promise<readonly VendorWindows[]>;
 }
+
+const SPEND_CAP_ID = 'spend_cap';
+const DEFERRED_PREFIX = 'Deferred: ';
 
 const LEDGER_EVERY_MS = 15_000;
 const BREAKER_TICK_MS = 60_000;
@@ -65,6 +78,8 @@ export class AgentOps {
   private timers: NodeJS.Timeout[] = [];
   private names = new Map<string, string>();
   private readonly restarting = new Set<string>();
+  /** `${day}|${agentId}`: agents the spend cap already constrained today, so a cleared guard stays cleared. */
+  private capTripped = new Set<string>();
   readonly runs: ScheduleRunWatcher;
 
   constructor(private readonly deps: AgentOpsDeps) {
@@ -134,7 +149,7 @@ export class AgentOps {
         return;
       }
       if (trip.level === 'constrained') {
-        if (agent.vendor === 'claude') this.deps.setIntercept(trip.agentId, true);
+        if (managedProvider(agent.vendor)?.intercept) this.deps.setIntercept(trip.agentId, true);
         else if (agent.tier === 'A') await this.deps.interrupt(trip.agentId);
       }
       if (agent.canInstruct) await this.deps.instruct(trip.agentId, steer);
@@ -152,7 +167,7 @@ export class AgentOps {
 
   // ---- usage --------------------------------------------------------------------------------
 
-  private flushUsage(): void {
+  private flushUsage(now = Date.now()): SpendStatus {
     for (const agent of this.deps.registry.list()) {
       if (!agent.usage) continue;
       // A tower-launched parent's SDK stream already includes its subagents' spend.
@@ -164,6 +179,68 @@ export class AgentOps {
       }
       const trip = this.breaker.observeCost(agent.id, agent.usage.costUsd);
       if (trip) void this.enforce(trip);
+    }
+    const status = this.currentSpend(now);
+    this.applySpendCap(status);
+    return status;
+  }
+
+  // ---- fleet spend cap ----------------------------------------------------------------------
+
+  spendCap(): SpendCapConfig {
+    const saved = this.deps.store.loadRecords<SpendCapConfig & { id: string }>('settings').find((record) => record.id === SPEND_CAP_ID);
+    if (!saved) return DEFAULT_SPEND_CAP;
+    const { id: _id, ...config } = saved;
+    return config;
+  }
+
+  setSpendCap(raw: unknown): SpendCapConfig {
+    const config = validateSpendCap(raw);
+    this.deps.store.saveRecord('settings', { id: SPEND_CAP_ID, ...config });
+    this.deps.store.audit('spend_cap', SPEND_CAP_ID, config);
+    return config;
+  }
+
+  /** Records pending usage first, so the numbers are current. */
+  spendStatus(now = Date.now()): SpendStatus {
+    return this.flushUsage(now);
+  }
+
+  private currentSpend(now: number): SpendStatus {
+    return evaluateSpend(this.spendCap(), this.deps.store.spendByProject(now), localDay(now));
+  }
+
+  /** Puts running agents launched here into the guard's constrained state, once per agent per day. */
+  private applySpendCap(status: SpendStatus): void {
+    if (!this.spendCap().constrainRunning || !status.scopes.some((scope) => scope.state === 'over')) return;
+    this.capTripped = new Set([...this.capTripped].filter((key) => key.startsWith(`${status.day}|`)));
+    for (const agent of this.deps.registry.list()) {
+      if (agent.tier !== 'A' || agent.status === 'stopped') continue;
+      const over = exceededFor(status, agent.project);
+      const key = `${status.day}|${agent.id}`;
+      if (!over || this.capTripped.has(key)) continue;
+      this.capTripped.add(key);
+      const trip = this.breaker.force(agent.id, overReason(over));
+      if (trip) void this.enforce(trip);
+    }
+  }
+
+  /** Why a schedule or factory stage for this vendor and folder should wait, or undefined to go ahead. */
+  async automatedLaunchBlock(vendor: string, cwd: string | undefined, now = Date.now()): Promise<string | undefined> {
+    const config = this.spendCap();
+    const pressure = config.quotaPausePercent === undefined ? undefined
+      : quotaPressure(await this.readQuota(), vendor, config.quotaPausePercent);
+    return automatedLaunchBlock(this.flushUsage(now), pressure, projectName(cwd));
+  }
+
+  private async readQuota(): Promise<readonly VendorWindows[]> {
+    if (!this.deps.quota) return [];
+    try {
+      return await this.deps.quota();
+    } catch (error) {
+      // Without a reading the quota rule can't apply; the spend caps still do.
+      console.error('[ops] reading plan windows failed:', (error as Error).message);
+      return [];
     }
   }
 
@@ -201,10 +278,13 @@ export class AgentOps {
     const launch = this.deps.managed.launchOf(agentId);
     const runner = this.deps.managed.get(agentId);
     if (!launch || !runner) throw new OpsInputError('Restart & continue works for agents launched from the tower.');
+    if (runner.snapshot().capabilities?.resume === false) throw new OpsInputError('This agent does not support conversation recovery through ACP. Start a new session instead.');
+    if (managedProvider(launch.vendor)?.available === false || !managedProvider(launch.vendor)) throw new OpsInputError('This provider is no longer configured or available. Reconnect it in Setup checks.');
     if (this.deps.isTeamMember(agentId)) throw new OpsInputError('Team members restart with their team: pause it, then resume.');
     const sessionId = runner.sessionId;
     if (!sessionId) throw new OpsInputError('This agent has no conversation to continue yet. Give it a moment, or stop it and launch a new one.');
     const model = optionalModel(body.model) ?? launch.model;
+    if (runner.snapshot().capabilities?.model === false && model !== launch.model) throw new OpsInputError('This agent does not expose model selection through ACP. Configure its model in its own CLI.');
     const prompt = optionalText(body.message, 'message', 8000) ?? DEFAULT_CONTINUE;
     const current = this.deps.registry.get(agentId);
     this.deps.store.audit('restart', agentId, { sessionId, model, previousModel: launch.model });
@@ -315,12 +395,28 @@ export class AgentOps {
   async runDueSchedules(now = Date.now()): Promise<void> {
     for (const schedule of this.loadSchedules()) {
       if (dueSlot(schedule, now) === undefined) continue;
+      const blocked = await this.automatedLaunchBlock(schedule.launch.vendor, schedule.launch.cwd, now);
+      if (blocked) {
+        this.recordDeferral(schedule, blocked);
+        continue;
+      }
       try {
         this.fire(schedule, now, false);
       } catch {
         // fire() already recorded the failure on the schedule.
       }
     }
+  }
+
+  /**
+   * The slot stays due (lastRunAt is unchanged), so the next tick tries again; past the catch-up
+   * window the run is skipped like any missed run.
+   */
+  private recordDeferral(schedule: Schedule, reason: string): void {
+    const lastResult = `${DEFERRED_PREFIX}${reason}`;
+    if (schedule.lastResult === lastResult) return;
+    this.deps.store.saveRecord('schedules', { ...schedule, lastResult });
+    this.deps.store.audit('schedule_deferred', schedule.id, { reason });
   }
 
   private get resourcesDir(): string {
@@ -349,13 +445,13 @@ export class AgentOps {
       throw error;
     }
     const launch: ScheduledLaunch = {
-      vendor: launchBody.vendor === 'codex' ? 'codex' : 'claude',
+      vendor: launchBody.vendor === undefined ? 'claude' : String(launchBody.vendor),
       cwd: typeof launchBody.cwd === 'string' ? launchBody.cwd.trim() : '',
       prompt: typeof launchBody.prompt === 'string' ? launchBody.prompt : '',
       name: optionalText(launchBody.name, 'name', MAX_NAME_CHARS),
       model: optionalModel(launchBody.model),
       appendSystemPrompt: optionalText(launchBody.appendSystemPrompt, 'instructions', 8000),
-      intercept: launchBody.vendor !== 'codex' && launchBody.intercept === true,
+      intercept: !!managedProvider(String(launchBody.vendor))?.intercept && launchBody.intercept === true,
       ...(loadout ? { loadout } : {}),
     };
     // The same checks as New agent, so a schedule can't be saved for a folder that doesn't exist.

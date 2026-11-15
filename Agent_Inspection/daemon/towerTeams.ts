@@ -81,6 +81,10 @@ export class TowerTeams {
 
   create(raw: unknown) { return asUserError(() => this.manager.create(raw)); }
 
+  output(teamId: string, outputId: string) { return asUserError(() => this.manager.output(teamId, outputId)); }
+
+  revealOutput(teamId: string, outputId: string) { return asUserError(() => this.manager.revealOutput(teamId, outputId)); }
+
   log(teamId: string) { return asUserError(() => this.manager.log(teamId)); }
 
   message(teamId: string, body: Record<string, unknown>) {
@@ -88,6 +92,8 @@ export class TowerTeams {
     if (text.length > MAX_MESSAGE_CHARS) throw new UserError('Message is too long.');
     return asUserError(() => this.manager.message(teamId, body.to, text));
   }
+
+  addMember(teamId: string, raw: unknown) { return asUserError(() => this.manager.addMember(teamId, raw)); }
 
   pause(teamId: string) { return asUserError(() => this.manager.pause(teamId)); }
 

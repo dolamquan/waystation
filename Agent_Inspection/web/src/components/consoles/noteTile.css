@@ -1,0 +1,3 @@
+.canvas-note { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+.canvas-note-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+.canvas-note-editor { width: 100%; min-height: 300px; resize: vertical; font-family: monospace; }

@@ -20,7 +20,7 @@ export function AgentMeta({ agent }: { readonly agent: Agent }) {
   return (
     <div className="agent-meta">
       {model && <span className="meta-chip" title={agent.model}>{model}</span>}
-      {usage && (
+      {usage && usage.tokensReported !== false && (
         <span className="meta-spend" title={`${tokens.toLocaleString()} tokens${usage.costUsd === undefined ? ' (no list price known for this model)' : ' (list-price estimate)'}`}>
           {usage.costUsd !== undefined ? formatUsd(usage.costUsd) : `${formatTokens(tokens)} tok`}
         </span>

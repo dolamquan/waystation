@@ -5,6 +5,20 @@ import { SessionHistory } from '../daemon/sessions/history.ts';
 import { makeAgent, tempDir } from './helpers.ts';
 
 describe('session history', () => {
+  it('persists observed runtimes without claiming conversation recovery or matching absent session ids', () => {
+    const path = join(tempDir(), 'history.db');
+    let store = new TowerStore(path);
+    let history = new SessionHistory(store);
+    const agent = makeAgent({ id: 'proc:1:created', sessionId: undefined, tier: 'C', vendor: 'other', providerId: 'copilot', providerLabel: 'GitHub Copilot', observation: { processName: 'copilot-runtime.exe', created: '2026-10-19T00:00:00Z', host: 'editor' } });
+    history.sync([agent], () => undefined);
+    expect(history.list([agent])[0]).toMatchObject({ live: true, canResume: false });
+    history.sync([], () => undefined);
+    expect(history.list([makeAgent({ id: 'proc:2', vendor: 'other', sessionId: undefined })])[0]).toMatchObject({ live: false, state: 'finished', canResume: false, resumeBlockedReason: expect.stringContaining('Process detection') });
+    store.close();
+    store = new TowerStore(path); history = new SessionHistory(store);
+    expect(history.list([])[0].agent.providerLabel).toBe('GitHub Copilot');
+    store.close();
+  });
   it('keeps project-searchable history and interrupted recovery without persisting credentials', () => {
     const path = join(tempDir(), 'sessions.db');
     let store = new TowerStore(path);

@@ -1,3 +1,6 @@
+import { managedProvider } from '../../../shared/agentProviders.ts';
+import { useProviders } from '../useProviders.ts';
+import { CopilotAccountPanel } from './CopilotAccountPanel.tsx';
 import { useState } from 'react';
 import { TEAM_PRESETS, type TeamPreset } from '../../../shared/teamPresets.ts';
 import { api, type TeamView } from '../api.ts';
@@ -58,6 +61,7 @@ function CreateSummary({ requirePlanApproval }: { requirePlanApproval: boolean }
 }
 
 export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTeamDialogProps) {
+  const { providers } = useProviders();
   const tools = useToolAvailability();
   const [name, setName] = useState('');
   const [cwd, setCwd] = useState(defaultCwd ?? '');
@@ -158,9 +162,10 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
           <button type="button" className="btn btn-small btn-ghost" onClick={add} disabled={members.length >= MAX_MEMBERS}>
             <Icon name="plus" size={14} />Add member
           </button>
-          {(['claude', 'codex'] as const).map((v) => (
+          {members.some(member => member.vendor === 'copilot') && <CopilotAccountPanel compact />}
+          {providers.map(({ id: v, launchLabel }) => (
             <datalist key={v} id={modelListId(v)}>
-              {MODEL_SUGGESTIONS[v].map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              {(MODEL_SUGGESTIONS[v] ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </datalist>
           ))}
         </fieldset>
@@ -186,7 +191,7 @@ export function NewTeamDialog({ defaultCwd, onClose, onCreated, notify }: NewTea
         </label>
         <label className="check">
           <input type="checkbox" checked={intercept} onChange={(e) => setIntercept(e.target.checked)} />
-          Start Claude members in Intercept mode (approve their tool calls)
+          Start members with approval support in Intercept mode (approve their tool calls)
         </label>
         <div className="callout">
           Each member works in its own git worktree and branch, outside your project folder. Nothing reaches your branch until you review a member's diff and merge it.

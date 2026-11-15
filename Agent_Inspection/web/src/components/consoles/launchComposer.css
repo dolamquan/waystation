@@ -1,0 +1,34 @@
+/* Launch composer: a light modal, so it uses the app theme tokens rather than the dark console ones. */
+.composer { width: min(40rem, calc(100vw - 24px)); }
+.composer-presets { display: grid; gap: 8px; margin-bottom: 14px; }
+.composer-preset-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.composer-chip {
+  display: inline-flex; align-items: center; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--text); font-size: 12px; cursor: pointer;
+}
+.composer-chip:hover { border-color: var(--accent); }
+.composer-chip-saved { padding: 0; cursor: default; overflow: hidden; }
+.composer-chip-saved button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 5px 8px 5px 11px; }
+.composer-chip-saved .composer-chip-x { padding: 5px 9px 5px 4px; color: var(--muted); display: inline-flex; align-items: center; }
+.composer-chip-x:hover { color: var(--text); }
+.composer-save { display: flex; gap: 8px; }
+.composer-save .text-input { flex: 1; min-width: 0; }
+
+.composer-slots { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.composer-slot { display: grid; grid-template-columns: 1.4rem minmax(7rem, 9rem) 1fr auto; gap: 8px; align-items: center; }
+.composer-slot-n { color: var(--muted); font-size: 12px; text-align: center; }
+.composer-add { margin-bottom: 14px; }
+.composer-team { display: grid; gap: 6px; margin-top: 12px; }
+.composer-team-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.composer-failures {
+  margin-top: 12px; padding: 10px 12px; border: 1px solid var(--danger, var(--red)); border-radius: 8px; font-size: 12px;
+}
+.composer-failures ul { margin: 6px 0 0; padding-left: 18px; }
+
+@media (max-width: 560px) {
+  .composer-slot { grid-template-columns: 1.4rem 1fr auto; }
+  .composer-slot select { grid-column: 2; grid-row: 1; }
+  .composer-slot input { grid-column: 2; grid-row: 2; }
+  .composer-slot .icon-btn { grid-column: 3; grid-row: 1; }
+  .composer-save { flex-wrap: wrap; }
+}

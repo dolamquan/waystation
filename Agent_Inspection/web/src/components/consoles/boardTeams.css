@@ -1,0 +1,49 @@
+/* Waystation-run teams on the console board: a sheet over the right of the board, and frames on the canvas.
+   Both live inside .surface-dark, so the plain theme tokens are the dark set here. */
+.console-body { position: relative; }
+
+.board-teams {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 20000;
+  width: min(1120px, 100%); display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-2); color: var(--text);
+  box-shadow: -24px 0 60px -20px rgb(0 0 0 / 0.8);
+  animation: board-teams-in 0.22s var(--ease-out);
+}
+@keyframes board-teams-in { from { opacity: 0; transform: translateX(16px); } }
+@media (prefers-reduced-motion: reduce) { .board-teams { animation: none; } }
+
+.board-teams-head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex: none;
+}
+.board-teams-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.board-teams-note { color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.board-teams-spacer { flex: 1; }
+.board-teams-body { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
+.board-teams-body .teams-layout { min-height: 100%; }
+@media (max-width: 760px) { .board-teams-note { display: none; } .board-teams-body { padding: 10px; } }
+
+/* Canvas frames around a team's member tiles. */
+.managed-team {
+  position: absolute; z-index: 0; pointer-events: none;
+  border: 1px solid var(--violet-line); border-radius: 14px;
+  background: color-mix(in srgb, var(--violet) 6%, transparent);
+}
+.managed-team-alert { border-color: var(--amber-line); background: color-mix(in srgb, var(--amber) 6%, transparent); }
+.managed-team-head {
+  pointer-events: auto; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 12px;
+  color: var(--violet-text); font-size: 12px; cursor: move; touch-action: none; overflow: hidden; white-space: nowrap;
+  zoom: var(--canvas-zoom, 1);
+}
+.managed-team-alert .managed-team-head { color: var(--amber-text); }
+.managed-team-head strong { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.managed-team-status { padding: 1px 8px; border-radius: 999px; background: var(--violet-soft); }
+.managed-team-alert .managed-team-status { background: var(--amber-soft); }
+.managed-team-progress { color: var(--muted); }
+.managed-team-spacer { flex: 1; }
+.managed-team-open {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; flex: none;
+  border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel-2); color: var(--text);
+  font: 500 12px var(--font); cursor: pointer;
+}
+.managed-team-open:hover { background: var(--panel-3); }
+.managed-team-open:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

@@ -1,0 +1,62 @@
+/* File tiles (code, notebooks, PDFs, images), the folder browser and inline renaming. Board tokens; contents scale with the zoom. */
+.canvas-tile > .file-tile { zoom: var(--canvas-zoom, 1); }
+
+/* Renaming: the name is a button that reads as text; clicking turns it into a text box. */
+.tile-name { min-width: 0; padding: 1px 4px; margin: 0 -4px; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: text; }
+.tile-name:hover { background: color-mix(in srgb, var(--on-deep) 7%, transparent); box-shadow: inset 0 -1px 0 var(--console-muted); }
+.tile-name-input { min-width: 6rem; width: 12rem; max-width: 50%; padding: 2px 6px; border: 1px solid var(--console-accent); border-radius: 4px; background: var(--console-bg); color: var(--console-text); font: inherit; font-weight: 600; }
+.canvas-drag .console-head input { pointer-events: auto; }
+.tile-note { margin: 0; color: var(--console-muted); font-size: 12px; }
+
+.file-tile { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--console-tile); color: var(--console-text); }
+.file-bar { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-bottom: 1px solid var(--console-line); font-size: 12px; }
+.file-bar .icon-btn { color: var(--console-muted); }
+.file-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--console-muted); font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.file-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--console-line) transparent; }
+.file-message { display: grid; gap: 8px; justify-items: start; padding: 14px 16px; }
+
+.file-code pre { margin: 0; padding: 8px 0; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre; tab-size: 4; }
+.file-line { display: block; padding-right: 16px; }
+.file-line:hover { background: color-mix(in srgb, var(--on-deep) 3%, transparent); }
+.file-ln { display: inline-block; width: 4.2em; padding-right: 1em; margin-right: 0.8em; border-right: 1px solid var(--console-line); color: var(--text-2); text-align: right; user-select: none; }
+.file-image { display: grid; place-items: center; min-height: 100%; padding: 12px; background: repeating-conic-gradient(color-mix(in srgb, var(--on-deep) 3%, transparent) 0 25%, transparent 0 50%) 0 0 / 18px 18px; }
+.file-image img { max-width: 100%; height: auto; }
+
+.pdf-view { display: grid; gap: 12px; justify-items: center; padding: 12px; background: var(--deep-2); }
+.pdf-page { display: block; width: 100%; max-width: 900px; height: auto; background: var(--panel); box-shadow: 0 4px 16px color-mix(in srgb, var(--shadow-ink) 40%, transparent); }
+
+.nb-view { display: grid; gap: 10px; padding: 12px 16px 20px; font-size: 13px; line-height: 1.55; }
+.nb-markdown { overflow-wrap: anywhere; }
+.nb-markdown > :first-child { margin-top: 0; }
+.nb-markdown h1, .nb-markdown h2, .nb-markdown h3 { margin: 0.6em 0 0.3em; line-height: 1.25; }
+.nb-markdown h1 { font-size: 1.6em; } .nb-markdown h2 { font-size: 1.35em; } .nb-markdown h3 { font-size: 1.15em; }
+.nb-markdown p, .nb-markdown ul, .nb-markdown ol { margin: 0.4em 0; }
+.nb-markdown code { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--on-deep) 7%, transparent); font: 0.92em ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.nb-markdown a { color: var(--console-accent); }
+.nb-markdown blockquote { margin: 0.4em 0; padding-left: 10px; border-left: 3px solid var(--console-line); color: var(--console-muted); }
+.nb-pre { margin: 0; padding: 8px 10px; overflow-x: auto; border-radius: 6px; font: 12.5px/1.5 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre; }
+.nb-in { display: grid; grid-template-columns: 4.8em 1fr; gap: 6px; align-items: start; }
+.nb-prompt { padding-top: 8px; color: var(--blue-text); font: 11.5px ui-monospace, 'Cascadia Mono', Consolas, monospace; text-align: right; }
+.nb-source { background: var(--console-bg); border: 1px solid var(--console-line); }
+.nb-outputs { display: grid; gap: 6px; margin-left: calc(4.8em + 6px); }
+.nb-out-stream, .nb-out-result { background: transparent; }
+.nb-out-stderr { background: color-mix(in srgb, var(--red) 8%, transparent); }
+.nb-error { background: color-mix(in srgb, var(--red) 8%, transparent); color: var(--red-text); }
+.nb-image { max-width: 100%; height: auto; border-radius: 4px; background: var(--panel); }
+
+.folder-browser { display: grid; gap: 6px; min-height: 0; }
+.folder-bar { display: flex; gap: 8px; align-items: center; }
+.folder-crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; white-space: nowrap; font-size: 12px; color: var(--console-muted); }
+.folder-crumbs button { display: inline-flex; align-items: center; gap: 5px; padding: 2px 5px; border: 0; border-radius: 4px; background: transparent; color: var(--console-text); font: inherit; cursor: pointer; }
+.folder-crumbs button:hover { background: color-mix(in srgb, var(--on-deep) 7%, transparent); }
+.folder-filter { width: 9rem; padding: 4px 8px; border: 1px solid var(--console-line); border-radius: 6px; background: var(--console-bg); color: var(--console-text); font: inherit; font-size: 12px; }
+.folder-list { list-style: none; margin: 0; padding: 4px; max-height: 15rem; overflow-y: auto; border: 1px solid var(--console-line); border-radius: 8px; background: var(--console-bg); scrollbar-width: thin; scrollbar-color: var(--console-line) transparent; }
+.folder-row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 0; border-radius: 5px; background: transparent; color: var(--console-text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.folder-row:hover { background: color-mix(in srgb, var(--on-deep) 5%, transparent); }
+.folder-row-on { background: color-mix(in srgb, var(--panel-3) 14%, transparent); box-shadow: inset 0 0 0 1px var(--console-accent); }
+.folder-row small { color: var(--console-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-icon { display: inline-flex; width: 2.6rem; justify-content: center; color: var(--console-accent); }
+.folder-badge { width: 2.6rem; padding: 1px 0; border-radius: 4px; background: color-mix(in srgb, var(--on-deep) 6%, transparent); color: var(--console-muted); font: 600 9.5px/1.5 ui-monospace, Consolas, monospace; text-align: center; }
+.folder-empty { padding: 8px; color: var(--console-muted); font-size: 12px; }
+.folder-row:focus-visible, .folder-crumbs button:focus-visible, .tile-name:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 1px; }

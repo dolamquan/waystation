@@ -28,7 +28,11 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     try {
-      if (published) rmSync(paths.daemonInfo, { force: true });
+      if (published) {
+        rmSync(paths.daemonInfo, { force: true });
+        rmSync(paths.channelsInfo, { force: true });
+        rmSync(paths.mcpInfo, { force: true });
+      }
       tower?.releaseAllIntercepts();
       server?.close();
       await tower?.shutdown();
@@ -59,6 +63,9 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     server = await startServer({ tower, port: DAEMON_PORT, host: DAEMON_HOST, token, webDist: join(projectRoot, 'web', 'dist'), dev, instance: { pid: process.pid, startedAt } });
     writeFileSync(paths.daemonInfo, JSON.stringify({ port: DAEMON_PORT, token, pid: process.pid, startedAt, dev }), { mode: 0o600 });
+    // The agent channel CLI reads only this: a token that opens /agent/channel/*, never the operator API.
+    writeFileSync(paths.channelsInfo, JSON.stringify({ port: DAEMON_PORT, token: tower.channels.token }), { mode: 0o600 });
+    writeFileSync(paths.mcpInfo, JSON.stringify({ url: `http://${DAEMON_HOST}:${DAEMON_PORT}`, token: tower.library.automation.token }), { mode: 0o600 });
     published = true;
     if (process.env.WAYSTATION_DESKTOP === '1') {
       console.log('Waystation desktop daemon is ready. Opening the application window.');

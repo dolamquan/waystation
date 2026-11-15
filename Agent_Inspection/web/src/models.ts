@@ -1,4 +1,5 @@
-export type Vendor = 'claude' | 'codex';
+import type { ManagedVendor } from '../../shared/agentProviders.ts';
+export type Vendor = ManagedVendor;
 
 export interface ModelOption {
   readonly id: string;
@@ -7,6 +8,7 @@ export interface ModelOption {
 
 /** Suggestions only: the model field also accepts any other name the vendor's CLI knows. */
 export const MODEL_SUGGESTIONS: Readonly<Record<Vendor, readonly ModelOption[]>> = {
+  copilot: [], // Populated from the signed-in account's model list by ModelPicker.
   claude: [
     { id: 'claude-opus-5-5', label: 'Opus 5.5' },
     { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
@@ -24,11 +26,12 @@ export const MODEL_SUGGESTIONS: Readonly<Record<Vendor, readonly ModelOption[]>>
 };
 
 export const DEFAULT_MODEL_LABEL: Readonly<Record<Vendor, string>> = {
+  copilot: 'Default (Copilot setting)',
   claude: 'Default (Claude Code setting)',
   codex: 'Default (Codex config)',
 };
 
 /** Mirrors the daemon's check: model names reach a command line. */
-export const MODEL_NAME_PATTERN = '[A-Za-z0-9][A-Za-z0-9._:\\[\\]\\-]{0,63}';
+export const MODEL_NAME_PATTERN = '[A-Za-z0-9][A-Za-z0-9._:\\/@\\[\\]\\-]{0,199}';
 
 export const modelListId = (vendor: Vendor): string => `models-${vendor}`;

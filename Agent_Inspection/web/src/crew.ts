@@ -1,22 +1,15 @@
 import type { Agent } from './api.ts';
 
 export const CREW = [
-  { name: 'Pip', color: '#f4b85e', light: '#ffe3ab', kind: 'round', detail: 'The little optimist' },
-  { name: 'Mica', color: '#b6a2f0', light: '#e1d8ff', kind: 'cat', detail: 'A curious problem solver' },
-  { name: 'Orbit', color: '#74c7df', light: '#cbf1ff', kind: 'jelly', detail: 'Always thinking ahead' },
-  { name: 'Sprout', color: '#9ac88a', light: '#d7edb3', kind: 'plant', detail: 'Making room for good ideas' },
-  { name: 'Bolt', color: '#ee9987', light: '#ffd1b7', kind: 'box', detail: 'Small bot, big energy' },
-  { name: 'Nova', color: '#e1b0d7', light: '#ffe1f5', kind: 'cyclops', detail: 'An eye for the details' },
+  { name: 'Pip', color: '#e9b04f', light: '#f6d79c', kind: 'round', detail: 'Steady and optimistic' },
+  { name: 'Mica', color: '#a48cf2', light: '#d4c8ff', kind: 'cat', detail: 'A curious problem solver' },
+  { name: 'Orbit', color: '#5cb8e6', light: '#b9e3f7', kind: 'jelly', detail: 'Always thinking ahead' },
+  { name: 'Sprout', color: '#5fc98f', light: '#b8ecd0', kind: 'plant', detail: 'Making room for good ideas' },
+  { name: 'Bolt', color: '#ec7f68', light: '#f8c5b8', kind: 'box', detail: 'Small, fast, focused' },
+  { name: 'Nova', color: '#df8fcf', light: '#f3cdea', kind: 'cyclops', detail: 'An eye for the details' },
 ] as const;
 
 export type CrewCharacter = typeof CREW[number];
-export type WorldTheme = 'moonbase' | 'greenhouse' | 'deepsea';
-
-export const WORLD_THEMES: Record<WorldTheme, { label: string; location: string; description: string }> = {
-  moonbase: { label: 'Moonbase', location: 'Lunar workspace', description: 'Moonbase' },
-  greenhouse: { label: 'Greenhouse', location: 'Botanical workspace', description: 'Greenhouse' },
-  deepsea: { label: 'Deep Sea', location: 'Underwater workspace', description: 'Deep Sea' },
-};
 
 export function characterFor(id: string): CrewCharacter {
   const demo = CREW.find(character => id === `demo-${character.name}`);

@@ -31,6 +31,21 @@ describe('availableCommands', () => {
     expect(kinds(context({ tier: 'B' }))).toMatchObject({ usage: 'native', mcp: 'native', model: 'native', context: 'native', status: 'native' });
   });
 
+  it('types Claude Code commands into an observed session whose VS Code terminal is connected', () => {
+    // Arrange: a session started in your own terminal, not from Waystation
+    const connected = context({ tier: 'B', terminalConnected: true, status: 'idle' });
+    const hooksOnly = context({ tier: 'B', terminalConnected: false, status: 'idle' });
+
+    // Act / Assert: the real terminal runs them, exactly as if typed there
+    expect(kinds(connected)).toMatchObject({ compact: 'send', clear: 'send', review: 'send', init: 'send', usage: 'native' });
+    // A hook can only add text to the conversation, so /compact would not run as a command
+    expect(kinds(hooksOnly)).toMatchObject({ compact: 'unavailable' });
+  });
+
+  it('keeps full-screen terminal commands unavailable even when the terminal is connected', () => {
+    expect(kinds(context({ tier: 'B', terminalConnected: true, status: 'idle' }))).toMatchObject({ config: 'unavailable', resume: 'unavailable' });
+  });
+
   it('runs session commands in agents launched here, and explains why not elsewhere', () => {
     // Arrange
     const launched = context();

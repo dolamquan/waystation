@@ -18,6 +18,10 @@ export function filetimeToMs(filetime: string): number | undefined {
 
 /** WMI CIM_DATETIME (yyyymmddHHMMSS.ffffff±UUU) -> epoch ms. */
 export function wmiDateToMs(value: string): number | undefined {
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const ms = Date.parse(value);
+    return Number.isFinite(ms) ? ms : undefined;
+  }
   const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(\d{3})\d*([+-]\d{3})$/.exec(value.trim());
   if (!match) return undefined;
   const [, y, mo, d, h, mi, s, ms, offset] = match;
@@ -39,7 +43,10 @@ export function killRefusal({ agent, proc, expectedProcStart }: KillCheck): stri
   if (!proc) return 'Process is no longer running.';
   if (proc.pid !== agent.pid) return 'Process id mismatch.';
   if (NEVER_KILL.test(proc.name)) return `Refusing to stop ${proc.name}: it is a host application, not an agent.`;
-  if (!AGENT_PROCESS_NAME.test(proc.name)) return `Refusing to stop unexpected process ${proc.name}.`;
+  if (agent.observation) {
+    if (agent.observation.host === 'editor') return 'Stop this shared runtime in its original editor.';
+    if (!agent.observation.created || proc.created !== agent.observation.created || proc.name !== agent.observation.processName) return 'Process identity changed; refusing to stop it.';
+  } else if (!AGENT_PROCESS_NAME.test(proc.name)) return `Refusing to stop unexpected process ${proc.name}.`;
   if (expectedProcStart) {
     const expected = filetimeToMs(expectedProcStart);
     const actual = wmiDateToMs(proc.created);
@@ -52,7 +59,7 @@ export function killRefusal({ agent, proc, expectedProcStart }: KillCheck): stri
 
 export async function lookupProcess(pid: number): Promise<ProcInfo | undefined> {
   if (!Number.isInteger(pid) || pid <= 0) return undefined;
-  const script = `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($p) { [pscustomobject]@{ pid = $p.ProcessId; ppid = $p.ParentProcessId; name = $p.Name; cmd = [string]$p.CommandLine; created = [string]$p.CreationDate } | ConvertTo-Json -Compress }`;
+  const script = `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($p) { [pscustomobject]@{ pid = $p.ProcessId; ppid = $p.ParentProcessId; name = $p.Name; cmd = [string]$p.CommandLine; created = if ($p.CreationDate) { $p.CreationDate.ToUniversalTime().ToString('o') } else { '' } } | ConvertTo-Json -Compress }`;
   const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
     windowsHide: true,
     timeout: 15_000,

@@ -1,3 +1,4 @@
+import { providerLabel } from '../../shared/agentProviders.ts';
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import {
@@ -241,7 +242,7 @@ export class SkillLibrary implements LoadoutProvider {
         'Skills given to you for this task. When one is relevant, read its SKILL.md first and follow it:',
         ...lines,
       ].join('\n'),
-      notes: ['Waystation skills are not packaged as a Codex plugin: they are listed in its instructions for it to read when relevant.'],
+      notes: [`Selected skills for ${providerLabel(launch)} are listed in the agent's instructions with their local paths.`],
     };
   }
 

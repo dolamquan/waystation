@@ -1,3 +1,4 @@
+import { isManagedVendor, managedProvider } from '../../shared/agentProviders.ts';
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { EVERYONE, OPERATOR, SYSTEM, type TeamRole, type TeamVendor } from './types.ts';
@@ -57,8 +58,8 @@ function parseMember(raw: unknown, index: number): MemberInput {
   if (RESERVED_NAMES.has(name)) throw new TeamInputError(`"${name}" is a reserved name`);
   const role = body.role === 'lead' ? 'lead' : body.role === 'worker' || body.role === undefined ? 'worker' : undefined;
   if (!role) throw new TeamInputError(`member "${name}": role must be lead or worker`);
-  const vendor = body.vendor === 'codex' ? 'codex' : body.vendor === 'claude' ? 'claude' : undefined;
-  if (!vendor) throw new TeamInputError(`member "${name}": vendor must be claude or codex`);
+  const vendor = isManagedVendor(body.vendor) ? body.vendor : undefined;
+  if (!vendor) throw new TeamInputError(`member "${name}": vendor must identify a registered managed provider`);
   const model = text(body.model) || undefined;
   if (model && !isValidModelName(model)) throw new TeamInputError(`member "${name}": model name looks invalid`);
   const focus = parseFocus(body.focus, name);
@@ -115,6 +116,18 @@ export function parseTeamInput(raw: unknown): TeamInput {
     requirePlanApproval: parseFlag(body.requirePlanApproval, true, 'requirePlanApproval'),
     members,
   };
+}
+
+/**
+ * A worker joining an existing team: same rules as at creation, plus the team's current roster.
+ * Only workers can join; the team already has its one lead.
+ */
+export function parseAddedMember(raw: unknown, existingNames: readonly string[]): MemberInput {
+  if (existingNames.length >= MAX_MEMBERS) throw new TeamInputError(`A team has at most ${MAX_MEMBERS} members.`);
+  const member = parseMember(raw, existingNames.length);
+  if (member.role === 'lead') throw new TeamInputError('A team has exactly one lead: add the new member as a worker.');
+  if (existingNames.includes(member.name)) throw new TeamInputError(`A member named "${member.name}" is already on the team.`);
+  return member;
 }
 
 export const slug = (value: string) =>

@@ -31,16 +31,33 @@ let notice;
 let status = 'Starting Waystation';
 const agentNotifications = new DesktopNotifications({ Notification, icon: stationIcon, onClick: () => showWindow() });
 
+/** The Waystation planet in black and green (same artwork as web/public/waystation-mark.svg), drawn without an image file. */
 function stationIcon() {
   const size = 32;
   const pixels = Buffer.alloc(size * size * 4);
+  const tile = [10, 10, 11], ring = [79, 211, 148], ringBack = [37, 104, 74], moon = [182, 245, 211];
+  const lit = [61, 220, 147], shade = [10, 61, 40];
+  const tilt = -22 * Math.PI / 180;
   for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
-    const dx = x - 15.5, dy = y - 15.5;
-    const ring = Math.abs(Math.hypot(dx / 14, (dy + dx * 0.35) / 4.5) - 1) < 0.16;
-    const planet = Math.hypot(dx, dy) < 9;
-    const dot = Math.hypot(x - 24, y - 5) < 2.5;
-    const color = dot ? [208, 138, 89] : ring ? [243, 224, 192] : planet ? [128, 97, 135] : undefined;
-    if (color) { const offset = (y * size + x) * 4; pixels[offset] = color[2]; pixels[offset + 1] = color[1]; pixels[offset + 2] = color[0]; pixels[offset + 3] = 255; }
+    const px = x + 0.5, py = y + 0.5;
+    const cornerX = Math.max(0, Math.abs(px - 16) - 8.5), cornerY = Math.max(0, Math.abs(py - 16) - 8.5);
+    if (Math.hypot(cornerX, cornerY) > 7.5) continue; // Outside the rounded tile: transparent.
+    const dx = px - 16, dy = py - 16.5;
+    const rx = dx * Math.cos(-tilt) - dy * Math.sin(-tilt), ry = dx * Math.sin(-tilt) + dy * Math.cos(-tilt);
+    // Distance to the tilted ellipse, to first order: |f - 1| / |grad f|.
+    const f = Math.hypot(rx / 12.6, ry / 3.9);
+    const onRing = Math.abs(f - 1) * f / Math.max(1e-6, Math.hypot(rx / 12.6 ** 2, ry / 3.9 ** 2)) < 0.95;
+    const planetDistance = Math.hypot(dx, dy);
+    let color = tile;
+    if (onRing) color = ringBack;
+    if (planetDistance < 7.6) {
+      const t = Math.min(1, Math.hypot(px - 13.3, py - 13.5) / 10);
+      color = lit.map((channel, i) => Math.round(channel + (shade[i] - channel) * t));
+    }
+    if (onRing && (ry > 0 || planetDistance >= 7.6)) color = ry > 0 ? ring : ringBack;
+    if (Math.hypot(px - 25, py - 6.6) < 2.2) color = moon;
+    const offset = (y * size + x) * 4;
+    pixels[offset] = color[2]; pixels[offset + 1] = color[1]; pixels[offset + 2] = color[0]; pixels[offset + 3] = 255;
   }
   return nativeImage.createFromBitmap(pixels, { width: size, height: size, scaleFactor: 1 });
 }
@@ -89,7 +106,7 @@ function createWindow() {
     ? { x: saved.x, y: saved.y } : {};
   mainWindow = new BrowserWindow({
     width, height, ...position, minWidth: Math.min(900, display.width), minHeight: Math.min(620, display.height),
-    title: 'Waystation', icon: stationIcon(), backgroundColor: '#fffcf5', show: false,
+    title: 'Waystation', icon: stationIcon(), backgroundColor: '#0a0a0b', show: false,
     webPreferences: { preload: join(projectRoot, 'desktop', 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false },
   });
   mainWindow.once('ready-to-show', () => { if (saved.maximized) mainWindow.maximize(); if (process.env.WAYSTATION_DESKTOP_HIDDEN !== '1') mainWindow.show(); });

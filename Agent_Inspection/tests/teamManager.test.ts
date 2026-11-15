@@ -132,11 +132,18 @@ describe('TeamManager: collaboration across models', () => {
     expect(api.sent.at(-1)).toContain('ui → api: "what does login() return?"');
 
     call(ui, 'update_task', { taskId: 't2', status: 'done', note: 'form ok' });
+    // Not while api is still answering ui, or the lead has unread reports: replies would be dropped.
+    expect(call(lead, 'finish_team', { summary: 'login shipped' }).text).toMatch(/unread/);
+    call(lead, 'read_messages');
+    expect(call(lead, 'finish_team', { summary: 'login shipped' }).text).toMatch(/still working/);
+    idle(api);
+    idle(ui);
     const finished = call(lead, 'finish_team', { summary: 'login shipped' });
     expect(finished.isError).toBe(false);
     expect(teams.list()[0]).toMatchObject({ status: 'done', summary: 'login shipped' });
 
     // Operator merges the Codex worker's branch, but not while it is mid-turn.
+    api.status = 'busy';
     await expect(teams.merge(team.id, 'api')).rejects.toThrow(/still working/);
     idle(api);
     await teams.merge(team.id, 'api');

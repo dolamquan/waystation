@@ -1,0 +1,32 @@
+/* Terminal-style feed for agents without a pseudo-terminal. Colours come from the board's custom properties. */
+.agent-feed { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--console-bg, var(--deep)); color: var(--console-text, var(--on-deep)); font: 12px/1.5 ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.agent-feed-log { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 8px 10px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--console-line, var(--deep-2)) transparent; }
+.agent-feed-line { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-feed-prompt { color: var(--console-accent, var(--faint)); font-weight: 600; }
+.agent-feed-assistant { color: var(--console-text, var(--on-deep)); }
+.agent-feed-tool { color: var(--green-text); }
+.agent-feed-result { color: var(--console-muted, var(--faint)); }
+.agent-feed-error { color: var(--red-text); }
+.agent-feed-approval { color: var(--amber-text); }
+.agent-feed-status { color: var(--console-muted, var(--faint)); font-style: italic; }
+.agent-feed-note { margin: auto; display: grid; gap: 8px; justify-items: center; padding: 12px; text-align: center; color: var(--console-muted, var(--faint)); }
+.agent-feed-jump { position: absolute; right: 12px; bottom: 76px; padding: 3px 10px; border: 1px solid var(--console-line, var(--deep-line)); border-radius: 999px; background: var(--console-tile, var(--deep)); color: var(--console-text, var(--on-deep)); font: inherit; cursor: pointer; }
+.agent-feed-jump:hover { border-color: var(--console-accent, var(--line-strong)); }
+.agent-feed-status-line { display: flex; gap: 10px; padding: 3px 10px; border-top: 1px solid var(--console-line, var(--deep-line)); color: var(--console-muted, var(--faint)); font-size: 11px; white-space: nowrap; overflow: hidden; }
+.agent-feed-status-line span { overflow: hidden; text-overflow: ellipsis; }
+.agent-feed-status-line .agent-feed-activity { flex: 1; min-width: 0; }
+.agent-feed-input { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-top: 1px solid var(--console-line, var(--deep-line)); }
+.agent-feed-input::before { content: '>'; color: var(--console-accent, var(--faint)); }
+.agent-feed-input input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
+.agent-feed-input input:disabled { opacity: 0.6; }
+.agent-feed-input:focus-within { box-shadow: inset 0 1px 0 var(--console-accent, var(--shadow-ink)); }
+.agent-feed-command { color: var(--blue-text); }
+.agent-feed-suggest { list-style: none; margin: 0; padding: 4px 6px; border-top: 1px solid var(--console-line, var(--deep-line)); max-height: 9.5em; overflow-y: auto; }
+.agent-feed-suggest li { display: flex; gap: 8px; align-items: baseline; font-size: 11px; color: var(--console-muted, var(--faint)); white-space: nowrap; overflow: hidden; }
+.agent-feed-suggest li span { overflow: hidden; text-overflow: ellipsis; }
+.agent-feed-suggest button { padding: 1px 4px; border: 0; border-radius: 4px; background: transparent; color: var(--console-accent, var(--faint)); font: inherit; cursor: pointer; }
+.agent-feed-suggest button:hover { background: var(--console-line, var(--deep-2)); }
+.agent-feed-suggest-off button { color: var(--console-muted, var(--faint)); }
+.agent-feed-hint { margin: 0; padding: 6px 10px; border-top: 1px solid var(--console-line, var(--deep-line)); color: var(--console-muted, var(--faint)); font-size: 11px; }
+.agent-feed button:focus-visible { outline: 2px solid var(--console-accent, var(--line-strong)); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .agent-feed-log { scroll-behavior: auto; } }

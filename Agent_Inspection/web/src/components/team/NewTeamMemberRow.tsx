@@ -1,3 +1,4 @@
+import { useProviders } from '../../useProviders.ts';
 import { useState } from 'react';
 import type { NewTeamMember } from '../../api.ts';
 import type { LaunchLoadout } from '../../library/loadoutApi.ts';
@@ -40,26 +41,28 @@ interface NewTeamMemberRowProps {
   readonly index: number;
   readonly codexAvailable: boolean;
   readonly canRemove: boolean;
+  /** Joining an existing team: the role stays worker (the team already has its lead). */
+  readonly roleLocked?: boolean;
   readonly modelListId: string;
   readonly onChange: (patch: Partial<MemberDraft>) => void;
   readonly onMakeLead: () => void;
   readonly onRemove: () => void;
 }
 
-export function NewTeamMemberRow({ member, index, codexAvailable, canRemove, modelListId, onChange, onMakeLead, onRemove }: NewTeamMemberRowProps) {
+export function NewTeamMemberRow({ member, index, codexAvailable, canRemove, roleLocked = false, modelListId, onChange, onMakeLead, onRemove }: NewTeamMemberRowProps) {
+  const { providers } = useProviders();
   // The picker loads the library lists, so it mounts only once the operator opens it.
   const [loadoutOpen, setLoadoutOpen] = useState(false);
   const label = `Member ${index + 1}`;
   return (
     <div className="team-member-draft">
       <div className="team-member-row">
-        <button type="button" className={`lead-toggle ${member.role === 'lead' ? 'lead-on' : ''}`} onClick={onMakeLead} aria-pressed={member.role === 'lead'} title={member.role === 'lead' ? 'Team lead' : 'Make lead'}>
+        <button type="button" className={`lead-toggle ${member.role === 'lead' ? 'lead-on' : ''}`} onClick={onMakeLead} disabled={roleLocked} aria-pressed={member.role === 'lead'} title={roleLocked ? 'New members join as workers' : member.role === 'lead' ? 'Team lead' : 'Make lead'}>
           {member.role === 'lead' ? 'Lead' : 'Worker'}
         </button>
         <input className="text-input" aria-label={`${label} name`} value={member.name} onChange={(e) => onChange({ name: e.target.value.toLowerCase() })} pattern="[a-z][a-z0-9-]{0,23}" title="Lowercase letters, digits and dashes" required />
-        <select className="text-input" aria-label={`${label} agent`} value={member.vendor} onChange={(e) => onChange({ vendor: e.target.value as MemberDraft['vendor'] })}>
-          <option value="claude">Claude</option>
-          <option value="codex" disabled={!codexAvailable}>Codex</option>
+        <select className="text-input" aria-label={`${label} agent`} value={member.vendor} onChange={(e) => onChange({ vendor: e.target.value as MemberDraft['vendor'], model: '' })}>
+          {providers.map(provider => <option key={provider.id} value={provider.id} disabled={provider.available === false || provider.id === 'codex' && !codexAvailable}>{provider.label}</option>)}
         </select>
         <input className="text-input" aria-label={`${label} model`} list={modelListId} value={member.model ?? ''} onChange={(e) => onChange({ model: e.target.value })} placeholder="default model" />
         <button type="button" className="icon-btn" onClick={onRemove} disabled={!canRemove} aria-label={`Remove ${member.name}`}>

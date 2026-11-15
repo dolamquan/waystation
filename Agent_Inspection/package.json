@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "main": "desktop/main.mjs",
-  "engines": { "node": ">=22.20.0" },
+  "engines": {
+    "node": ">=22.20.0"
+  },
   "description": "Waystation: see and steer every coding agent on this machine (Claude Code, Codex and more) from one local dashboard. Intercept tool calls, instruct, stop, delegate and run mixed agent teams.",
   "bin": {
     "waystation": "scripts/waystation.mjs"
@@ -23,6 +25,8 @@
     "daemon:dev": "tsx daemon/index.ts --dev",
     "dev:web": "vite",
     "open": "node scripts/open.mjs",
+    "mcp:configure": "node scripts/configure-waystation-mcp.mjs",
+    "mcp:verify": "node --import tsx scripts/verify-waystation-mcp.ts",
     "attach": "tsx daemon/cli/attach.ts",
     "build": "vite build",
     "test": "vitest run",
@@ -30,13 +34,26 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^1.8.0",
     "@anthropic-ai/claude-agent-sdk": "^0.3.287",
+    "@github/copilot-sdk": "^1.0.23",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "ajv": "8.20.0",
+    "jsonc-parser": "^3.3.1",
+    "monaco-editor": "0.55.1",
+    "node-pty": "^1.1.0",
     "nodemailer": "^10.0.15",
+    "pdfjs-dist": "6.4.299",
+    "pg": "8.23.1",
+    "playwright-core": "1.64.0",
+    "quickjs-emscripten": "0.32.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@types/nodemailer": "^8.0.2",
+    "@types/pg": "8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
@@ -44,7 +61,6 @@
     "@vitest/coverage-v8": "^5.0.3",
     "electron": "44.7.0",
     "framer-motion": "^13.5.0",
-    "playwright-core": "1.64.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",

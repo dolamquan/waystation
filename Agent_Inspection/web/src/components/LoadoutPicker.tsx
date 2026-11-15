@@ -1,3 +1,4 @@
+import type { ManagedVendor } from '../../../shared/agentProviders.ts';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { loadoutApi, type LaunchLoadout } from '../library/loadoutApi.ts';
 import '../library/loadout.css';
@@ -5,7 +6,7 @@ import '../library/loadout.css';
 export type LoadoutSection = keyof LaunchLoadout;
 
 export interface LoadoutPickerProps {
-  readonly vendor: 'claude' | 'codex';
+  readonly vendor: ManagedVendor;
   readonly value: LaunchLoadout;
   readonly onChange: (next: LaunchLoadout) => void;
   /** Which sections to show; all by default. */
@@ -154,14 +155,14 @@ export function LoadoutPicker({ vendor, value, onChange, sections = ALL_SECTIONS
 
   return (
     <div className="loadout">
-      <p className="loadout-summary" aria-live="polite">{summarize(value, vendor === 'codex' ? keys.filter((key) => key !== 'pluginIds') : keys)}</p>
+      <p className="loadout-summary" aria-live="polite">{summarize(value, vendor !== 'claude' ? keys.filter((key) => key !== 'pluginIds') : keys)}</p>
       {keys.map((key) => (
         <LoadoutSectionView
           key={key}
           sectionKey={key}
           state={lists[key] ?? { status: 'loading' }}
           selected={value[key] ?? []}
-          disabledNote={key === 'pluginIds' && vendor === 'codex' ? 'Plugins are Claude-only, so Codex agents launch without them.' : undefined}
+          disabledNote={key === 'pluginIds' && vendor !== 'claude' ? 'These plugin bundles are Claude-only. This provider uses the selected skills and docs through its instructions.' : undefined}
           onChange={(ids) => onChange(withSection(value, key, ids))}
         />
       ))}

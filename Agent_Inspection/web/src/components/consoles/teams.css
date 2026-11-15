@@ -1,0 +1,48 @@
+/* Teams on the canvas: a soft frame behind its members, and the bottom dock. Uses the board's dark console tokens. */
+.team-frame {
+  position: absolute; z-index: 0; pointer-events: none;
+  border: 1px solid var(--green); border-radius: 12px; background: color-mix(in srgb, var(--green) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green-line) 13%, transparent);
+}
+.team-frame-head {
+  pointer-events: auto; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px 0 12px;
+  color: var(--green-text); font-size: 12px; cursor: move; touch-action: none; overflow: hidden; white-space: nowrap;
+}
+.team-frame-name { border: 0; padding: 2px 4px; border-radius: 4px; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: text; }
+.team-frame-name:hover { background: color-mix(in srgb, var(--green) 20%, transparent); }
+.team-frame-name-input { width: 12rem; padding: 2px 6px; border: 1px solid var(--green); border-radius: 4px; background: var(--deep); color: inherit; font: inherit; }
+.team-frame-count { min-width: 1.4rem; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--green) 20%, transparent); text-align: center; font-variant-numeric: tabular-nums; }
+.team-frame-spacer { flex: 1; }
+.team-frame-action {
+  padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.team-frame-action:hover:not(:disabled) { background: color-mix(in srgb, var(--green) 20%, transparent); }
+.team-frame-action:disabled { opacity: 0.45; cursor: default; }
+.team-frame-x { color: inherit; }
+.team-frame-head button:focus-visible, .canvas-dock button:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 1px; }
+
+.canvas-tile-selected { outline: 2px solid var(--amber-line); outline-offset: 2px; }
+.canvas-marquee {
+  position: absolute; z-index: 9999; pointer-events: none;
+  border: 1px solid var(--amber-line); background: color-mix(in srgb, var(--amber) 12%, transparent); border-radius: 2px;
+}
+
+.canvas-dock {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 10000;
+  display: flex; align-items: center; gap: 4px; padding: 4px; max-width: calc(100% - 24px); overflow-x: auto;
+  border: 1px solid var(--console-line); border-radius: 10px; background: color-mix(in srgb, var(--deep) 94%, transparent); box-shadow: 0 6px 22px color-mix(in srgb, var(--shadow-ink) 40%, transparent);
+}
+.canvas-dock button {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; flex-shrink: 0;
+  border: 1px solid var(--console-line); border-radius: 7px; background: transparent; color: var(--console-text); font-size: 12px; cursor: pointer;
+}
+.canvas-dock button:hover:not(:disabled) { background: var(--console-line); }
+.canvas-dock button:disabled { opacity: 0.45; cursor: default; }
+.canvas-dock-selection { font-size: 12px; color: var(--amber-text); padding: 0 2px 0 4px; white-space: nowrap; flex-shrink: 0; }
+.canvas-dock-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--console-line); flex-shrink: 0; }
+
+/* The dock owns the bottom centre, so the hint moves to the top-left corner. */
+.console-canvas .canvas-hint { top: 10px; bottom: auto; }
+
+.handoff-form { display: grid; gap: 10px; }
+.handoff-form label { display: grid; gap: 4px; font-size: 13px; }

@@ -1,3 +1,4 @@
+import { providerLabel, managedProvider } from '../../../shared/agentProviders.ts';
 import { AnimatePresence } from 'framer-motion';
 import { useId, useRef, useState } from 'react';
 import { api, type Agent, type MemberDiff, type TeamMember, type TeamView } from '../api.ts';
@@ -5,12 +6,14 @@ import type { TeamLogItem } from '../useTower.ts';
 import { cliUnavailableReason, useToolAvailability } from '../useToolAvailability.ts';
 import { Icon } from './Icon.tsx';
 import { Confirm, Modal } from './Modal.tsx';
+import { AddMemberForm } from './team/AddMemberForm.tsx';
 import { MemberCard } from './team/MemberCard.tsx';
 import { PlanReview } from './team/PlanReview.tsx';
 import { TaskBoard } from './team/TaskBoard.tsx';
 import { TeamComposer } from './team/TeamComposer.tsx';
 import { TeamConversation } from './team/TeamConversation.tsx';
 import { TeamHeader } from './team/TeamHeader.tsx';
+import { TeamOutputs } from './team/TeamOutputs.tsx';
 import { TeamOverview } from './team/TeamOverview.tsx';
 import { isArchived, leadOf, resumeGrantText, type PendingConfirm, type RunAction } from './team/teamUi.ts';
 import { useTeamLog } from './team/useTeamLog.ts';
@@ -27,8 +30,8 @@ interface TeamDetailProps {
   readonly onSelectAgent: (agentId: string) => void;
 }
 
-type Tab = 'tasks' | 'conversation';
-const TABS: readonly Tab[] = ['tasks', 'conversation'];
+type Tab = 'tasks' | 'conversation' | 'outputs';
+const TABS: readonly Tab[] = ['tasks', 'conversation', 'outputs'];
 
 /** Runs one action at a time, reporting success or the error message. */
 function useTeamAction(connected: boolean, notify: TeamDetailProps['notify']): { busy?: string; run: RunAction } {
@@ -58,7 +61,7 @@ function mergeAllMessage(result: Awaited<ReturnType<typeof api.mergeAll>>): stri
 export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, onSelectAgent }: TeamDetailProps) {
   const tools = useToolAvailability();
   const sessionId = useId();
-  const [tab, setTab] = useState<Tab>('tasks');
+  const [tab, setTab] = useState<Tab>(team.status === 'done' || team.status === 'disbanded' ? 'outputs' : 'tasks');
   const [to, setTo] = useState('all');
   const [confirm, setConfirm] = useState<PendingConfirm>();
   const [diff, setDiff] = useState<{ member: TeamMember; diff: MemberDiff }>();
@@ -92,7 +95,7 @@ export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, 
     action: async () => notify(mergeAllMessage(await api.mergeAll(team.id))),
   });
   const askOpenCli = (member: TeamMember) => {
-    const cli = member.vendor === 'codex' ? 'Codex' : 'Claude Code';
+    const cli = providerLabel(member);
     setConfirm({
       title: `Open ${member.name} in ${cli}?`,
       body: `Waystation stops its copy of ${member.name} and opens the same session in ${cli} in a new terminal tab, with its team tools. The team won't wake ${member.name} while it is open there; messages wait. Close the session (or use Take back) and ${member.name} rejoins the team where it left off. ${member.name} must be idle.`,
@@ -139,17 +142,20 @@ export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, 
         onOperatorCli={() => void run('operator', async () => notify((await api.openTeamOperator(team.id)).message))}
         onMergeAll={askMergeAll} onDisband={askDisband} onRemove={askRemove}
       />
-      <TeamOverview team={team} agents={agents} now={now} connected={connected} onSelectAgent={onSelectAgent} onMessage={messageMember} />
+      <TeamOverview team={team} agents={agents} now={now} connected={connected} onSelectAgent={onSelectAgent} onMessage={messageMember} onOutputs={() => setTab('outputs')} />
       {!archived && <PlanReview team={team} unavailable={unavailable} busy={busy} run={run} onFeedback={feedbackToLead} />}
 
       <div className="session-workspace">
         <div className="session-main">
-          <TeamTabs sessionId={sessionId} tab={tab} taskCount={team.tasks.length} onChange={setTab} />
+          <TeamTabs sessionId={sessionId} tab={tab} taskCount={team.tasks.length} outputCount={team.outputs?.length ?? 0} onChange={setTab} />
           <div {...panelProps('conversation')}>
             <TeamConversation team={team} logState={logState} now={now} connected={connected} active={tab === 'conversation'} />
             {archived
               ? <p className="session-composer-note team-archived-note">This team has been disbanded. Its conversation is saved here.</p>
               : <TeamComposer team={team} to={to} onToChange={setTo} inputRef={messageInput} busy={busy} unavailable={unavailable} run={run} notify={notify} />}
+          </div>
+          <div {...panelProps('outputs')}>
+            <TeamOutputs key={team.id} team={team} connected={connected} onDiff={openDiff} />
           </div>
           <div {...panelProps('tasks')}>
             <TaskBoard team={team} readOnly={archived} unavailable={unavailable} run={run} ask={setConfirm} />
@@ -168,6 +174,7 @@ export function TeamDetail({ team, agents, teamLogFeed, now, connected, notify, 
                 />
               ))}
             </ul>
+            {!archived && <AddMemberForm team={team} codexAvailable={tools.codex !== false} isUnavailable={unavailable} run={run} notify={notify} />}
           </section>
           <section className="session-project"><h3><Icon name="folder" size={17} />Project workspace</h3><span title={team.repoRoot}>{team.repoRoot.split(/[\\/]/).filter(Boolean).at(-1) || team.repoRoot}</span><code title={team.repoRoot}>{team.repoRoot}</code><div><Icon name="link" size={14} />Base branch <strong>{team.baseBranch}</strong></div></section>
         </aside>
@@ -211,15 +218,16 @@ interface TeamTabsProps {
   readonly sessionId: string;
   readonly tab: Tab;
   readonly taskCount: number;
+  readonly outputCount: number;
   readonly onChange: (tab: Tab) => void;
 }
 
 /** Task board / conversation tabs with arrow-key, Home and End navigation. */
-function TeamTabs({ sessionId, tab, taskCount, onChange }: TeamTabsProps) {
+function TeamTabs({ sessionId, tab, taskCount, outputCount, onChange }: TeamTabsProps) {
   const move = (event: React.KeyboardEvent, view: Tab) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const next = event.key === 'Home' ? TABS[0] : event.key === 'End' ? TABS[TABS.length - 1] : TABS[(TABS.indexOf(view) + 1) % TABS.length];
+    const next = event.key === 'Home' ? TABS[0] : event.key === 'End' ? TABS[TABS.length - 1] : TABS[(TABS.indexOf(view) + (event.key === 'ArrowLeft' ? TABS.length - 1 : 1)) % TABS.length];
     onChange(next);
     document.getElementById(`${sessionId}-${next}-tab`)?.focus();
   };
@@ -227,7 +235,8 @@ function TeamTabs({ sessionId, tab, taskCount, onChange }: TeamTabsProps) {
     <div className="session-tabs" role="tablist" aria-label="Session views">
       {TABS.map((view) => (
         <button key={view} id={`${sessionId}-${view}-tab`} role="tab" aria-selected={tab === view} aria-controls={`${sessionId}-${view}-panel`} tabIndex={tab === view ? 0 : -1} onClick={() => onChange(view)} onKeyDown={(event) => move(event, view)}>
-          <Icon name={view === 'conversation' ? 'message' : 'grid'} size={17} />{view === 'conversation' ? 'Conversation' : 'Task board'}
+          <Icon name={view === 'conversation' ? 'message' : view === 'outputs' ? 'book' : 'grid'} size={17} />{view === 'conversation' ? 'Conversation' : view === 'outputs' ? 'Outputs' : 'Task board'}
+          {view === 'outputs' && <span className="session-count">{outputCount}</span>}
           {view === 'tasks' && <span className="session-count">{taskCount}</span>}
         </button>
       ))}

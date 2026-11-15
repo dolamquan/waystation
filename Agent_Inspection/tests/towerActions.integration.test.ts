@@ -187,11 +187,11 @@ describe('guards on observe-only and missing agents', () => {
     expect((await api('POST', '/api/agents/missing/intercept', { on: true })).json.error).toMatch(/not found/);
     expect((await api('POST', '/api/hooks/install', {})).json.error).toMatch(/confirm/);
 
-    // Delegating from a non-Claude agent hands off a summary instead of resuming.
+    // Delegating from an observed Codex agent launches its own provider with a summary.
     tower.registry.pushEvent({ agentId: 'codex:observed', ts: Date.now(), kind: 'tool_call', summary: 'exec: npm run build' });
     const delegated = await api('POST', '/api/agents/codex%3Aobserved/delegate', { prompt: 'finish the build' });
     expect(delegated.status).toBe(200);
-    expect(sdkOptions.at(-1)?.resume).toBeUndefined();
+    expect(delegated.json.agent.vendor).toBe('codex');
   });
 
   it('records hook events, including session lifecycle', () => {

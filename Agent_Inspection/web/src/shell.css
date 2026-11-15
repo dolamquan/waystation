@@ -1,0 +1,277 @@
+/* App shell, Warp / Mastra style: flat dark planes, hairline borders, one quiet type scale.
+   Loaded last; the :root :is(...) scope outranks the older layered .workbench-content rules. */
+
+/* ---------- Sidebar ---------- */
+:root .tower.workbench-content::before,
+:root .tower::before { background: var(--bg-2); border-right: 1px solid var(--line); }
+:root :is(.tower) .sidebar {
+  padding: 14px 10px 12px; gap: 0;
+  background: var(--bg-2); color: var(--text); border-right: 1px solid var(--line);
+}
+:root :is(.tower) .sidebar-brand { gap: 10px; padding: 4px 8px; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+:root :is(.tower) .sidebar-brand div > span { margin-top: 0; font: 400 11.5px var(--font); letter-spacing: 0; color: var(--muted); }
+/* The Waystation planet: black tile, green planet and ring, mint moon. Same artwork as the favicon and desktop icon. */
+.brand-mark,
+:root :is(.tower, .standby) .brand-mark {
+  width: 24px; height: 24px; flex: none; display: inline-block; padding: 0;
+  border: 0; border-radius: 7px; color: transparent;
+  background: url('/waystation-mark.svg') center / contain no-repeat;
+}
+:root :is(.tower) .workspace-label {
+  margin: 16px 0 18px; padding: 8px; gap: 9px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+  font-size: 12.5px; color: var(--text);
+}
+:root :is(.tower) .workspace-avatar { width: 24px; height: 24px; border-radius: 6px; background: var(--panel-3); color: var(--muted); }
+:root :is(.tower) .workspace-label small { font-size: 11px; color: var(--muted); margin-top: 0; }
+:root :is(.tower) .nav-label { padding: 0 8px; margin-bottom: 6px; font: 500 11px var(--font); letter-spacing: 0; color: var(--faint); }
+:root :is(.tower) .sidebar-nav { gap: 1px; }
+:root :is(.tower) .sidebar-nav button {
+  height: 32px; padding: 0 8px; gap: 9px;
+  border: 0; border-radius: 6px; background: transparent;
+  color: var(--text-2); font-size: 13px; font-weight: 450;
+  transition: background 120ms, color 120ms;
+}
+:root :is(.tower) .sidebar-nav button > svg { width: 16px; height: 16px; color: var(--muted); }
+:root :is(.tower) .sidebar-nav button:hover { background: var(--panel-2); color: var(--text); }
+:root :is(.tower) .sidebar-nav .nav-active { background: var(--panel-3); color: var(--text); border: 0; }
+:root :is(.tower) .sidebar-nav .nav-active > svg { color: var(--text); }
+:root :is(.tower) .nav-count { padding: 0; background: transparent; font: 500 11px var(--mono); color: var(--faint); }
+:root :is(.tower) .nav-active .nav-count { background: transparent; color: var(--muted); }
+:root :is(.tower) .nav-count.nav-alert { color: var(--amber-text); }
+:root :is(.tower) .sidebar-bottom { padding-top: 24px; }
+:root :is(.tower) .integration-card { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+:root :is(.tower) .integration-card > svg { color: var(--muted); margin-bottom: 8px; }
+:root :is(.tower) .integration-card strong { font-size: 12.5px; font-weight: 600; color: var(--text); }
+:root :is(.tower) .integration-card p { margin: 4px 0 10px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+:root :is(.tower) .integration-card button {
+  height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--panel-2); color: var(--text); font-size: 12px; font-weight: 500;
+}
+:root :is(.tower) .integration-card button:hover { background: var(--panel-3); }
+:root :is(.tower) .sidebar-status { padding: 12px 6px 0; font: 11px var(--font); color: var(--muted); }
+:root :is(.tower) .sidebar-status small { padding: 0; font: 11px var(--mono); color: var(--faint); }
+.connection-dot { background: var(--faint); }
+.connection-dot.live { background: var(--green-text); box-shadow: 0 0 0 3px var(--green-soft); }
+
+/* ---------- Top bar + page header ---------- */
+:root :is(.tower) .main-shell { background: var(--bg); }
+:root :is(.tower) .topbar {
+  position: sticky; top: 0; z-index: 20;
+  min-height: 52px; padding: 0 24px;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+:root :is(.tower) .breadcrumb { gap: 8px; font-size: 13px; color: var(--muted); }
+:root :is(.tower) .breadcrumb > span { color: var(--faint); }
+:root :is(.tower) .breadcrumb strong { font-weight: 500; color: var(--text); }
+:root :is(.tower) .topbar-actions { gap: 6px; }
+:root :is(.tower) .dashboard-content { max-width: 1600px; padding: 28px 32px 24px; }
+:root :is(.tower) .page-heading { min-height: 0; margin-bottom: 20px; gap: 16px; align-items: flex-end; }
+:root :is(.tower) .page-heading h1 { margin: 0 0 4px; font: 600 22px/1.25 var(--font); letter-spacing: -0.02em; color: var(--text); }
+:root :is(.tower) .page-heading p { margin: 0; font-size: 13px; color: var(--muted); }
+:root :is(.tower) .page-heading-tools { display: flex; align-items: center; gap: 8px; }
+:root :is(.tower) .dashboard-footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--faint); }
+:root :is(.tower) .dashboard-footer span { color: var(--faint); }
+
+/* ---------- Buttons ---------- */
+:root :is(.tower, .modal-backdrop, .standby) .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 32px; height: auto; padding: 0 12px;
+  border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--panel-2); color: var(--text);
+  font: 500 13px/1 var(--font); box-shadow: none;
+  transition: background 120ms, border-color 120ms, opacity 120ms;
+}
+:root :is(.tower, .modal-backdrop, .standby) .btn:hover:not(:disabled) { background: var(--panel-3); border-color: var(--faint); color: var(--text); }
+:root :is(.tower, .modal-backdrop, .standby) .btn:disabled { opacity: 0.45; }
+:root :is(.tower, .modal-backdrop, .standby) .btn-small { min-height: 28px; padding: 0 10px; font-size: 12.5px; }
+:root :is(.tower, .modal-backdrop, .standby) .btn-go { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+:root :is(.tower, .modal-backdrop, .standby) .btn-go:hover:not(:disabled) { background: var(--primary); border-color: var(--primary); color: var(--on-primary); opacity: 0.88; }
+:root :is(.tower, .modal-backdrop, .standby) .btn-ghost { background: transparent; border-color: transparent; }
+:root :is(.tower, .modal-backdrop, .standby) .btn-ghost:hover:not(:disabled) { background: var(--panel-2); border-color: transparent; }
+:root :is(.tower, .modal-backdrop) .btn-ok { color: var(--green-text); border-color: var(--green-line); background: var(--green-soft); }
+:root :is(.tower, .modal-backdrop) .btn-danger { color: var(--red-text); border-color: var(--red-line); background: var(--red-soft); }
+:root :is(.tower, .modal-backdrop) .btn-warn { color: var(--amber-text); border-color: var(--amber-line); background: var(--amber-soft); }
+:root :is(.tower, .modal-backdrop) .icon-btn {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted);
+}
+:root :is(.tower, .modal-backdrop) .icon-btn:hover { background: var(--panel-2); color: var(--text); }
+
+/* ---------- Inputs ---------- */
+:root :is(.tower, .modal-backdrop) :is(.text-input, .code-input, select, textarea) {
+  background: var(--bg-2); border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text);
+}
+:root :is(.tower, .modal-backdrop) .agent-composer .text-input { background: transparent; border: 0; }
+:root :is(.tower, .modal-backdrop) :is(.text-input, .code-input, select, textarea):focus {
+  border-color: var(--faint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 8%, transparent); outline: none;
+}
+:root :is(.tower) .search-field, :root :is(.tower) .sort-select, :root :is(.tower) .view-toggle {
+  height: 32px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); color: var(--text); box-shadow: none;
+}
+:root :is(.tower) .search-field:focus-within { border-color: var(--faint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 8%, transparent); }
+:root :is(.tower) .search-field input { background: transparent; border: 0; font-size: 13px; }
+:root :is(.tower) .view-toggle { padding: 2px; gap: 2px; }
+:root :is(.tower) .view-toggle button { border: 0; border-radius: 4px; background: transparent; color: var(--muted); }
+:root :is(.tower) .view-toggle .view-active { background: var(--panel-3); color: var(--text); }
+
+/* ---------- Chips + pills ---------- */
+:root :is(.tower) .chip {
+  height: 28px; padding: 0 10px; gap: 6px;
+  border: 1px solid var(--line); border-radius: 6px; background: transparent;
+  color: var(--muted); font-size: 12.5px; font-weight: 500; box-shadow: none;
+}
+:root :is(.tower) .chip:hover { color: var(--text); background: var(--panel-2); }
+:root :is(.tower) .chip-on, :root :is(.tower) .chip-on:hover { background: var(--panel-3); border-color: var(--line-strong); color: var(--text); }
+:root :is(.tower) .chip-count { background: transparent; padding: 0; font: 500 11px var(--mono); color: var(--faint); }
+:root :is(.tower, .modal-backdrop) .status-pill {
+  height: 20px; padding: 0 7px; gap: 5px; border: 1px solid var(--line); border-radius: 999px;
+  background: transparent; color: var(--muted); font-size: 11px; font-weight: 500;
+}
+:root :is(.tower, .modal-backdrop) .pill-busy { color: var(--green-text); border-color: var(--green-line); background: var(--green-soft); }
+:root :is(.tower, .modal-backdrop) .pill-waiting { color: var(--amber-text); border-color: var(--amber-line); background: var(--amber-soft); }
+:root :is(.tower, .modal-backdrop) .pill-stopped { color: var(--faint); }
+
+/* ---------- Summary strip (fleet + ops metrics) ---------- */
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+  margin-bottom: 24px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden;
+}
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric {
+  min-height: 0; padding: 14px 16px; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left;
+}
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric + .metric { border-left: 1px solid var(--line); }
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric-label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; text-transform: none; }
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric-label > svg { width: 14px; height: 14px; color: var(--faint); }
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric-value { margin: 6px 0 2px; font: 600 22px/1.2 var(--font); letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+:root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric-note { font-size: 11.5px; color: var(--muted); }
+:root :is(.tower) .fleet-metrics .metric-button { cursor: pointer; }
+:root :is(.tower) .fleet-metrics .metric-button:hover { background: var(--panel-2); }
+:root :is(.tower) .fleet-metrics .metric-attention .metric-value, :root :is(.tower) .fleet-metrics .metric-attention .metric-label { color: var(--amber-text); }
+:root :is(.tower) .metric-indicator { font-size: 11px; color: var(--muted); }
+
+/* ---------- Sections + cards ---------- */
+:root :is(.tower) .section-heading h2 { font: 600 15px/1.3 var(--font); letter-spacing: -0.01em; color: var(--text); }
+:root :is(.tower) .section-heading p { font-size: 12.5px; color: var(--muted); }
+:root :is(.tower) .section-count { margin-left: 8px; padding: 0; background: transparent; font: 500 12px var(--mono); color: var(--faint); }
+:root :is(.tower) .live-label { font-size: 12px; color: var(--muted); }
+:root :is(.tower) .card {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: none; color: var(--text);
+  transition: border-color 140ms, background 140ms;
+}
+:root :is(.tower) .card:hover { border-color: var(--line-strong); background: var(--panel); box-shadow: none; }
+:root :is(.tower) .card-selected, :root :is(.tower) .card-selected:hover { border-color: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 10%, transparent); }
+:root :is(.tower) .card.status-waiting { border-color: var(--amber-line); }
+:root :is(.tower) .card-crew-avatar { background: transparent; border: 0; padding: 0; }
+:root :is(.tower) .card-name { font-size: 14px; font-weight: 600; color: var(--text); }
+:root :is(.tower) .card-provider, :root :is(.tower) .card-provider > span, :root :is(.tower) .card-project { font-size: 12px; color: var(--muted); }
+:root :is(.tower) .card .activity { border: 1px solid var(--line); border-radius: 6px; background: var(--bg-2); }
+:root :is(.tower) .card-foot { border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+:root :is(.tower) :is(.team-card, .schedule-card, .template-card) { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: none; }
+:root :is(.tower) :is(.team-card, .schedule-card, .template-card):hover { border-color: var(--line-strong); }
+:root :is(.tower) .team-card-on { border-color: var(--text); }
+
+/* ---------- Section tabs: underline strip, or segmented cards ---------- */
+:root :is(.tower) .section-tabs { display: flex; gap: 4px; padding: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; overflow-x: auto; scrollbar-width: none; }
+:root :is(.tower) .section-tabs > button {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; flex: none;
+  height: 38px; padding: 0 10px; margin: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  color: var(--muted); font-size: 13px; font-weight: 500;
+}
+:root :is(.tower) .section-tabs > button:hover { color: var(--text); background: transparent; }
+:root :is(.tower) .section-tabs > button::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 1.5px; border-radius: 2px; background: transparent; }
+:root :is(.tower) .section-tabs > button[aria-selected='true'] { color: var(--text); background: transparent; box-shadow: none; }
+:root :is(.tower) .section-tabs > button[aria-selected='true']::after { background: var(--text); }
+:root :is(.tower) .section-tabs .section-tab-icon { display: inline-flex; width: auto; height: auto; padding: 0; background: none; border: 0; color: inherit; }
+:root :is(.tower) .section-tabs .section-tab-icon svg { width: 15px; height: 15px; }
+:root :is(.tower) .section-tab-count { margin-left: 6px; padding: 0; background: transparent; font: 500 11px var(--mono); color: var(--faint); }
+:root :is(.tower) .section-tabs.section-tabs-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; border: 0; overflow: visible; }
+:root :is(.tower) .section-tabs.section-tabs-cards > button {
+  height: auto; align-items: flex-start; gap: 10px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); text-align: left;
+}
+:root :is(.tower) .section-tabs.section-tabs-cards > button::before, :root :is(.tower) .section-tabs.section-tabs-cards > button::after { display: none; }
+:root :is(.tower) .section-tabs.section-tabs-cards > button:hover { border-color: var(--line-strong); background: var(--panel); }
+:root :is(.tower) .section-tabs.section-tabs-cards > button[aria-selected='true'] { border-color: var(--text); background: var(--panel-2); }
+:root :is(.tower) .section-tabs.section-tabs-cards .section-tab-icon { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-2); color: var(--text-2); }
+:root :is(.tower) .section-tab-copy { display: flex; flex-direction: column; gap: 2px; }
+:root :is(.tower) .section-tab-description { font-size: 12px; font-weight: 400; color: var(--muted); line-height: 1.45; }
+
+/* ---------- Empty states ---------- */
+:root :is(.tower) :is(.empty, .panel-empty) { border: 1px dashed var(--line-strong); border-radius: 12px; background: transparent; padding: 40px 24px; text-align: center; }
+:root :is(.tower) :is(.empty-icon, .panel-empty-icon) {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; margin: 0 auto 12px;
+  border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); color: var(--text-2);
+}
+:root :is(.tower) :is(.empty, .panel-empty) h3 { margin: 0 0 6px; font: 600 15px/1.3 var(--font); color: var(--text); }
+:root :is(.tower) :is(.empty, .panel-empty) p { margin: 0 auto 14px; max-width: min(72ch, 100%); font-size: 13px; color: var(--muted); }
+
+/* ---------- Drawer, modal, toasts ---------- */
+:root :is(.tower) .drawer { background: var(--panel); border-left: 1px solid var(--line); box-shadow: -24px 0 48px -24px var(--shadow-ink); color: var(--text); }
+:root :is(.tower) .drawer-head { border-bottom: 1px solid var(--line); }
+:root .modal-backdrop { background: var(--overlay); }
+:root :is(.modal-backdrop) .modal { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 24px 64px -16px var(--shadow-ink); color: var(--text); }
+:root :is(.modal-backdrop) .modal-head { border-bottom: 1px solid var(--line); }
+:root :is(.modal-backdrop) .modal-head h2 { font: 600 15px/1.3 var(--font); color: var(--text); }
+:root :is(.modal-backdrop) .modal-foot { border-top: 1px solid var(--line); background: var(--bg-2); }
+:root .toast { background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); box-shadow: 0 16px 40px -16px var(--shadow-ink); font-size: 13px; }
+:root .toast-ok { border-color: var(--line-strong); }
+:root .toast-error { border-color: var(--red-line); color: var(--red-text); }
+
+/* ---------- Welcome / standby ---------- */
+.standby.waystation-welcome {
+  min-height: 100vh; display: flex; flex-direction: column;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 20px 20px;
+  color: var(--text);
+}
+.waystation-welcome .standby-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.waystation-welcome .standby-brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.waystation-welcome .standby-local { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.waystation-welcome .standby-main {
+  flex: 1; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: center; gap: 56px;
+  width: min(1240px, 100%); margin: 0 auto; padding: 56px 32px;
+}
+.waystation-welcome .standby-copy h1 { margin: 0 0 16px; font: 600 clamp(32px, 4vw, 52px)/1.06 var(--font); letter-spacing: -0.035em; max-width: 14ch; }
+.waystation-welcome .standby-copy > p { margin: 0 0 28px; max-width: 46ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
+.waystation-welcome .standby-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.waystation-welcome .standby-start { min-height: 40px; padding: 0 16px; font-size: 14px; }
+.waystation-welcome .standby-note { font-size: 12.5px; color: var(--faint); margin: 0; }
+.welcome-world { margin: 0; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--bg-2); overflow: hidden; box-shadow: 0 32px 80px -32px var(--shadow-ink); }
+.welcome-world-caption { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted); }
+.welcome-world-caption > span:first-child { display: inline-flex; align-items: center; gap: 7px; color: var(--text); font-weight: 500; }
+.welcome-world-canvas {
+  padding: 20px; max-height: 520px; overflow: hidden;
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 20px 20px;
+  -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent);
+}
+.welcome-world-canvas .graph-lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+@media (max-width: 960px) {
+  .waystation-welcome .standby-main { grid-template-columns: 1fr; gap: 32px; padding: 32px 16px; }
+  .waystation-welcome .standby-header { padding: 14px 16px; }
+  .welcome-world-canvas .graph-lanes { grid-template-columns: 1fr; }
+  .welcome-world-canvas .graph-team { grid-column: auto; }
+  :root :is(.tower) :is(.fleet-metrics, .ops-metrics) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric:nth-child(3) { border-left: 0; }
+  :root :is(.tower) :is(.fleet-metrics, .ops-metrics) .metric:nth-child(n + 3) { border-top: 1px solid var(--line); }
+}
+@media (max-width: 720px) {
+  :root :is(.tower) .dashboard-content { padding: 20px 16px; }
+  :root :is(.tower) .topbar { padding: 0 16px; }
+}
+
+/* Narrow: the sidebar becomes a top bar with one scrollable row of destinations. */
+@media (max-width: 700px) {
+  :root :is(.tower) .sidebar { width: 100%; padding: 12px 16px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  :root :is(.tower) .workspace-label, :root :is(.tower) .nav-label, :root :is(.tower) .sidebar-bottom { display: none; }
+  :root :is(.tower) .sidebar-nav { display: flex; flex-direction: row; gap: 4px; margin: 12px -16px 0; padding: 0 16px 10px; overflow-x: auto; scrollbar-width: none; }
+  :root :is(.tower) .sidebar-nav button { flex: none; white-space: nowrap; }
+  :root :is(.tower) .main-shell { margin-left: 0; }
+  :root :is(.tower) .topbar { position: static; padding: 8px 16px; flex-wrap: wrap; }
+  :root :is(.tower) .breadcrumb { display: none; }
+  :root :is(.tower) .topbar-actions { width: 100%; justify-content: flex-end; }
+  :root :is(.tower) .page-heading { flex-direction: column; align-items: flex-start; }
+  :root :is(.tower) .agent-world { margin-left: -16px; margin-right: -16px; border-radius: 0; border-left: 0; border-right: 0; }
+}

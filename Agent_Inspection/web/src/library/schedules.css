@@ -2,20 +2,20 @@
 .schedule-form { display: grid; gap: 14px; }
 .schedule-form-head h3 { margin: 0 0 5px; font-size: 20px; font-weight: 550; }
 .schedule-form-head p { margin: 0; color: var(--muted); font-size: 13px; }
-.schedule-form { padding: 24px; background: #fafcf6; border-radius: 12px; gap: 20px; }
+.schedule-form { padding: 24px; background: var(--bg-2); border-radius: 12px; gap: 20px; }
 .schedule-step { border: 0; padding: 18px 0 0; margin: 0; display: grid; gap: 15px; min-width: 0; }
 .schedule-step > legend { font-size: 14px; font-weight: 600; }
-.schedule-step > legend span { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; margin-right: 9px; font-size: 12px; background: #e5eddc; color: #4f6a40; }
+.schedule-step > legend span { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; margin-right: 9px; font-size: 12px; background: var(--panel-3); color: var(--green-text); }
 .schedule-form label { font-size: 12px; gap: 7px; }
 .schedule-form .text-input { font-size: 13px; }
-.schedule-options { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.schedule-options { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 .schedule-options > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 15px; cursor: pointer; font-size: 13px; font-weight: 600; }
 .schedule-options > summary::-webkit-details-marker { display: none; }
 .schedule-options > summary > span { flex: 1; }
 .schedule-options summary small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; margin-top: 4px; }
 .schedule-options[open] > summary > svg:last-child { transform: rotate(180deg); }
 .schedule-options > div { display: grid; gap: 15px; padding: 0 15px 15px; }
-.schedule-options .schedule-fieldset { background: #fbfcf8; }
+.schedule-options .schedule-fieldset { background: var(--bg-2); }
 .schedule-form .detail-form-actions { border-top: 1px solid var(--line); padding-top: 18px; }
 .schedule-fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; display: grid; gap: 10px; min-width: 0; }
 .schedule-fieldset > legend { font-size: 13px; font-weight: 600; padding: 0 4px; }

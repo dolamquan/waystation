@@ -267,6 +267,9 @@ describe('CodexSessionsCollector', () => {
       utimesSync(file, ts, ts);
     }
 
+    /** Test lock files are plain files nobody holds; these tests treat them as held by a live Codex. */
+    const held = async () => true;
+
     function setup() {
       const root = tempDir();
       const locks = tempDir();
@@ -279,8 +282,18 @@ describe('CodexSessionsCollector', () => {
       rollout(join(root, '2020', '01', '01'), OPEN_ID, 180, 'task_complete');
       writeFileSync(join(locks, `${OPEN_ID}.lock`), '');
       const registry = new AgentRegistry();
-      await new CodexSessionsCollector(registry, () => [codexBackend], root, locks).scan();
+      await new CodexSessionsCollector(registry, () => [codexBackend], root, locks, held).scan();
       expect(registry.get(`codex:${OPEN_ID}`)?.status).toBe('idle');
+    });
+
+    it('drops a thread whose lock file was left behind by a killed Codex process', async () => {
+      const now = new Date();
+      const { root, locks } = setup();
+      rollout(candidateDayDirs(root, now)[0], CLOSED_ID, 0, 'task_complete');
+      writeFileSync(join(locks, `${CLOSED_ID}.lock`), '');
+      const registry = new AgentRegistry();
+      await new CodexSessionsCollector(registry, () => [codexBackend], root, locks, async () => false).scan(now.getTime());
+      expect(registry.list()).toEqual([]);
     });
 
     it('drops a thread as soon as its lock is released, even mid-turn and freshly written', async () => {
@@ -288,7 +301,7 @@ describe('CodexSessionsCollector', () => {
       const { root, locks } = setup();
       rollout(candidateDayDirs(root, now)[0], CLOSED_ID, 0, 'task_started');
       const registry = new AgentRegistry();
-      const collector = new CodexSessionsCollector(registry, () => [codexBackend], root, locks);
+      const collector = new CodexSessionsCollector(registry, () => [codexBackend], root, locks, held);
       writeFileSync(join(locks, `${CLOSED_ID}.lock`), '');
       await collector.scan(now.getTime());
       expect(registry.get(`codex:${CLOSED_ID}`)).toBeDefined();

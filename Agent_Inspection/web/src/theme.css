@@ -1,0 +1,153 @@
+/* Waystation theme: one token vocabulary, dark by default, light on request ([data-theme='light'] on <html>).
+   Every other stylesheet reads these names; no component should carry a raw color. */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* .surface-dark re-declares the whole dark set on an element, so anything inside an always-dark area (the console board,
+   terminals) reads dark tokens even when the app is light. Custom properties resolve where they are declared, so this
+   block must stay complete: roles and legacy aliases included. */
+:root, .surface-dark {
+  --font: 'Geist', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --hand: var(--font);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Surfaces, darkest to most raised. */
+  --bg: #0a0a0b;
+  --bg-2: #0e0e10;
+  --panel: #111113;
+  --panel-solid: #111113;
+  --panel-2: #161618;
+  --panel-3: #1d1d20;
+  --line: #1f1f23;
+  --line-strong: #2d2d32;
+
+  /* Text. */
+  --text: #ededee;
+  --text-2: #b9b9bf;
+  --muted: #a1a1aa;
+  --faint: #8a8a93;
+
+  /* Always-dark surfaces (terminals, code), the same in both themes. */
+  --deep: #0b0b0d;
+  --deep-2: #151518;
+  --deep-line: #26262b;
+  --on-deep: #ececef;
+  --on-deep-muted: #8b8b94;
+  --shadow-ink: rgb(0 0 0 / 0.55);
+  --overlay: rgb(0 0 0 / 0.6);
+
+  /* Hue families: solid fill, readable text, soft wash, tinted border. */
+  --green: #1f9d66;   --green-text: #4fd394; --green-soft: rgb(79 211 148 / 0.1);  --green-line: rgb(79 211 148 / 0.32);
+  --amber: #c98a1b;   --amber-text: #f1b54a; --amber-soft: rgb(241 181 74 / 0.1);  --amber-line: rgb(241 181 74 / 0.34);
+  --red: #d2453b;     --red-text: #f47a72;   --red-soft: rgb(244 122 114 / 0.1);   --red-line: rgb(244 122 114 / 0.34);
+  --blue: #3b7ff2;    --blue-text: #7fb2ff;  --blue-soft: rgb(127 178 255 / 0.1);  --blue-line: rgb(127 178 255 / 0.32);
+  --violet: #8a63f0;  --violet-text: #b8a1ff; --violet-soft: rgb(184 161 255 / 0.1); --violet-line: rgb(184 161 255 / 0.32);
+  --clay: #cf6d4c;    --clay-text: #ec9575;  --clay-soft: rgb(236 149 117 / 0.1);  --clay-line: rgb(236 149 117 / 0.32);
+
+  /* Roles. */
+  --accent: var(--green-text);
+  --accent-soft: var(--green-soft);
+  --on-accent: #04140c;
+  --primary: #ededee;
+  --on-primary: #0a0a0b;
+  --busy: var(--green-text);
+  --ok: var(--green-text);
+  --waiting: var(--amber-text);
+  --warn: var(--amber-text);
+  --danger: var(--red-text);
+  --idle: var(--faint);
+  --claude: var(--clay-text);
+  --codex: var(--blue-text);
+  --other: var(--violet-text);
+  --focus: rgb(127 178 255 / 0.7);
+  --grid-dot: rgb(255 255 255 / 0.07);
+
+  /* Legacy names still read by older stylesheets. */
+  --ink: var(--text);
+  --paper: var(--panel);
+  --paper-warm: var(--panel-2);
+  --pencil: var(--line-strong);
+  --lilac: var(--panel-3);
+  --peach: var(--clay-soft);
+  --sage: var(--green-soft);
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #fafafa;
+  --bg-2: #f4f4f5;
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
+  --panel-2: #f6f6f7;
+  --panel-3: #ececee;
+  --line: #e6e6e9;
+  --line-strong: #d3d3d8;
+
+  --text: #0b0b0d;
+  --text-2: #3c3c43;
+  --muted: #55555e;
+  --faint: #64646d;
+
+  --deep: #0e0e10;
+  --deep-2: #18181b;
+  --deep-line: #2a2a2f;
+  --shadow-ink: rgb(12 12 16 / 0.08);
+  --overlay: rgb(10 10 12 / 0.32);
+
+  --green-text: #0d7a4c; --green-soft: rgb(16 150 95 / 0.08);  --green-line: rgb(16 150 95 / 0.3);
+  --amber-text: #9a5d05; --amber-soft: rgb(201 138 27 / 0.1);  --amber-line: rgb(201 138 27 / 0.36);
+  --red-text: #c0342a;   --red-soft: rgb(210 69 59 / 0.08);    --red-line: rgb(210 69 59 / 0.3);
+  --blue-text: #1d5fd1;  --blue-soft: rgb(59 127 242 / 0.08);  --blue-line: rgb(59 127 242 / 0.3);
+  --violet-text: #6a40d8; --violet-soft: rgb(138 99 240 / 0.08); --violet-line: rgb(138 99 240 / 0.3);
+  --clay-text: #ad4a28;  --clay-soft: rgb(207 109 76 / 0.09);  --clay-line: rgb(207 109 76 / 0.3);
+
+  --primary: #0b0b0d;
+  --on-primary: #fafafa;
+  --on-accent: #ffffff;
+  --focus: rgb(29 95 209 / 0.6);
+  --grid-dot: rgb(10 10 12 / 0.09);
+
+  color-scheme: light;
+}
+
+/* Browser surfaces carry the theme too. */
+html { background: var(--bg); }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button, input, select, textarea { font-family: var(--font); }
+/* Tint only: the selected text keeps its own color, so selected text on a light button or a dark panel stays readable. */
+::selection { background: rgb(59 127 242 / 0.38); }
+:root { scrollbar-color: var(--line-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border: 3px solid transparent; background-clip: padding-box; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--faint); }
+input, textarea { caret-color: var(--text); }
+::placeholder { color: var(--faint); opacity: 1; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+code, kbd, pre, samp { font-family: var(--mono); }
+h1, h2, h3, h4 { font-family: var(--font); text-wrap: balance; }
+/* Body copy never ends on a stranded word. */
+p, li, dd, figcaption, small { text-wrap: pretty; }
+table, .tabular { font-variant-numeric: tabular-nums; }

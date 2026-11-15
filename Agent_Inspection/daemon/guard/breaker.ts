@@ -104,6 +104,14 @@ export class Breaker {
     return trip;
   }
 
+  /**
+   * An outside policy (the fleet spend cap) wants this agent constrained now. Same ladder and
+   * same "Clear guard" as the guard's own trips; returns undefined when it is already there.
+   */
+  force(agentId: string, reason: string, now = Date.now()): Trip | undefined {
+    return this.escalate(agentId, reason, now, 'constrained');
+  }
+
   /** Clears warnings that have gone quiet. Returns the agents whose state changed. */
   tick(now = Date.now()): string[] {
     const calmed = [...this.tracks].filter(([, track]) =>

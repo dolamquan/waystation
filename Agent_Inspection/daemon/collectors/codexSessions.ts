@@ -47,14 +47,47 @@ type Rollout = { file: string; mtimeMs: number };
 const LOCK_SUFFIX = '.lock';
 const rolloutId = (file: string): string | undefined => /([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\.jsonl$/i.exec(file)?.[1];
 
+/** Whether a live Codex process still holds a thread's lock file. */
+export type ThreadLockProbe = (file: string) => Promise<boolean>;
+
+/**
+ * On Windows, Codex holds a byte-range lock on an open thread's lock file, so reading it fails with EBUSY.
+ * A lock file nobody holds was left behind by a Codex process that was killed (e.g. a console closed with
+ * its process tree) before it could delete it: that thread is closed. Other platforms use advisory locks a
+ * read cannot see, so there the file's presence is all there is to go on. Any doubt counts as held.
+ */
+export async function threadLockHeld(file: string): Promise<boolean> {
+  if (process.platform !== 'win32') return true;
+  const handle = await open(file, 'r').catch((error: NodeJS.ErrnoException) => error);
+  if (!('read' in handle)) return handle.code !== 'ENOENT';
+  try {
+    await handle.read(Buffer.alloc(1), 0, 1, 0);
+    return false;
+  } catch {
+    return true;
+  } finally {
+    await handle.close();
+  }
+}
+
 /**
  * Codex keeps `<threadId>.lock` in its thread-writer-locks folder while a thread is open and
- * deletes it on close. Returns the open thread ids, or undefined when this Codex has no such folder.
+ * deletes it on close. Returns each open thread id with when its lock was created (when a Codex process
+ * opened, or resumed, that thread), or undefined when this Codex has no such folder.
  */
-async function openThreadIds(locksDir: string): Promise<Set<string> | undefined> {
+async function openThreads(locksDir: string, isHeld: ThreadLockProbe): Promise<Map<string, number | undefined> | undefined> {
   const names = await readdir(locksDir).catch(() => undefined);
   if (!names) return undefined;
-  return new Set(names.filter((n) => n.endsWith(LOCK_SUFFIX) && !n.startsWith('.')).map((n) => n.slice(0, -LOCK_SUFFIX.length)));
+  const locks = names.filter((n) => n.endsWith(LOCK_SUFFIX) && !n.startsWith('.'));
+  const entries = await Promise.all(locks.map(async (name) => {
+    const file = join(locksDir, name);
+    if (!await isHeld(file)) return undefined;
+    const info = await stat(file).catch(() => undefined);
+    // birthtime is when the lock appeared; filesystems without it report 0, so fall back to the write time.
+    const openedAt = info ? (info.birthtimeMs > 0 ? info.birthtimeMs : info.mtimeMs) : undefined;
+    return [name.slice(0, -LOCK_SUFFIX.length), openedAt] as const;
+  }));
+  return new Map(entries.filter((entry) => entry !== undefined));
 }
 
 /**
@@ -82,6 +115,7 @@ export class CodexSessionsCollector {
     private readonly getProcs: () => readonly ProcInfo[],
     private readonly sessionsRoot = join(paths.codexHome, 'sessions'),
     private readonly locksDir = join(paths.codexHome, 'thread-writer-locks'),
+    private readonly lockHeld: ThreadLockProbe = threadLockHeld,
   ) {}
 
   start(): void {
@@ -102,7 +136,8 @@ export class CodexSessionsCollector {
         this.registry.replaceSource(CODEX_SOURCE, []);
         return;
       }
-      const openIds = await openThreadIds(this.locksDir);
+      const open = await openThreads(this.locksDir, this.lockHeld);
+      const openIds = open ? new Set(open.keys()) : undefined;
       const recent = await this.recentRollouts(now);
       const candidates = openIds ? [...recent, ...await this.olderOpenRollouts(openIds, recent)] : recent;
       for (const { file, mtimeMs } of candidates) await this.refresh(file, mtimeMs);
@@ -111,7 +146,7 @@ export class CodexSessionsCollector {
       const execRunning = hasCodexExecProcess(procs);
       const live = [...this.rollouts.values()].filter(state => !this.isManagedSession(state.meta.id) &&
         (openIds ? openIds.has(state.meta.id) : isLive(state, now, execRunning)));
-      this.registry.replaceSource(CODEX_SOURCE, live.map((state) => this.toAgent(state, now)));
+      this.registry.replaceSource(CODEX_SOURCE, live.map((state) => this.toAgent(state, now, open?.get(state.meta.id))));
     } catch (error) {
       console.error('[codex-sessions] scan failed:', (error as Error).message);
     } finally {
@@ -193,7 +228,7 @@ export class CodexSessionsCollector {
     return this.registry.list().some(agent => agent.vendor === 'codex' && agent.tier === 'A' && agent.sessionId === sessionId);
   }
 
-  private toAgent(state: RolloutState, now: number): Agent {
+  private toAgent(state: RolloutState, now: number, openedAt: number | undefined): Agent {
     const { meta } = state;
     const recentlyWritten = now - state.mtimeMs < timings.codexBusyWindowMs;
     const parent = meta.parentThreadId ? this.registry.list()
@@ -215,6 +250,7 @@ export class CodexSessionsCollector {
       subagent: meta.parentThreadId ? { type: meta.agentRole, parentName } : undefined,
       currentActivity: state.activity,
       startedAt: meta.startedAt,
+      ...(openedAt !== undefined ? { openedAt } : {}),
       lastEventAt: state.lastEventAt ?? state.mtimeMs,
       hooked: false,
       intercepting: false,

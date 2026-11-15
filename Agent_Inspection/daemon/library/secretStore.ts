@@ -16,30 +16,41 @@ export class SecretStore {
   }
 
   get(key: string): string | undefined {
-    return this.values[key];
+    let prefix = ''; const seen = new Set<string>();
+    while (this.values[`ref:${key}`]) { if (seen.has(key) || seen.size >= 20) return undefined; seen.add(key); prefix += this.values[`refprefix:${key}`] ?? ''; key = this.values[`ref:${key}`]; }
+    return !Object.hasOwn(this.values, key) ? undefined : prefix + this.values[key];
   }
 
   has(key: string): boolean {
-    return key in this.values;
+    return this.get(key) !== undefined;
   }
 
   /** Keys starting with `prefix`, with the prefix removed. */
   namesUnder(prefix: string): string[] {
-    return Object.keys(this.values).filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length)).sort();
+    return [...new Set(Object.keys(this.values).filter(key => !key.startsWith('refprefix:')).map(key => key.startsWith('ref:') ? key.slice(4) : key))].filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length)).sort();
+  }
+  reference(key: string): string | undefined { return this.values[`ref:${key}`]; }
+  referencePrefix(key: string): string { return this.values[`refprefix:${key}`] ?? ''; }
+  referencesTo(source: string): string[] { return Object.keys(this.values).filter(key => key.startsWith('ref:') && this.values[key] === source).map(key => key.slice(4)); }
+  alias(key: string, source: string, prefix = ''): void {
+    if (!SAFE_KEY.test(key) || !SAFE_KEY.test(source) || !['', 'Bearer '].includes(prefix)) throw new Error('Invalid secret reference.');
+    if (key === source) return;
+    const seen = new Set([key]); let cursor: string | undefined = source;
+    while (cursor) { if (seen.has(cursor)) throw new Error('Secret references cannot form a cycle.'); seen.add(cursor); cursor = this.reference(cursor); }
+    const values = { ...this.values, [`ref:${key}`]: source, [`refprefix:${key}`]: prefix }; delete values[key]; this.write(values);
   }
 
   set(key: string, value: string): void {
     if (!SAFE_KEY.test(key)) throw new Error(`invalid secret key: ${key}`);
-    this.write({ ...this.values, [key]: value });
+    const values = { ...this.values, [key]: value }; delete values[`ref:${key}`]; delete values[`refprefix:${key}`]; this.write(values);
   }
 
   delete(key: string): void {
-    if (!(key in this.values)) return;
-    this.write(Object.fromEntries(Object.entries(this.values).filter(([k]) => k !== key)));
+    this.write(Object.fromEntries(Object.entries(this.values).filter(([k]) => k !== key && k !== `ref:${key}` && k !== `refprefix:${key}`)));
   }
 
   deleteUnder(prefix: string): void {
-    const kept = Object.entries(this.values).filter(([key]) => !key.startsWith(prefix));
+    const kept = Object.entries(this.values).filter(([key]) => !key.startsWith(prefix) && !key.startsWith(`ref:${prefix}`) && !key.startsWith(`refprefix:${prefix}`));
     if (kept.length !== Object.keys(this.values).length) this.write(Object.fromEntries(kept));
   }
 

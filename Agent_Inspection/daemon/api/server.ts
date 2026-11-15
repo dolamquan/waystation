@@ -9,7 +9,13 @@ import { TeamAuthError } from '../teams/teamManager.ts';
 import { OpsInputError } from '../ops/templates.ts';
 import { LibraryInputError } from '../library/types.ts';
 import { agentRoutes, libraryRoutes } from './routes/index.ts';
+import { remoteRoutes } from './routes/remote.ts';
+import { RemoteAccess } from '../remote/remoteAccess.ts';
+import { REMOTE_MARK } from '../remote/gateway.ts';
 import { teamBridgeRoutes, teamRoutes } from './routes/teams.ts';
+import { attachConsoleSocket } from '../pty/ptySocket.ts';
+import { workspaceRuntime } from '../files/workspaceRuntime.ts';
+import { automationRpc } from '../automation/rpc.ts';
 import {
   WS_PROTOCOL, contentSecurityPolicy, isAllowedHost, isAllowedOrigin, tokenFromProtocols, tokensMatch,
 } from './security.ts';
@@ -17,12 +23,20 @@ import {
 const MAX_BODY_BYTES = 1024 * 1024;
 /** Messages may carry up to 8 images of 5 MB each, base64-encoded. */
 const MAX_MESSAGE_BODY_BYTES = 56 * 1024 * 1024;
-const MESSAGE_ROUTE = /^\/api\/agents\/[^/]+\/instruct$/;
+const MESSAGE_ROUTE = /^(?:\/api\/agents\/[^/]+\/instruct|\/api\/files\/write)$/;
 const MAX_AGENT_BODY_BYTES = 32 * 1024;
 const MAX_WS_PAYLOAD_BYTES = 64 * 1024;
+/** A console's own socket: `/pty/<console id>`. Ids are UUIDs. */
+const CONSOLE_SOCKET_PATH = /^\/pty\/([A-Za-z0-9-]{1,64})$/;
+const BROWSER_SOCKET_PATH = /^\/ws\/browser\/([A-Za-z0-9_-]{1,128})$/;
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
+  '.bcmap': 'application/octet-stream',
+  '.ttf': 'font/ttf',
+  '.pfb': 'application/octet-stream',
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
@@ -102,6 +116,8 @@ function buildRoutes(tower: Tower, instance?: ServerOptions['instance']): Route[
       await tower.interrupt(params[0]);
       return { ok: true };
     }),
+    r('POST', '/api/agents/:id/move-to-worktree', async ({ params }) => ({ ok: true, ...(await tower.moveToWorktree(params[0])) })),
+    r('POST', '/api/contention/notify', async ({ body }) => ({ ok: true, ...(await tower.notifyContention(bodyOf(body).path)) })),
     r('POST', '/api/agents/:id/delegate', async ({ params, body }) => ({ ok: true, ...(await tower.delegate(params[0], body)) })),
     r('POST', '/api/agents/:id/skills', ({ params, body }) => {
       if (bodyOf(body).confirm !== true) throw new UserError('Attaching a skill requires confirm: true.');
@@ -119,6 +135,8 @@ function buildRoutes(tower: Tower, instance?: ServerOptions['instance']): Route[
       return { ok: true };
     }),
     // ---- usage, runaway guard, rename, restart, templates, schedules, prerequisites ----
+    r('GET', '/api/spend-cap', () => ({ config: tower.ops.spendCap(), status: tower.ops.spendStatus() })),
+    r('POST', '/api/spend-cap', ({ body }) => ({ config: tower.ops.setSpendCap(body), status: tower.ops.spendStatus() })),
     r('GET', '/api/usage', ({ req }) => ({ usage: tower.ops.usage(Number(new URL(req.url ?? '/', 'http://localhost').searchParams.get('days') ?? 7)) })),
     r('POST', '/api/agents/:id/name', ({ params, body }) => ({ ok: true, name: tower.ops.renameAgent(params[0], bodyOf(body).name) ?? null })),
     r('POST', '/api/agents/:id/restart', async ({ params, body }) => {
@@ -200,16 +218,44 @@ function serveStatic(webDist: string, port: number, urlPath: string, res: Server
 
 export function startServer(opts: ServerOptions): Promise<Server> {
   const { tower, port, host, token, webDist, dev = false } = opts;
-  const routes = buildRoutes(tower, opts.instance);
+  const remote = new RemoteAccess({ store: tower.store, localHost: host, localPort: port, token });
+  // Desktop only: the remote gateway refuses every /api/remote route.
+  const routes = [...buildRoutes(tower, opts.instance), ...remoteRoutes(remote)];
   const bridgeTeamRoutes = teamBridgeRoutes(tower);
   const bridgeRoutes = agentRoutes(tower);
   tower.teams.setEndpoint(`http://${host}:${port}`);
   tower.library.notifier.setEndpoint(`http://${host}:${port}`);
+  tower.library.automation.setEndpoint(`http://${host}:${port}`);
+  tower.factory.setEndpoint(`http://${host}:${port}`);
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     if (!isAllowedHost(req.headers.host, port) || !isAllowedOrigin(req.headers.origin, port, dev)) {
       sendJson(res, 403, { error: 'forbidden host or origin' });
+      return;
+    }
+    if (url.pathname === '/mcp') {
+      const auth = req.headers.authorization;
+      const grant = tower.library.automation.authenticate(auth?.startsWith('Bearer ') ? auth.slice(7) : undefined);
+      if (req.method !== 'POST') {
+        res.setHeader('allow', 'POST');
+        sendJson(res, 405, { error: 'MCP uses POST; standalone SSE and session deletion are not supported.' });
+        return;
+      }
+      if (!req.headers['content-type']?.startsWith('application/json')) { sendJson(res, 415, { error: 'Use application/json.' }); return; }
+      const version = req.headers['mcp-protocol-version'];
+      if (version && !['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'].includes(String(version))) {
+        sendJson(res, 400, { error: 'Unsupported MCP protocol version.' }); return;
+      }
+      let body: unknown;
+      try { body = await readBody(req, 512 * 1024); }
+      catch (error) {
+        if (error instanceof HttpError && error.status === 400) { sendJson(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); return; }
+        throw error;
+      }
+      const response = await automationRpc(tower, body, grant);
+      if (response === undefined) { res.writeHead(202, BASE_HEADERS); res.end(); }
+      else sendJson(res, 200, response);
       return;
     }
     if (url.pathname.startsWith('/team/')) {
@@ -273,21 +319,43 @@ export function startServer(opts: ServerOptions): Promise<Server> {
       }
     });
   });
+  server.on('close', () => { workspaceRuntime.dispose(); void remote.stop(); });
 
   const wss = new WebSocketServer({
     noServer: true,
     maxPayload: MAX_WS_PAYLOAD_BYTES,
     handleProtocols: (protocols) => (protocols.has(WS_PROTOCOL) ? WS_PROTOCOL : false),
   });
+  const ptyWss = new WebSocketServer({
+    noServer: true,
+    maxPayload: MAX_WS_PAYLOAD_BYTES,
+    handleProtocols: (protocols) => (protocols.has(WS_PROTOCOL) ? WS_PROTOCOL : false),
+  });
+  const browserWss = new WebSocketServer({
+    noServer: true, maxPayload: MAX_WS_PAYLOAD_BYTES,
+    handleProtocols: (protocols) => (protocols.has(WS_PROTOCOL) ? WS_PROTOCOL : false),
+  });
   server.on('upgrade', (req, socket, head) => {
+    // After 'upgrade' Node no longer handles socket errors: a client resetting now must not crash the daemon.
+    socket.on('error', () => undefined);
     const url = new URL(req.url ?? '/', 'http://localhost');
-    const ok = url.pathname === '/ws'
+    const consoleId = CONSOLE_SOCKET_PATH.exec(url.pathname)?.[1];
+    const browserId = BROWSER_SOCKET_PATH.exec(url.pathname)?.[1];
+    const ok = (url.pathname === '/ws' || consoleId !== undefined || browserId !== undefined)
       && isAllowedHost(req.headers.host, port)
       && isAllowedOrigin(req.headers.origin, port, dev)
       && tokensMatch(tokenFromProtocols(req.headers['sec-websocket-protocol']), token);
     if (!ok) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
+      return;
+    }
+    if (consoleId !== undefined) {
+      ptyWss.handleUpgrade(req, socket, head, (ws) => attachConsoleSocket(ws, tower.consoles, consoleId));
+      return;
+    }
+    if (browserId !== undefined) {
+      browserWss.handleUpgrade(req, socket, head, (ws) => { void tower.browsers.attach(ws, browserId); });
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
@@ -297,9 +365,13 @@ export function startServer(opts: ServerOptions): Promise<Server> {
     const data = JSON.stringify(message);
     for (const client of wss.clients) if (client.readyState === 1) client.send(data);
   };
-  wss.on('connection', (ws: WebSocket) => {
-    desktopBridge(ws, tower.library.notifier);
-    tower.terminals.attach(ws);
+  wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    // Through the remote gateway the feed is receive-only: a device must never become the desktop
+    // notification sink or claim a VS Code terminal session. (The mark can only take rights away.)
+    if (!req.headers[REMOTE_MARK]) {
+      desktopBridge(ws, tower.library.notifier);
+      tower.terminals.attach(ws);
+    }
     ws.on('error', (error) => console.error('[ws]', error.message));
     ws.send(JSON.stringify({ type: 'snapshot', ...tower.state() }));
   });
@@ -309,6 +381,10 @@ export function startServer(opts: ServerOptions): Promise<Server> {
   const onTeams = (teams: unknown) => broadcast({ type: 'teams', teams });
   const onTeamLog = (entry: unknown) => broadcast({ type: 'team_log', entry });
   const onNotification = (entry: unknown) => broadcast({ type: 'notification', entry });
+  const onReveal = (reveal: unknown) => broadcast({ type: 'canvas_reveal', reveal });
+  const onContention = (contention: unknown) => broadcast({ type: 'contention', contention });
+  tower.contention.on('changed', onContention);
+  tower.library.automation.on('reveal', onReveal);
   tower.library.notifier.on('notification', onNotification);
   tower.registry.on('agents', onAgents);
   tower.registry.on('event', onEvent);
@@ -321,13 +397,19 @@ export function startServer(opts: ServerOptions): Promise<Server> {
     tower.interceptions.off('changed', onPending);
     tower.teams.off('teams', onTeams);
     tower.teams.off('log', onTeamLog);
+    tower.contention.off('changed', onContention);
     tower.library.notifier.off('notification', onNotification);
+    tower.library.automation.off('reveal', onReveal);
     for (const client of wss.clients) client.terminate();
     wss.close();
+    for (const client of ptyWss.clients) client.terminate();
+    ptyWss.close();
+    for (const client of browserWss.clients) client.terminate();
+    browserWss.close();
   });
 
   return new Promise((resolveServer, reject) => {
     server.once('error', reject);
-    server.listen(port, host, () => resolveServer(server));
+    server.listen(port, host, () => { void remote.start().then(() => resolveServer(server)); });
   });
 }

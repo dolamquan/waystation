@@ -10,7 +10,7 @@
 .skills-row { padding: 0 6px 0 0; align-items: stretch; }
 .skills-row-on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .skills-row-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-align: left; background: none; border: 0; padding: 12px 14px; cursor: pointer; border-radius: 10px; }
-.skills-row-open:hover { background: #f4f6f0; }
+.skills-row-open:hover { background: var(--bg-2); }
 .skills-row-open strong { overflow-wrap: anywhere; }
 .skills-row-open small { color: var(--muted); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .skills-row .icon-btn { align-self: center; }

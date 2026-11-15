@@ -1,0 +1,94 @@
+import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { chromium } from 'playwright-core';
+import { NATIVE_PROVIDERS } from '../shared/agentProviders.ts';
+
+// Run against Vite on 5173. Every API and WebSocket response is a fixture; no account or model is used.
+const captures = resolve(import.meta.dirname, '../.impeccable/review');
+mkdirSync(captures, { recursive: true });
+const now = Date.now();
+const tokens = { input: 100, output: 30, cacheRead: 20, cacheWrite5m: 0, cacheWrite1h: 0 };
+let agent = { id: 'managed:copilot-fixture', sessionId: 'copilot-fixture', vendor: 'copilot', providerId: 'copilot', providerLabel: 'GitHub Copilot', tier: 'A', name: 'Copilot builder', project: 'App', cwd: 'C:/Projects/App', status: 'idle', source: 'Copilot Agent SDK · launched here', hooked: false, intercepting: false, canInstruct: true, model: 'copilot-test', usage: { tokens, contextTokens: 1200, contextWindow: 100000 } };
+const account = { authenticated: true, models: [{ id: 'copilot-test', label: 'Copilot test model' }], limits: [{ window: 'premium_interactions', label: 'Premium interactions', source: 'copilot', usedPercent: 25, observedAt: now }] };
+const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, reducedMotion: 'reduce' });
+  page.setDefaultTimeout(10000);
+  const errors = [], launches = [], instructions = [];
+  page.on('pageerror', error => { errors.push(error.message); console.error('Browser error:', error.message); });
+  let socket;
+  await page.routeWebSocket('**/ws', ws => { socket = ws; ws.send(JSON.stringify({ type: 'snapshot', agents: [agent], pending: [], teams: [], hooks: { installed: true } })); });
+  await page.route('**/api/**', async route => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    let json = {};
+    if (path === '/api/providers') json = { providers: NATIVE_PROVIDERS };
+    else if (path === '/api/providers/copilot') json = account;
+    else if (path === '/api/managed') {
+      launches.push(req.postDataJSON()); agent = { ...agent, ...req.postDataJSON() };
+      socket.send(JSON.stringify({ type: 'agents', agents: [agent], hooks: { installed: true } })); json = { agent };
+    } else if (path.endsWith('/instruct')) {
+      instructions.push(req.postDataJSON());
+      socket.send(JSON.stringify({ type: 'event', event: { agentId: agent.id, ts: now + 1, kind: 'assistant', summary: 'Copilot received the follow-up.' } })); json = { ok: true };
+    } else if (path.endsWith('/events')) json = { events: [{ agentId: agent.id, ts: now, kind: 'assistant', summary: 'Copilot is ready.' }] };
+    else if (path.endsWith('/queue')) json = { messages: [] };
+    else if (path === '/api/usage/windows') json = { windows: { generatedAt: now, vendors: [{ vendor: 'copilot', limits: account.limits, week: { start: now - 604800000, end: now, tokens, totalTokens: 150, unpricedTokens: 150, requests: 1 } }] } };
+    else if (path === '/api/usage') json = { usage: { today: { tokens: 150, costUsd: 0 }, byDay: [], byAgent: [{ agentId: agent.id, name: agent.name, vendor: 'copilot', project: 'App', model: 'copilot-test', tokens: 150, priced: false, costUsd: 0 }] } };
+    else if (path === '/api/templates') json = { templates: [] };
+    else if (path === '/api/schedules') json = { schedules: [] };
+    else if (path === '/api/library/notify') json = { channels: [] };
+    else if (path === '/api/library/mcp') json = { servers: [], presets: [] };
+    else if (path === '/api/library/plugins') json = { plugins: [] };
+    else if (path === '/api/discovery') json = { rules: [{ id: 'copilot', label: 'GitHub Copilot', executables: ['copilot'], packages: [] }], agents: [] };
+    else if (path === '/api/prerequisites') json = { prerequisites: [{ id: 'codex', ok: true }, { id: 'git', ok: true }, { id: 'terminal', ok: true }, { id: 'copilot', ok: true }] };
+    else if (path.includes('notifications')) json = { unread: 0, notifications: [] };
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(json) });
+  });
+  await page.goto('http://127.0.0.1:5173/#token=abcdef1234567890&autostart=1', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'New agent', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Launch a new agent' });
+  await dialog.getByRole('radio', { name: 'Copilot (Agent SDK)', exact: true }).click();
+  await dialog.getByText('Copilot connected', { exact: true }).waitFor();
+  await dialog.getByLabel('Model', { exact: true }).selectOption('copilot-test');
+  await dialog.getByLabel('Name', { exact: true }).fill('Copilot builder');
+  await dialog.getByLabel('Project folder (absolute path)').fill('C:/Projects/App');
+  await dialog.getByLabel('Task', { exact: true }).fill('Build with Copilot');
+  await dialog.getByRole('checkbox', { name: /Intercept mode/ }).check();
+  await page.screenshot({ path: resolve(captures, 'copilot-launch-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: resolve(captures, 'copilot-launch-mobile.png'), fullPage: true });
+  assert.ok(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Launch dialog overflows on mobile');
+  await dialog.getByRole('button', { name: 'Launch', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(launches[0].vendor, 'copilot'); assert.equal(launches[0].model, 'copilot-test'); assert.equal(launches[0].intercept, true);
+  const drawer = page.getByRole('complementary', { name: 'Details for Copilot builder' });
+  await drawer.getByRole('combobox', { name: 'Message Copilot builder' }).fill('Follow-up task');
+  await drawer.getByRole('combobox', { name: 'Message Copilot builder' }).press('Enter');
+  await drawer.getByText('Copilot received the follow-up.', { exact: true }).waitFor();
+  assert.equal(instructions[0].text, 'Follow-up task');
+  await drawer.getByRole('tab', { name: 'Controls', exact: true }).click();
+  await drawer.getByRole('switch', { name: 'Review tool calls' }).waitFor();
+  await drawer.getByRole('button', { name: 'Restart & continue', exact: true }).waitFor();
+  assert.equal(await drawer.getByRole('button', { name: /Open in Claude|Open in Codex/ }).count(), 0);
+  await drawer.getByRole('button', { name: 'Close details', exact: true }).click();
+  await page.getByRole('button', { name: /Teams/ }).first().click();
+  await page.getByRole('button', { name: 'New team', exact: true }).first().click();
+  const team = page.getByRole('dialog', { name: 'Create an agent team' });
+  await team.getByLabel('Member 1 agent').selectOption('copilot');
+  await team.getByLabel('Member 2 agent').selectOption('copilot');
+  await team.getByText('Copilot connected', { exact: true }).waitFor();
+  await team.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Usage & schedules', exact: true }).click();
+  const usage = page.getByRole('article', { name: 'GitHub Copilot' });
+  await usage.getByText('25%', { exact: false }).waitFor();
+  await page.screenshot({ path: resolve(captures, 'copilot-usage-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.screenshot({ path: resolve(captures, 'copilot-usage-desktop.png'), fullPage: true });
+  await page.getByRole('tab', { name: 'Schedules', exact: false }).click();
+  await page.getByRole('button', { name: 'New schedule', exact: true }).first().click();
+  await page.locator('form.schedule-form select').first().selectOption('copilot');
+  await page.getByText('Copilot connected', { exact: true }).waitFor();
+  assert.deepEqual(errors, []);
+  console.log('Copilot browser verification passed: launch, account models, approval controls, chat, restart, team members, schedules and reported usage on desktop/mobile.');
+} catch (error) { console.error(error); process.exitCode = 1; }
+finally { for (const context of browser.contexts()) await context.close(); await browser.close(); }

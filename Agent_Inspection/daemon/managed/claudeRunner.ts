@@ -95,6 +95,7 @@ function denyHook(matcher: string, violation: Violation): HookCallbackMatcher {
 export function guardHooks(launch: ManagedLaunch): HookCallbackMatcher[] {
   const { writeRoot, readGuard, cwd } = launch;
   return [
+    ...(launch.toolPolicy === 'chat-only' ? [denyHook('.*', () => 'This agent is restricted to conversation. Tools are disabled.')] : []),
     ...(writeRoot ? [denyHook(WRITE_TOOL_MATCHER, (tool, input) => writeViolation(tool, input, writeRoot))] : []),
     ...(readGuard ? [denyHook(READ_TOOL_MATCHER, (tool, input) => readViolation(tool, input, cwd, readGuard))] : []),
   ];
@@ -138,14 +139,24 @@ export class ClaudeRunner implements ManagedRunner {
         canUseTool: this.canUseTool,
         disallowedTools: ['PushNotification'],
         permissionMode: 'default',
-        settingSources: ['user', 'project', 'local'],
+        settingSources: launch.toolPolicy ? [] : ['user', 'project', 'local'],
+        ...(launch.toolPolicy === 'chat-only' ? { tools: [] } : {}),
+        ...(launch.toolPolicy ? { maxTurns: 8 } : {}),
         // Secrets in launch.env stay in the environment (inherited by stdio MCP servers), never in argv.
         env: { ...process.env, ...launch.env, ...mcp.env, [MANAGED_ENV_FLAG]: '1' } as Record<string, string>,
         ...(launch.model ? { model: launch.model } : {}),
         ...(mcp.mcpServers ? { mcpServers: mcp.mcpServers } : {}),
         ...(plugins ? { plugins } : {}),
         hooks: {
-          ...(launch.writeRoot || launch.readGuard ? { PreToolUse: guardHooks(launch) } : {}),
+          ...(launch.writeRoot || launch.readGuard || launch.toolPolicy ? { PreToolUse: [
+            ...guardHooks(launch),
+            ...(launch.toolPolicy === 'review-tools' ? [{ matcher: '.*', hooks: [async (input) => {
+              if (input.hook_event_name !== 'PreToolUse') return {};
+              const decision = await this.host.requestDecision({ agentId: this.id, sessionId: this.sid ?? this.id, toolName: input.tool_name, input: (input.tool_input ?? {}) as Record<string, unknown>, origin: 'managed' }, this.abort.signal);
+              return { hookSpecificOutput: { hookEventName: 'PreToolUse' as const, permissionDecision: decision.behavior === 'allow' ? 'allow' as const : 'deny' as const,
+                ...(decision.behavior === 'allow' && decision.updatedInput ? { updatedInput: decision.updatedInput } : {}), permissionDecisionReason: decision.behavior === 'deny' ? decision.message : 'Operator tool review.' } };
+            }] } satisfies HookCallbackMatcher] : []),
+          ] } : {}),
           SubagentStart: [{ hooks: [async () => ({ hookSpecificOutput: { hookEventName: 'SubagentStart', additionalContext: WAYSTATION_CONTEXT } })] }],
         },
         ...(launch.resumeSessionId ? { resume: launch.resumeSessionId, forkSession: launch.fork ?? true } : {}),
@@ -267,6 +278,9 @@ export class ClaudeRunner implements ManagedRunner {
   }
 
   private canUseTool: CanUseTool = async (toolName, input, options) => {
+    if (this.launch.toolPolicy === 'chat-only') return { behavior: 'deny', message: 'Tools are disabled for this conversation-only agent.' };
+    // Review policy is enforced in PreToolUse even for normally pre-approved tools.
+    if (this.launch.toolPolicy === 'review-tools') return { behavior: 'allow', updatedInput: input };
     // A question for the operator is always held for an answer, intercepting or not.
     if (toolName === ASK_TOOL) return this.askOperator(input, options?.signal);
     if (!this.intercepting) return { behavior: 'allow', updatedInput: input };

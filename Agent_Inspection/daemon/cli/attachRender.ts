@@ -1,3 +1,4 @@
+import { providerLabel, managedProvider } from '../../shared/agentProviders.ts';
 import { describeToolInput } from '../domain/text.ts';
 import type { Agent, AgentEvent, AgentStatus, EventKind, PendingInterception } from '../domain/types.ts';
 import type { TaskStatus, TeamLogEntry, TeamLogKind, TeamTask, TeamView } from '../teams/types.ts';
@@ -113,7 +114,7 @@ export function renderMembers(team: TeamView, agents: readonly Agent[]): Line[] 
     const agent = member.agentId ? agents.find((candidate) => candidate.id === member.agentId) : undefined;
     const state = member.terminal ? 'in your CLI' : member.merged ? 'merged'
       : !member.agentId ? 'not started' : agent ? STATUS_WORD[agent.status] : 'exited';
-    const kind = `${member.role} · ${member.vendor === 'claude' ? 'Claude' : 'Codex'}${member.model ? ` ${member.model}` : ''}`;
+    const kind = `${member.role} · ${providerLabel(member)}${member.model ? ` ${member.model}` : ''}`;
     return line(`  ${member.name.padEnd(12)} ${kind.padEnd(24)} ${state.padEnd(15)} ${member.branch}`);
   });
 }

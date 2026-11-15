@@ -1,0 +1,100 @@
+/* Human tools use the canvas's existing console palette and typography. */
+.canvas-stage { isolation: isolate; }
+.planning-world { position: absolute; inset: 0; pointer-events: none; }
+.planning-heading { position: absolute; top: 16px; left: 20px; z-index: 11000; display: grid; gap: 2px; max-width: min(340px, 45%); padding: 8px 10px; border-radius: 8px; background: var(--console-bg); }
+.planning-heading input { width: 100%; min-width: 0; padding: 0; border: 0; outline-offset: 3px; background: transparent; color: var(--console-text); font: inherit; font-size: 16px; font-weight: 600; }
+.planning-heading span { color: var(--faint); font-size: 11px; }
+.planning-heading .planning-save-error { color: var(--red-text); }
+.planning-top-actions { position: absolute; right: 18px; top: 22px; z-index: 11001; display: flex; gap: 5px; }
+.planning-top-actions button, .planning-selection button, .planning-share button, .planning-ask-board, .planning-empty button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 6px 11px; border: 1px solid var(--console-line); border-radius: 7px; background: var(--deep); color: var(--console-text); font: inherit; font-size: 12px; cursor: pointer; }
+.planning-top-actions button:hover:not(:disabled), .planning-selection button:hover, .planning-share button:hover, .planning-ask-board:hover, .planning-empty button:hover { background: var(--deep-2); }
+.planning-top-actions button:disabled { opacity: .4; cursor: default; }
+.planning-top-actions svg, .planning-palette svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.planning-palette { position: absolute; top: 50%; left: 14px; transform: translateY(-50%); z-index: 11000; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px; border: 1px solid var(--deep-line); border-radius: 12px; background: var(--deep); }
+.planning-palette button { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--faint); cursor: pointer; }
+.planning-palette button:hover { background: var(--deep-2); color: var(--on-deep); }
+.planning-palette button[aria-pressed="true"] { background: var(--panel-3); color: var(--text); }
+.planning-divider { width: 24px; height: 1px; margin: 3px 0; background: var(--deep-2); }
+.planning-options { position: absolute; left: 78px; top: 50%; z-index: 11000; display: grid; gap: 10px; padding: 9px; background: var(--deep); border: 1px solid var(--deep-line); border-radius: 8px; }
+.planning-swatch { width: 18px; height: 18px; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; background: var(--planning-paper); }
+.planning-swatch[aria-pressed="true"] { outline: 2px solid var(--line); outline-offset: 3px; }
+.planning-color-sand { --planning-paper: var(--amber); --planning-ink: var(--amber-text); --planning-shape: var(--amber); --planning-shape-ink: var(--amber-text); }
+.planning-color-mint { --planning-paper: var(--green); --planning-ink: var(--text); --planning-shape: var(--green); --planning-shape-ink: var(--green-text); }
+.planning-color-rose { --planning-paper: var(--red-soft); --planning-ink: var(--red-text); --planning-shape: var(--deep-2); --planning-shape-ink: var(--red-text); }
+.planning-color-blue { --planning-paper: var(--panel-3); --planning-ink: var(--text); --planning-shape: var(--deep-2); --planning-shape-ink: var(--on-deep); }
+.planning-node { position: absolute; transform-origin: top left; display: flex; flex-direction: column; min-width: 100px; min-height: 70px; pointer-events: auto; color: var(--planning-ink); background: var(--planning-paper); border-radius: 3px; box-shadow: 0 6px 20px color-mix(in srgb, var(--shadow-ink) 33%, transparent); cursor: move; touch-action: none; }
+.planning-node-selected { outline: 2px solid var(--line-strong); outline-offset: 4px; }
+.planning-node-handle { display: flex; align-items: center; justify-content: space-between; flex: none; height: 30px; padding: 0 13px; font-size: 11px; font-weight: 600; opacity: .8; user-select: none; }
+.planning-handle-dots { font-size: 16px; letter-spacing: 1px; }
+.planning-node textarea { display: block; flex: 1; width: 100%; min-height: 0; padding: 6px 18px 20px; resize: none; border: 0; border-radius: 0; outline-offset: -3px; background: transparent; color: inherit; font: inherit; font-size: 20px; line-height: 1.4; caret-color: currentColor; touch-action: auto; }
+.planning-node textarea::placeholder { color: inherit; opacity: .8; }
+.planning-node textarea::selection, .planning-image-caption::selection { background: var(--deep-2); color: var(--on-deep); }
+.planning-node-resize { position: absolute; bottom: 1px; right: 1px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; background: transparent; color: inherit; cursor: nwse-resize; touch-action: none; }
+.planning-shape { border: 1px solid var(--planning-shape-ink); background: var(--planning-shape); color: var(--planning-shape-ink); border-radius: 12px; box-shadow: none; }
+.planning-shape textarea { text-align: center; }
+.planning-text { box-shadow: none; background: transparent; color: var(--planning-paper); }
+.planning-text .planning-node-handle { opacity: 0; }
+.planning-text:hover .planning-node-handle, .planning-text.planning-node-selected .planning-node-handle { opacity: .8; }
+.planning-text textarea { padding: 0 12px 12px; font-size: 24px; font-weight: 600; }
+.planning-image { overflow: hidden; background: var(--deep); color: var(--on-deep); border-radius: 8px; }
+.planning-image .planning-node-handle { position: absolute; top: 0; left: 0; right: 0; z-index: 1; background: var(--deep); opacity: 0; }
+.planning-image:hover .planning-node-handle, .planning-image.planning-node-selected .planning-node-handle { opacity: 1; }
+.planning-image img { width: 100%; height: calc(100% - 38px); object-fit: contain; pointer-events: none; }
+.planning-image-caption { width: calc(100% - 24px); min-height: 38px; padding: 0 10px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; }
+.planning-stroke { position: absolute; overflow: visible; pointer-events: none; z-index: 80; }
+.planning-stroke-hit { pointer-events: stroke; cursor: move; touch-action: none; }
+.planning-stroke-selected { filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--shadow-ink) 40%, transparent)); }
+.planning-create-surface { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 10000; touch-action: none; cursor: crosshair; }
+.planning-pan-surface { cursor: grab; }
+.canvas-stage-panning .planning-pan-surface { cursor: grabbing; }
+.planning-selection { position: absolute; top: 83px; right: 18px; z-index: 11000; display: flex; align-items: center; gap: 5px; padding: 5px; border: 1px solid var(--console-line); border-radius: 9px; background: var(--deep); }
+.planning-selection > span { padding: 0 5px; color: var(--faint); font-size: 11px; }
+.planning-selection button:first-of-type, .planning-empty button { background: var(--panel-3); color: var(--text); border-color: transparent; }
+.planning-selection button:first-of-type:hover, .planning-empty button:hover { background: var(--panel-3); }
+.planning-share { position: absolute; top: 68px; right: 18px; z-index: 12000; width: min(320px, calc(100% - 36px)); display: grid; gap: 10px; padding: 18px; border: 1px solid var(--deep-line); border-radius: 12px; background: var(--deep); color: var(--on-deep); box-shadow: 0 12px 30px color-mix(in srgb, var(--shadow-ink) 40%, transparent); }
+.planning-share h3 { margin: 0; font: inherit; font-size: 15px; font-weight: 600; }
+.planning-share p { margin: 0; color: var(--faint); font-size: 13px; line-height: 1.5; }
+.planning-share button { justify-content: flex-start; }
+.planning-share button:disabled { opacity: .45; cursor: default; }
+.planning-share .planning-share-note { font-size: 11px; }
+.planning-empty { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: min(440px, calc(100% - 170px)); z-index: 1; display: grid; justify-items: center; gap: 14px; color: var(--faint); text-align: center; cursor: default; }
+.planning-empty h2 { margin: 0; color: var(--console-text); font-family: inherit; font-size: 24px; line-height: 1.2; font-weight: 600; text-wrap: balance; }
+.planning-empty p { margin: 0; color: var(--faint); font-size: 14px; line-height: 1.6; }
+.planning-empty small { color: var(--faint); font-size: 11px; }
+.planning-ask-board { position: absolute; top: 85px; right: 18px; z-index: 11000; }
+.planning-agent-form { display: grid; gap: 14px; }
+.planning-agent-form p { margin: 0; font-size: 13px; line-height: 1.5; }
+.planning-agent-form label { display: grid; gap: 5px; font-size: 13px; }
+.planning-agent-form details { font-size: 12px; }
+.planning-agent-form pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow-y: auto; }
+.planning-agent-form summary { cursor: pointer; }
+.planning-recovery { position: absolute; top: 125px; left: 50%; transform: translateX(-50%); z-index: 12000; width: min(460px, calc(100% - 30px)); padding: 16px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--deep); color: var(--console-text); box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-ink) 47%, transparent); }
+.planning-recovery strong { font-size: 15px; }
+.planning-recovery p { margin: 6px 0 12px; color: var(--faint); font-size: 13px; line-height: 1.5; }
+.planning-recovery button { padding: 7px 10px; margin: 3px 5px 3px 0; border: 1px solid var(--deep-line); border-radius: 6px; background: var(--deep-2); color: var(--console-text); font: inherit; font-size: 12px; cursor: pointer; }
+.planning-recovery button:focus-visible, .planning-stroke:focus-visible, .planning-node-resize:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 3px; }
+.planning-heading input:focus-visible, .planning-top-actions button:focus-visible, .planning-palette button:focus-visible, .planning-swatch:focus-visible, .planning-selection button:focus-visible, .planning-share button:focus-visible, .planning-ask-board:focus-visible, .planning-empty button:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 3px; }
+.console-canvas .canvas-hint { top: auto; bottom: 58px; left: 16px; max-width: calc(100% - 32px); }
+.console-canvas .canvas-dock { left: 16px; transform: none; max-width: calc(100% - 300px); }
+@media (max-width: 1000px) { .console-canvas .canvas-dock { max-width: calc(100% - 32px); bottom: 52px; } .console-canvas .canvas-hint { display: none; } .canvas-tools { bottom: 10px; } }
+@media (max-width: 560px) {
+  .planning-heading { left: 7px; top: 8px; max-width: calc(100% - 135px); padding: 6px; }
+  .planning-heading input { font-size: 14px; }
+  .planning-heading span { font-size: 10px; }
+  .planning-heading span:not(.planning-save-error) { max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .planning-top-actions { top: 13px; right: 8px; gap: 3px; }
+  .planning-top-actions button { min-width: 30px; padding: 5px; font-size: 11px; }
+  .planning-top-actions > button:nth-child(2) { display: none; }
+  .planning-palette { left: 7px; gap: 2px; padding: 4px; }
+  .planning-palette button { width: 32px; height: 34px; }
+  .planning-options { left: 7px; top: auto; bottom: 108px; display: flex; padding: 9px; }
+  .planning-selection { top: 69px; right: 8px; gap: 3px; }
+  .planning-selection > span { display: none; }
+  .planning-selection button { padding: 5px 7px; }
+  .planning-ask-board { top: 69px; right: 8px; font-size: 11px; }
+  .planning-empty { width: calc(100% - 100px); left: 57%; top: 43%; gap: 12px; }
+  .planning-empty h2 { font-size: 20px; }
+  .planning-empty p { font-size: 12px; }
+  .planning-empty small { display: none; }
+  .planning-share { right: 8px; top: 58px; }
+}

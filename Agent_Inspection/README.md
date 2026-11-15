@@ -6,9 +6,17 @@
 
 ## Why Waystation
 
-- **One view across vendors.** Claude Code, Codex, Aider, Gemini CLI, Cursor Agent, OpenCode and Goose sessions all show up together, whether they run in a terminal, VS Code or from Waystation itself.
+Construct [multipurpose agents in the Architecture workspace](docs/architecture-workspace.md), with [executable resources and an activity dashboard](docs/agent-resources.md). Configure SQLite/PostgreSQL memory, build JavaScript or HTTP tools, and deliver outputs to files or webhooks. Choose a restrained coding runtime or an OpenAI, Anthropic, or compatible API brain, keeping keys separate from the graph. Run agents and manage history, logs, approvals, cancellations, and retries across architectures. Designs save locally, with undo for manual and architect edits.
+
+The [agent platform](docs/agent-platform.md) adds immutable local deployments, persistent agent conversations, reusable versioned skills/tools/memory, Tavily search, service connections, environment limits, a durable run queue, schedules and scoped webhook triggers. Inspect each deployed agent's architecture and download its traces and output artifacts. Draft edits stay separate from deployed versions. [Central secrets and agent quality tools](docs/agent-evaluation.md) add reusable credential references, local JavaScript/Docker sandboxes, versioned datasets, deterministic/code/LLM evaluators, experiments and result comparison.
+
+Agents can now [control Waystation through its built-in MCP](docs/waystation-mcp.md): create notes and tiles, open files and local previews, inspect their workspace, and show results in the canvas. New Waystation-managed sessions receive the tools automatically; `npm run mcp:configure -- --apply` connects external coding agents.
+
+Create and select [Git worktrees on the canvas](docs/git-worktrees.md), then launch Claude Code, Codex, or console tiles in them. Use a **Worktree** tile to keep a branch workspace manager on your board, or enable **Use a Git worktree** while creating a terminal tile.
+
+- **One view across vendors.** Native integrations, configured ACP agents and recognized CLI runtimes appear together. Process observations are labeled separately from managed conversations.
 - **Intercept and approve tool calls.** Hold an agent's next tool call, then approve it, edit its input, or deny it with an instruction. You can also send messages, stop agents, delegate their work and attach skills.
-- **Mixed Claude + Codex teams.** Members share a task board and message each other. Each one works in its own git worktree sandbox, and you merge their work when you're ready.
+- **Mixed provider teams.** Choose Claude, Codex, Copilot or connected ACP agents. Members share a task board and message each other, work in separate git worktrees, and merge when you're ready.
 - **Runaway guard and cost estimates.** Each card shows its model, an estimated cost and how full its context is. The guard steps in when an agent loops, keeps failing or goes over a spend limit.
 - **The animated station.** Live sessions appear as a small illustrated crew, with an office for each project folder, so you can tell at a glance who is working, who is waiting and who needs you.
 
@@ -62,7 +70,7 @@ Spawned Claude Code and Codex subagents are linked to their parent sessions. Das
 
 Select a session to open **Overview**, **Activity**, or **Details**. Overview shows its current state and available actions. Activity starts with conversation messages; use **Tool calls** or **Everything** to inspect recorded tools and session updates. Tool payloads and technical session identifiers are expandable, and recorded activity is searchable. Observed sessions explain where to send messages rather than showing unavailable controls.
 
-The interface uses a locally hosted [Source Sans 3](https://github.com/adobe-fonts/source-sans) font with Georgia headings. Its OFL license is included in `web/public/fonts/SourceSans3-LICENSE.md`.
+The interface is dark by default (with a light theme toggle in the top bar) and uses locally hosted [Geist Sans and Geist Mono](https://github.com/vercel/geist-font). Their OFL license is included in `web/public/fonts/Geist-LICENSE.txt`.
 
 ## What you can do with each agent
 
@@ -127,6 +135,15 @@ It steps in one level at a time:
 - `AGENT_TOWER_AGENT_BUDGET_USD=5`: per-agent spend limit.
 - `AGENT_TOWER_BREAKER_HARD_STOP=1`: allow the last level, stopping the agent.
 
+**Daily spend cap** (**Usage & schedules → Usage**). Set a cap for all agents together and per project folder, per local day (list-price estimates).
+- Over a cap, scheduled runs and software-factory stages wait instead of launching, and running agents launched here are moved to approval-per-tool-call through the runaway guard (once per agent per day; **Clear guard** lets one carry on). Agents you launch yourself are never blocked.
+- Optionally hold schedules and factory stages while a vendor's plan window (Usage windows) is at 80, 90 or 95% or more. A waiting factory stage starts by itself when the cap or window allows; a schedule keeps retrying until its normal 10-minute catch-up window ends.
+- A banner at the top of the workspace appears when a cap is nearly used (80%) or exceeded.
+
+**Agents editing the same file.** When two agents in the same checkout (not separate worktrees, and not a parent with its own subagent) write the same file within 10 minutes, both cards show **Shared file** and a panel lists the file. **Tell them** messages each agent that can receive messages; **Move … to a worktree** creates a `waystation/<name>-<id>` branch worktree from the last commit, starts a new agent there with a summary of the original's recent work, and stops the original. Uncommitted edits stay in the shared checkout.
+
+**Keyboard.** `Ctrl K` opens a command palette for agents, teams, views and actions. `N` / `Shift N` step through everything that needs you (held tool calls and questions first, then guard alarms, waiting agents and shared files). On a focused tool call: `A` approves, `E` edits the input, `D` denies with an instruction, `Ctrl Enter` sends, `Esc` cancels. On a question: `1`–`9` pick an option, `Enter` sends. Shortcuts never fire while you type in a field, a terminal or the code editor.
+
 **Rename** any agent from its details. The name is kept across tower restarts.
 
 **Restart & continue** (agents launched here):
@@ -186,7 +203,7 @@ The console shows recent history, then streams live activity. It is a view onto 
 
 ## Agent teams
 
-Open **Teams** in the sidebar and click **New team** to put several agents on one goal. Teams can mix models: for example a Claude lead, a Codex builder and a Claude reviewer on Haiku. Each member can have its own model.
+On the **Console board**, click **Teams** and then **New team** to put several agents on one goal. On the canvas, each team appears as a frame around its members; **Open team** shows its task board, conversation and outputs. (The board's **Channels** button is different: it lets any running sessions message each other.) Teams can mix models: for example a Claude lead, a Codex builder and a Claude reviewer on Haiku. Each member can have its own model.
 
 How a team works:
 
@@ -207,6 +224,7 @@ How a team works:
   - If everyone goes idle with work left, the lead is prompted once. If nothing changes after that, the team pauses.
   - A paused team never loops. **Resume** adds budget and time.
   - Intercept still works on Claude members.
+- **Deliverables.** The **Outputs** tab collects the completion summary, clickable file cards, and branch diffs. Preview Markdown, text, CSV/TSV tables and images in the app; open supported files in a new tab, download them, or open their containing folder. Members publish files with `register_output` (title, description, path inside their own worktree; up to 20 MB each). Saved copies survive worktree cleanup and tower restarts. Older runs need their files published by a member before cards appear.
 - **Shared log.** The team page shows the channel, task changes, merges and (under **Everything**) each member's tool activity. Agents see the channel and the board, not each other's raw transcripts.
 - **You merge.** **Diff** shows a member's changes since the team started. **Merge** commits the worktree and merges its branch into the base branch, but only if your checkout is on that branch with no uncommitted changes. On a conflict, nothing is changed.
 - **Disband** stops all members and removes their worktrees. Unmerged branches are kept.
@@ -214,6 +232,12 @@ How a team works:
 The project folder must be the top of its own git repository; a subfolder of a larger repo is refused. If the folder isn't a repo yet, tick **Set up git**. Worktrees contain only committed files.
 
 Teams survive a tower restart. They come back as **Stopped**, and **Resume** relaunches their members.
+
+## Software factory
+
+Open **Software factory** to configure a project’s reusable planner, builder and reviewer, required checks, approval points and repair limits. Its six sections are **Overview**, **Work**, **Agents**, **Workflows**, **Quality**, and **Settings**. Queue scoped requests with acceptance criteria, approve plans, inspect real branch diffs and check evidence, then accept and explicitly merge a candidate. Active work recovers paused after a restart. Factory decisions also appear in **Needs attention**.
+
+See the [software factory guide](docs/software-factory.md) for setup, lifecycle behavior, first-version limits, and verification commands.
 
 ## Hooks
 
@@ -249,6 +273,33 @@ Safety rules:
   - instructions and approval decisions
 - Stop only targets processes the tower discovered. Before stopping, it re-checks the process name and start time (to guard against a reused PID), and it never targets VS Code, terminals or shells.
 - Event history is clipped, scrubbed of common secret formats, and kept for 7 days.
+
+## Remote access (optional)
+
+Reach your station from a phone or another computer on your private network. It is off until you turn it on in **Usage & schedules → Setup checks → Remote access**.
+
+1. Install [Tailscale](https://tailscale.com) on this PC and on your phone, signed in to the same tailnet.
+2. On this PC, run `tailscale serve --bg 4318` (or the gateway port you choose). Tailscale publishes the gateway with HTTPS to your own devices only.
+3. In Waystation, turn on remote access and enter the machine's Tailscale name (for example `my-pc.tail1234.ts.net`).
+4. Choose what the device may do and click **Show a pairing code**. Open `https://my-pc.tail1234.ts.net` on the phone and enter the code. It is valid once, for 5 minutes.
+
+What each device may do:
+
+| Access | Allows |
+|---|---|
+| **View only** | The live station, agent activity and transcripts (including anything an agent printed), usage, schedules and history. |
+| **Triage** (default) | Also review diffs, approve, edit or deny tool calls, answer questions, message, interrupt and stop agents, pause and resume teams, approve team plans. Approving and messaging can make an agent run commands, so a Triage device can run code through your agents: protect it like a key. |
+| **Full control** | Everything, including terminals, files, browser tiles and launching agents. Only for devices you fully trust. |
+
+How it is protected:
+- The gateway listens on `127.0.0.1` only; Waystation never opens a port to your network. Tailscale Serve (or another tunnel you set up) publishes it.
+- Each device holds its own random token in an HttpOnly, SameSite=Strict cookie (Secure over HTTPS). Waystation stores only its SHA-256. Devices never see the local access token: the gateway adds it when it forwards an allowed request.
+- Anything not explicitly allowed for a level needs Full control. Remote-access settings, pairing, hook installation, agent bridges and the audit log are never reachable remotely.
+- Removing a device, or changing what it may do, closes its live connections at once. A device unused for 30 days must pair again. Every remote change is recorded in the audit log with the device name.
+- Remote connections to the live feed are receive-only: a device can never act as the desktop notification sink or a VS Code terminal bridge.
+- Over HTTPS the device cookie is a `__Host-` cookie, so other services published under the same Tailscale name never receive it.
+- Pairing needs a code shown on the desktop, so an agent cannot pair a device through the gateway. An agent that already holds the local access token (see Known limits) could start a pairing through the local API; check **Paired devices** if something looks wrong.
+- The 5 wrong-code limit applies to the one active code, so another device on your tailnet could keep invalidating codes (an annoyance, not a way in). Start a new code if pairing keeps failing.
 
 ## Where things live
 
@@ -302,3 +353,58 @@ npm run typecheck
 - Codex members can't commit inside their sandbox. The tower commits their worktree when you merge.
 - Codex threads are matched to running Codex processes heuristically and shown as "likely live" for up to an hour after their last write.
 - Detection of other CLIs (Aider, Gemini CLI and so on) is by process name and command line, so it isn't exhaustive.
+
+
+## Automatic agent discovery
+
+Waystation checks running Windows processes every four seconds. Dedicated Claude and Codex collectors still supply their richer session data. A shared discovery catalog recognizes Copilot (including its VS Code runtime), Aider, Gemini CLI, Cursor Agent, OpenCode, Goose, Amp, Qwen Code, Auggie, Crush, Cline CLI, Kilo Code CLI and Kiro CLI. Detection depends on the process executable or Node/Python entry-script path; installation alone does not create a live card.
+
+For an unfamiliar tool, open **Usage & schedules ? Setup checks ? Agent discovery**. Save its name and executable (for example `my-agent.exe`), or its entry-script package (for example `@example/coding-agent`). Rules are saved locally and apply without a restart. They identify running processes; they never launch the executable. Remove a custom rule to stop recognizing it without stopping its process.
+
+Detected providers retain their names in provider filters, cards, the station, details and session history. The usage view lists runtimes whose model/token/cost data is unavailable without counting them as zero usage. Process identity includes creation time, so a reused PID creates a separate history record. Process command lines are used only in memory and are not returned by discovery or saved in history.
+
+Basic discovery observes a runtime, not individual conversations. It does not expose messages, tool activity, working folders, approval requests, model usage or conversation recovery. Editor runtimes may serve multiple conversations and cannot be stopped from Waystation. Standalone detected processes can be stopped only after verifying their creation time and executable identity. Managed launches, team tasks, templates and schedules use the shared provider catalog, including Claude, Codex and GitHub Copilot. Other tools need a provider adapter to gain managed capabilities. Providers hidden entirely inside an editor host, remote/WSL sessions, unusual runtime flags and unrecognized entry scripts need an additional discovery rule or dedicated integration. Waystation does not infer that every arbitrary process is a coding agent.
+
+
+## Managed providers and GitHub Copilot
+
+The shared provider catalog (`shared/agentProviders.ts`) declares each managed adapter and its capabilities. The managed runner registry supplies the implementation. Launching, chat, approvals, interruption, history/recovery, model changes, templates, schedules, skills, context docs, MCP servers, notifications, team worktrees/task delivery, output review and runaway protection all consume the common runner lifecycle. Provider selectors enumerate the catalog rather than a fixed Claude/Codex pair.
+
+GitHub Copilot uses the official `@github/copilot-sdk` with its bundled runtime. Open **New agent** and choose **Copilot (Agent SDK)**, or choose Copilot for a team member or scheduled task. Model choices come from your signed-in Copilot account; custom model names remain available.
+
+If the SDK reports that you are signed out, use **Sign in to Copilot** in the launch form or **Usage & schedules / Setup checks / GitHub Copilot**. Waystation uses the SDK's browser sign-in flow in a session with no tools and sends no model prompt. VS Code and the standalone SDK may use separate sign-ins. Credentials stay in Copilot's credential store and are never returned to the browser or saved in Waystation history.
+
+The Usage page and `/usage` show the account allowances returned by Copilot, including reported percentages and reset times. Managed sessions report model, input/output/cache tokens and context utilization. Live usage samples are saved locally and deduplicated by event id. Copilot's premium-request multiplier is not a dollar amount; Waystation does not apply Claude/OpenAI API prices to Copilot subscription usage. External editor runtimes remain process observations; their per-conversation metrics cannot be inferred from the process list.
+
+Copilot supports editable pre-tool approvals, permission review, questions to the operator, cancellation and session recovery through the SDK. Claude plugin bundles and CLI handoff remain provider-specific capabilities; use shared skills/docs/MCP and managed Copilot sessions for those workflows. Team file tools check worktree paths and private state, as with the Claude adapter; shell commands are not a security boundary.
+
+A newly detected arbitrary executable cannot gain an unknown messaging, session or billing API through detection alone. ACP-compatible agents can now use the shared adapter described below without changes to application code. Adding a process discovery rule alone still supplies visibility only.
+
+## Dynamic provider connections
+
+Waystation refreshes its provider registry every ten seconds. Installed Gemini CLI (`gemini --acp`), OpenCode (`opencode acp`), Qwen Code (`qwen --acp`) and Goose (`goose acp`) register automatically from PATH, including supported Windows npm shims. Their usual user configuration files also trigger registration; a missing executable is shown as unavailable. They use their existing sign-in. Installation creates a provider choice, not a running session: select **New agent / Gemini CLI**, for example, to launch one. Sign in using the agent's own CLI first. The installed version must support the documented startup command and ACP v1.
+
+Custom ACP agents configured in Zed's `agent_servers` are imported automatically from `~/.config/zed/settings.json` and `%APPDATA%/Zed/settings.json`. Only existing local command definitions are imported; registry entries requiring downloads are not installed or executed during discovery. JSON comments and trailing commas are accepted.
+
+For other ACP-compatible tools, open **Usage & schedules / Setup checks / Connected agent providers / Connect another ACP agent**. Enter its executable and documented argument array once. Alternatively, edit `%LOCALAPPDATA%/agent-tower/providers.json` (`AGENT_TOWER_HOME` overrides the directory) or `~/.waystation/providers.json`:
+
+```json
+{
+  "providers": [
+    {
+      "id": "my-agent",
+      "label": "My coding agent",
+      "command": "C:/Tools/my-agent.exe",
+      "args": ["--acp"]
+    }
+  ]
+}
+```
+
+Arguments are separate strings, never a shell command. An optional `env` object is forwarded to the subprocess but excluded from provider API responses. Keep credentials in the agent's own sign-in store where possible. Provider IDs must be unique lowercase names and cannot replace native integrations. File edits update the running app without rebuilding or restarting. Invalid edits retain the last valid configuration and show a setup message. Removing a provider prevents new launches; its existing sessions keep running. Configuration changes apply to subsequent launches.
+
+The shared ACP v1 runner supplies persistent messaging, streamed agent/tool events, approve/deny permission requests, cancellation, stop, file services, model selection when exposed as session configuration, and recovery when `loadSession` is advertised. It forwards shared skills/docs instructions and MCP connections, including the team bridge and notification tools. Teams, schedules, templates, history, output review and runaway protection use the same managed lifecycle as native adapters. A provider must support the relevant protocol feature; unsupported recovery or model selection produces an explicit explanation. ACP approvals do not support rewriting tool arguments. Shell commands remain outside the file-tool worktree guard.
+
+Context utilization is shown when the agent reports it. ACP's experimental token usage field has inconsistent per-turn/session semantics across implementations. Set `"usageMode": "turn"` or `"usageMode": "session"` only when the agent documents its reporting scope; the connection form offers both. Otherwise, raw readings appear in agent details without being added to usage totals. Declared usage is persisted, cumulative reports are differenced, and per-turn reports are added individually. Context occupancy is never counted as consumed tokens. Missing reports are labeled unavailable. Account quotas and dollar costs are not inferred from ACP; those still require a provider-specific account adapter.
+
+See the [Gemini ACP documentation](https://geminicli.com/docs/cli/acp-mode/) and [ACP protocol](https://agentclientprotocol.com/protocol/overview) for the underlying interfaces. Non-ACP tools continue to require an adapter; Waystation never treats an arbitrary executable as protocol-compatible merely because it is running.

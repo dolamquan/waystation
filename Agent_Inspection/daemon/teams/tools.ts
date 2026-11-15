@@ -40,6 +40,11 @@ const schema = (properties: Record<string, unknown>, required: string[] = []) =>
   ({ type: 'object', properties, required, additionalProperties: false });
 
 const COMMON_TOOLS: readonly ToolDefinition[] = [
+  {
+    name: 'register_output',
+    description: 'Publish a deliverable as a clickable card in the team Outputs tab. Saves a copy of a file from your own worktree (maximum 20 MB). Register reports, images, tables and other final deliverables before marking a task done or finishing the team. Register again after revisions.',
+    inputSchema: schema({ title: str('Readable deliverable title'), description: str('What this file contains and why it matters'), path: str('File path inside your own worktree, relative or absolute') }, ['title', 'description', 'path']),
+  },
   { name: 'team_roster', description: 'List your teammates: name, role, model, focus, and what they are working on.', inputSchema: schema({}) },
   {
     name: 'post_message',

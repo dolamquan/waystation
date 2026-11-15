@@ -1,4 +1,5 @@
 import type { Agent } from '../domain/types.ts';
+import { managedProvider } from '../../shared/agentProviders.ts';
 import type { UsageWindowsReport, VendorWindows } from '../usage/windowTypes.ts';
 import { isValidModelName } from '../managed/modelName.ts';
 import {
@@ -71,13 +72,13 @@ export function untilText(ts: number | undefined, now: number): string | undefin
 const usd = (value: number | undefined): string | undefined =>
   value === undefined ? undefined : value > 0 && value < 0.01 ? '<$0.01' : `$${value.toFixed(2)}`;
 const toneFor = (percent: number): CommandRow['tone'] => (percent >= 90 ? 'bad' : percent >= 70 ? 'warn' : 'ok');
-const VENDOR_NAME = { claude: 'Claude', codex: 'Codex' } as const;
 
 // ── /usage, /cost, /context, /status ───────────────────────────────────────
 
 function sessionRows(agent: Agent): CommandRow[] {
   const usage = agent.usage;
   if (!usage) return [{ label: 'This session', value: 'No usage recorded yet', tone: 'muted' }];
+  if (usage.tokensReported === false) return [{ label: 'Tokens', value: 'Not reported by this agent', tone: 'muted' }];
   const t = usage.tokens;
   const total = t.input + t.output + t.cacheRead + t.cacheWrite5m + t.cacheWrite1h;
   return [
@@ -100,7 +101,7 @@ function limitRows(vendor: VendorWindows, now: number): CommandRow[] {
     : { label: 'Current 5-hour block (estimate)', value: 'No activity in the last 5 hours', tone: 'muted' };
   const week: CommandRow = { label: 'Last 7 days (estimate)', value: `${compactNumber(vendor.week.totalTokens)} tokens`, detail: usd(vendor.week.costUsd) };
   const none: CommandRow = { label: 'Plan limits', value: 'No live reading on this machine yet', tone: 'muted' };
-  return [...(real.length ? real : [none]), estimate, week];
+  return [...(real.length ? real : [{ ...none, value: vendor.message ?? none.value }]), ...(['claude', 'codex'].includes(vendor.vendor) ? [estimate] : []), week];
 }
 
 async function usage(deps: CommandDeps, agent: Agent): Promise<CommandResult> {
@@ -108,7 +109,7 @@ async function usage(deps: CommandDeps, agent: Agent): Promise<CommandResult> {
   const report = await deps.usageWindows().catch(() => undefined);
   const vendor = report?.vendors.find((v) => v.vendor === agent.vendor);
   const sections: CommandSection[] = [
-    ...(vendor ? [{ heading: `${VENDOR_NAME[vendor.vendor]} plan${vendor.planType ? ` (${vendor.planType})` : ''}`, rows: limitRows(vendor, now) }] : []),
+    ...(vendor ? [{ heading: `${managedProvider(vendor.vendor)?.label ?? vendor.vendor} plan${vendor.planType ? ` (${vendor.planType})` : ''}`, rows: limitRows(vendor, now) }] : []),
     { heading: 'This session', rows: sessionRows(agent) },
   ];
   return {
@@ -175,7 +176,7 @@ async function switchModel(deps: CommandDeps, agent: Agent, control: ClaudeContr
     deps.audit('set_model', agent.id, { model: wanted });
     return { title: 'Model', sections: [{ rows: [{ label: 'Now using', value: wanted, tone: 'ok' }] }], done: `Switched to ${wanted}` };
   }
-  if (agent.tier === 'A' && agent.vendor === 'codex' && !agent.inTerminal) {
+  if (agent.tier === 'A' && agent.vendor !== 'other' && !agent.inTerminal) {
     await deps.restartWithModel(agent.id, wanted);
     return { title: 'Model', sections: [{ rows: [{ label: 'Restarted on', value: wanted, tone: 'ok' }] }], done: `Restarted on ${wanted}` };
   }

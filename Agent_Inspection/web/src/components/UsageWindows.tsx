@@ -3,6 +3,8 @@ import { api } from '../api.ts';
 import { formatTokens, formatUsd, timeAgo } from '../format.ts';
 import type { ComputedWindow, PlanLimit, UsageWindowsReport, VendorWindows } from '../../../daemon/usage/windowTypes.ts';
 import { Icon } from './Icon.tsx';
+import { managedProvider } from '../../../shared/agentProviders.ts';
+import { useProviders } from '../useProviders.ts';
 
 /** The daemon caches the report for a minute, so polling faster gains nothing. */
 const POLL_MS = 60_000;
@@ -15,8 +17,8 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-const VENDOR_NAME: Record<VendorWindows['vendor'], string> = { claude: 'Claude', codex: 'Codex' };
 const SOURCE_TEXT: Record<PlanLimit['source'], string> = {
+  copilot: 'reported by Copilot',
   codex: 'reported by Codex',
   'claude-sdk': 'reported by Claude',
   'claude-transcript': 'reported by Claude Code',
@@ -64,7 +66,7 @@ function LimitMeter({ limit, now }: { readonly limit: PlanLimit; readonly now: n
     {percent !== undefined
       ? <div className="limit-track" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} aria-valuetext={`${value} ${expired ? 'at the last reading, window has since reset' : 'used'}`} aria-label={`${limit.label} plan usage`}><span style={{ width: `${percent}%` }} /></div>
       : <div className="limit-track limit-track-unavailable" aria-hidden="true" />}
-    <div className="usage-reset"><Icon name={expired ? 'refresh' : 'clock'} size={13} /><span>{reset ?? (limit.status ? STATUS_TEXT[limit.status] : 'Percentage not reported')}{limit.resetsAt && !expired ? ` · ${clock(limit.resetsAt, limit.resetsAt - now > DAY / 2)}` : ''}</span></div>
+    <div className="usage-reset"><Icon name={expired ? 'refresh' : 'clock'} size={13} /><span>{reset ?? (limit.status ? STATUS_TEXT[limit.status] : percent === undefined ? 'Percentage not reported' : 'Reset time not reported')}{limit.resetsAt && !expired ? ` · ${clock(limit.resetsAt, limit.resetsAt - now > DAY / 2)}` : ''}</span></div>
     <div className="usage-observed">Updated {timeAgo(limit.observedAt, now)} · {SOURCE_TEXT[limit.source]}{limit.status && !expired && (limit.status !== 'allowed' || percent === undefined) && <span className={`usage-limit-status status-${level}`}>{STATUS_TEXT[limit.status]}</span>}</div>
   </div>;
 }
@@ -97,12 +99,12 @@ function ComputedBlock({ title, window, note }: { readonly title: string; readon
 }
 
 function VendorCard({ vendor, now }: { readonly vendor: VendorWindows; readonly now: number }) {
-  const name = VENDOR_NAME[vendor.vendor];
+  const name = managedProvider(vendor.vendor)?.label ?? vendor.vendor;
   const block = vendor.block;
-  const defaults = [{ window: 'five_hour', label: '5-hour' }, { window: vendor.vendor === 'claude' ? 'seven_day' : 'weekly', label: 'Weekly' }];
+  const defaults = !['claude', 'codex'].includes(vendor.vendor) ? [] : [{ window: 'five_hour', label: '5-hour' }, { window: vendor.vendor === 'claude' ? 'seven_day' : 'weekly', label: 'Weekly' }];
   const otherLimits = vendor.limits.filter((limit) => !defaults.some((window) => window.window === limit.window));
   return <article className={`limit-vendor limit-vendor-${vendor.vendor}`} aria-labelledby={`limits-${vendor.vendor}`}>
-    <header><span className="usage-vendor-icon"><Icon name={vendor.vendor === 'claude' ? 'sparkle' : 'terminal'} size={24} /></span><div><h3 id={`limits-${vendor.vendor}`}>{name}</h3><span>Subscription usage</span></div>{vendor.planType && <span className="usage-plan-badge">{vendor.planType} plan</span>}</header>
+    <header><span className="usage-vendor-icon"><Icon name={vendor.vendor === 'claude' ? 'sparkle' : 'terminal'} size={24} /></span><div><h3 id={`limits-${vendor.vendor}`}>{name}</h3><span>{managedProvider(vendor.vendor)?.adapter === 'acp' ? 'Agent usage' : 'Subscription usage'}</span></div>{vendor.planType && <span className="usage-plan-badge">{vendor.planType} plan</span>}</header>
     <div className="limit-group usage-plan-windows" aria-label={`${name} plan percentages`}>
       <div className="usage-group-heading"><span>Plan limits</span><span className="usage-source-badge">Reported by {name}</span></div>
       {defaults.map((window) => {
@@ -110,14 +112,14 @@ function VendorCard({ vendor, now }: { readonly vendor: VendorWindows; readonly 
         return limit ? <LimitMeter key={window.window} limit={limit} now={now} /> : <MissingLimit key={window.window} label={window.label} />;
       })}
       {otherLimits.map((limit) => <LimitMeter key={limit.window} limit={limit} now={now} />)}
-      {vendor.limits.length === 0 && <p className="usage-no-reading">{vendor.vendor === 'claude' ? 'Claude hasn’t supplied a plan percentage yet. Refresh to check again.' : 'A percentage reading will appear after a Codex session reports its limits.'}</p>}
+      {(vendor.message || vendor.limits.length === 0) && <p className="usage-no-reading">{vendor.message ?? (vendor.vendor === 'claude' ? 'Claude hasn’t supplied a plan percentage yet. Refresh to check again.' : 'A percentage reading will appear after the provider reports its limits.')}</p>}
     </div>
     <details className="usage-local-details">
       <summary><span><Icon name="activity" size={15} />Local usage details<small>Tokens & estimated cost</small></span><Icon name="chevronDown" size={15} /></summary>
       <div className="limit-group">
         {block
           ? <ComputedBlock title="Current 5-hour block" window={block} note={`${resetText(block.end, now) ?? ''} (${clock(block.end, false)}), started ${clock(block.start, false)}`} />
-          : <p className="limit-none">No active 5-hour block. The next request starts one.</p>}
+          : <p className="limit-none">{!['claude', 'codex'].includes(vendor.vendor) ? 'Token counts cover sessions launched in Waystation that reported usage.' : 'No active 5-hour block. The next request starts one.'}</p>}
         <ComputedBlock title="Last 7 days" window={vendor.week} note={vendor.week.lastActivityAt ? `Last activity ${timeAgo(vendor.week.lastActivityAt, now)}` : 'No local activity'} />
       </div>
     </details>
@@ -130,6 +132,7 @@ interface UsageWindowsProps {
 }
 
 export function UsageWindows({ refreshKey = 0 }: UsageWindowsProps) {
+  const { providers } = useProviders();
   const [report, setReport] = useState<UsageWindowsReport>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -153,7 +156,7 @@ export function UsageWindows({ refreshKey = 0 }: UsageWindowsProps) {
     void load();
     const poll = setInterval(() => void load(), POLL_MS);
     return () => clearInterval(poll);
-  }, [load, refreshKey]);
+  }, [load, refreshKey, providers]);
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(tick);
@@ -165,7 +168,7 @@ export function UsageWindows({ refreshKey = 0 }: UsageWindowsProps) {
     {!report && !error && <div className="workspace-loading" role="status"><Icon name="clock" />Reading plan usage…</div>}
     {report && <>
       <div className="limit-vendors">{report.vendors.map((vendor) => <VendorCard key={vendor.vendor} vendor={vendor} now={now} />)}</div>
-      <div className="usage-measurement-note"><Icon name="info" size={16} /><div><p>Plan percentages are reported by Claude and Codex. Local token totals are shown in each card’s usage details.</p><details><summary>How usage is measured</summary><p>Token counts and costs are estimates from this machine’s sessions at list prices. Local 5-hour blocks start at the hour of your first request after the previous block ended. Local totals exclude other devices and web usage; plan percentages reflect the provider’s reported usage. A missing percentage stays unavailable rather than being estimated from tokens.</p></details></div></div>
+      <div className="usage-measurement-note"><Icon name="info" size={16} /><div><p>Account allowances are reported by each provider. Copilot local token totals cover sessions launched in Waystation.</p><details><summary>How usage is measured</summary><p>Local token counts cover this machine. Dollar estimates use API list prices where applicable; Copilot subscription usage is not converted to dollars. Local 5-hour blocks start at the hour of your first request after the previous block ended. Account percentages can include other devices and apps. A missing percentage stays unavailable.</p></details></div></div>
     </>}
   </section>;
 }

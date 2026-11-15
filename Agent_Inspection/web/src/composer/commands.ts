@@ -28,7 +28,7 @@ export interface ComposerCommand {
 }
 
 export interface ComposerContext {
-  readonly agent: Pick<Agent, 'tier' | 'vendor' | 'status' | 'canInstruct' | 'breaker' | 'inTerminal' | 'sessionId' | 'slashCommands' | 'stopBlockedReason' | 'cwd'>;
+  readonly agent: Pick<Agent, 'tier' | 'vendor' | 'status' | 'canInstruct' | 'breaker' | 'inTerminal' | 'sessionId' | 'slashCommands' | 'stopBlockedReason' | 'cwd' | 'terminalConnected'>;
   /** A tool call from this agent is waiting for a decision. */
   readonly hasPending: boolean;
   readonly canIntercept: boolean;
@@ -67,9 +67,17 @@ const SPECS: readonly CommandSpec[] = [
 /** Live SDK controls exist only for Claude agents launched here, while Waystation (not your terminal) runs them. */
 const launchedClaude = (ctx: ComposerContext) => ctx.agent.vendor === 'claude' && ctx.agent.tier === 'A' && !ctx.agent.inTerminal && live(ctx);
 
+/**
+ * A session started in your own VS Code terminal, with the Waystation extension connected: an idle message is typed
+ * into that terminal and submitted, so Claude Code runs a slash command there exactly as if you had typed it.
+ * (A hook can only add text to the conversation, so hook-only sessions cannot run commands.)
+ */
+const typesIntoTerminal = (ctx: ComposerContext) => ctx.agent.vendor === 'claude' && ctx.agent.tier !== 'A' && !!ctx.agent.terminalConnected && live(ctx);
+
 function unavailableReason(ctx: ComposerContext, terminalOnly: boolean): string {
   const cli = ctx.canOpenCli ? ' Use /cli to open it there.' : '';
   if (ctx.agent.inTerminal) return 'This agent is open in your terminal right now; type it there.';
+  if (!terminalOnly && typesIntoTerminal(ctx)) return 'Wait until Claude is idle: the command is then typed into your VS Code terminal.';
   if (terminalOnly) return `This needs Claude Code’s own terminal screen.${cli}`;
   return `This runs inside the session, and Waystation can’t type into a session running in your terminal or editor.${cli}`;
 }
@@ -77,11 +85,14 @@ function unavailableReason(ctx: ComposerContext, terminalOnly: boolean): string 
 function claudeCommands(ctx: ComposerContext): ComposerCommand[] {
   const reported = new Map((ctx.agent.slashCommands ?? []).map(command => [command.name.toLowerCase(), command] as const));
   const canRun = launchedClaude(ctx);
+  const canType = typesIntoTerminal(ctx) && ctx.agent.status === 'idle';
   const builtIn = CLAUDE_CODE_COMMANDS.map((command): ComposerCommand => {
     const base = { name: command.name, description: command.description, args: command.args };
     if (command.support === 'native') return { ...base, kind: 'native' };
     // An agent launched here reports what its session can run; trust that over the catalogue.
     if (canRun && (command.support === 'session' || reported.has(command.name))) return { ...base, kind: 'send' };
+    // Full-screen pickers (/config, /resume…) would open in the terminal with nobody there to answer them.
+    if (canType && command.support === 'session') return { ...base, kind: 'send' };
     return { ...base, kind: 'unavailable', reason: unavailableReason(ctx, command.support === 'terminal') };
   });
   const known = new Set<string>([...CLAUDE_CODE_COMMANDS.map(command => command.name), ...SPECS.map(spec => spec.name), 'mode']);

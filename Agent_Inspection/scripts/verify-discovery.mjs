@@ -1,0 +1,115 @@
+import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { chromium } from 'playwright-core';
+import { NATIVE_PROVIDERS } from '../shared/agentProviders.ts';
+
+// Uses the local Vite server; HTTP and WebSocket agent data are fixtures. No real agent is changed.
+const captures = resolve(import.meta.dirname, '../.impeccable/review');
+mkdirSync(captures, { recursive: true });
+const now = Date.now();
+const copilot = { id: 'proc:100:fixture', vendor: 'other', providerId: 'copilot', providerLabel: 'GitHub Copilot', tier: 'C', name: 'GitHub Copilot', pid: 100, project: 'pid 100', status: 'unknown', source: 'GitHub Copilot · editor runtime', startedAt: now, hooked: false, intercepting: false, canInstruct: false, currentActivity: 'Process detected. Conversation activity is unavailable.', stopBlockedReason: 'This runtime may serve several editor sessions. Stop it in its original editor.', observation: { processName: 'copilot-runtime.exe', created: '2026-10-19T00:00:00Z', host: 'editor' } };
+const claude = { id: 'claude:fixture', vendor: 'claude', tier: 'B', name: 'Claude builder', pid: 101, project: 'App', cwd: 'C:/Projects/App', status: 'idle', source: 'Claude Code', hooked: true, intercepting: false, canInstruct: true };
+let agents = [copilot, claude];
+let rules = [{ id: 'copilot', label: 'GitHub Copilot', executables: ['copilot', 'copilot-runtime'], packages: [] }];
+const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, reducedMotion: 'reduce' });
+  page.setDefaultTimeout(10000);
+  const errors = [];
+  const mutations = [];
+  page.on('pageerror', error => errors.push(error.message));
+  let socket;
+  const publish = () => socket?.send(JSON.stringify({ type: 'agents', agents, hooks: { installed: true } }));
+  await page.routeWebSocket('**/ws', ws => {
+    socket = ws;
+    ws.send(JSON.stringify({ type: 'snapshot', agents, pending: [], hooks: { installed: true }, teams: [] }));
+  });
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    let json = {};
+    if (request.method() === 'POST') mutations.push(path);
+    if (path === '/api/discovery' && request.method() === 'POST') {
+      const body = request.postDataJSON();
+      rules = [...rules, { id: 'custom-fixture', label: body.label, executables: [body.executable.replace(/\.exe$/, '')], packages: [] }];
+      agents = [...agents, { ...copilot, id: 'proc:102:fixture', pid: 102, providerId: 'custom-fixture', providerLabel: body.label, name: body.label, source: `${body.label} · process`, observation: { ...copilot.observation, host: 'cli', processName: body.executable }, stopBlockedReason: undefined }];
+      json = { rule: rules.at(-1) }; publish();
+    } else if (path === '/api/discovery') json = { rules, agents: agents.filter(agent => agent.observation) };
+    else if (path === '/api/providers') json = { providers: NATIVE_PROVIDERS };
+    else if (path.endsWith('/remove')) { rules = rules.filter(rule => rule.id !== 'custom-fixture'); agents = agents.filter(agent => agent.providerId !== 'custom-fixture'); json = { ok: true }; publish(); }
+    else if (path === '/api/sessions') json = { sessions: [{ id: copilot.id, agent: copilot, updatedAt: now, state: 'active', live: true, canResume: false, resumeBlockedReason: 'Process detection does not provide conversation recovery.' }] };
+    else if (path === '/api/usage') json = { usage: { today: { tokens: 0, costUsd: 0 }, byDay: [], byAgent: [] } };
+    else if (path === '/api/usage/windows') json = { windows: { generatedAt: now, vendors: [] } };
+    else if (path === '/api/providers/copilot') json = { authenticated: true, limits: [], models: [] };
+    else if (path === '/api/templates') json = { templates: [] };
+    else if (path === '/api/schedules') json = { schedules: [] };
+    else if (path === '/api/prerequisites') json = { prerequisites: [] };
+    else if (path.includes('notifications')) json = { unread: 0, notifications: [] };
+    else if (path.endsWith('/events')) json = { events: [] };
+    else if (path.endsWith('/queue')) json = { messages: [] };
+    else if (path.includes('availability')) json = { claude: true, codex: true };
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(json) });
+  });
+  await page.goto('http://127.0.0.1:5173/#token=abcdef1234567890&autostart=1', { waitUntil: 'domcontentloaded' });
+  const filter = page.getByRole('navigation', { name: 'Filter agents' });
+  await filter.getByRole('button', { name: /GitHub Copilot/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.card').length === 1);
+  assert.match(await page.locator('.card-provider').innerText(), /GitHub Copilot/);
+  await page.getByRole('tab', { name: /Unassigned/ }).click();
+  assert.match(await page.locator('.crew-row').filter({ hasText: 'GitHub Copilot' }).first().innerText(), /GitHub Copilot/);
+  await page.screenshot({ path: resolve(captures, 'discovery-desktop.png'), fullPage: true });
+  await page.locator('.card').click();
+  await page.getByRole('heading', { name: 'Process detected', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Send', exact: true }).count(), 0);
+  await page.getByRole('tab', { name: 'Controls', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Stop agent', exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Close details' }).click();
+  await page.getByRole('button', { name: 'Session history', exact: true }).click();
+  await page.getByRole('button', { name: 'View detection', exact: true }).waitFor();
+  assert.match(await page.locator('.history-meta').innerText(), /GitHub Copilot/);
+  await page.getByRole('button', { name: 'Usage & schedules', exact: true }).click();
+  await page.getByRole('heading', { name: /External runtimes/ }).waitFor();
+  await page.getByRole('tab', { name: 'Setup checks', exact: true }).click();
+  const discoveryForm = page.getByRole('button', { name: 'Save discovery rule', exact: true }).locator('..');
+  await discoveryForm.getByLabel('Agent name', { exact: true }).fill('Example Agent');
+  await discoveryForm.getByLabel('Executable name', { exact: true }).fill('example-agent.exe');
+  await page.getByRole('button', { name: 'Save discovery rule', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove Example Agent discovery rule' }).waitFor();
+  await page.screenshot({ path: resolve(captures, 'discovery-setup-desktop.png'), fullPage: true });
+  await page.getByRole('button', { name: /Agent overview/ }).click();
+  await filter.getByRole('button', { name: /Example Agent/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.card').length === 1);
+  assert.match(await page.locator('.card-provider').innerText(), /Example Agent/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: resolve(captures, 'discovery-mobile.png'), fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Mobile horizontal overflow');
+  await page.getByRole('button', { name: 'Usage & schedules', exact: true }).click();
+  await page.getByRole('tab', { name: 'Setup checks', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove Example Agent discovery rule' }).click();
+  await page.getByRole('button', { name: 'Remove Example Agent discovery rule' }).waitFor({ state: 'hidden' });
+  await page.screenshot({ path: resolve(captures, 'discovery-setup-mobile.png'), fullPage: true });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(mutations, ['/api/discovery', '/api/discovery/custom-fixture/remove']);
+  // A missing service must not leak developer restart instructions into the form.
+  let discoveryAvailable = false;
+  await page.route('**/api/discovery', async route => {
+    if (discoveryAvailable) await route.fallback();
+    else await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not found' }) });
+  });
+  await page.goto('http://127.0.0.1:5173/#token=abcdef1234567890&autostart=1', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Usage & schedules', exact: true }).click();
+  await page.getByRole('tab', { name: 'Setup checks', exact: true }).click();
+  const unavailable = page.getByRole('button', { name: 'Discovery unavailable', exact: true });
+  await unavailable.waitFor(); assert.equal(await unavailable.isDisabled(), true);
+  assert.doesNotMatch(await page.locator('body').innerText(), /Restart Waystation|newer Waystation|Ctrl\+C|npm start/);
+  assert.equal(await unavailable.locator('..').getByRole('alert').count(), 0);
+  await page.screenshot({ path: resolve(captures, 'discovery-unavailable-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.screenshot({ path: resolve(captures, 'discovery-unavailable-desktop.png'), fullPage: true });
+  discoveryAvailable = true;
+  await page.getByRole('button', { name: 'Retry connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Save discovery rule', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Save discovery rule', exact: true }).isEnabled(), true);
+  console.log('Discovery browser verification passed: provider filters, station, controls, history, usage, custom rule add/remove, live updates and mobile layout.');
+} catch (error) { console.error(error); process.exitCode = 1; } finally { for (const context of browser.contexts()) await context.close(); await browser.close(); }

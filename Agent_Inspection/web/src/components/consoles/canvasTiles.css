@@ -1,0 +1,54 @@
+/* Canvas-only tiles: the "what should this be?" chooser and the browser tile. Contents scale with the canvas zoom. */
+.canvas-tile > .tile-chooser, .canvas-tile > .browser-tile { zoom: var(--canvas-zoom, 1); }
+
+.tile-chooser {
+  flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 22px 26px;
+  color: var(--console-text); scrollbar-width: thin; scrollbar-color: var(--console-line) transparent;
+}
+.tile-chooser h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.tile-chooser-fields { display: flex; flex-direction: column; gap: 14px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.tile-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px; }
+.tile-choice {
+  display: grid; gap: 4px; justify-items: start; padding: 14px; border: 1px solid var(--console-line); border-radius: 10px;
+  background: color-mix(in srgb, var(--on-deep) 2%, transparent); color: var(--console-text); font: inherit; text-align: left; cursor: pointer;
+}
+.tile-choice svg { color: var(--console-accent); margin-bottom: 4px; }
+.tile-choice small { color: var(--console-muted); font-size: 12px; }
+.tile-choice:hover { border-color: var(--deep-line); background: color-mix(in srgb, var(--on-deep) 4%, transparent); }
+.tile-choice-on { border-color: var(--console-accent); background: color-mix(in srgb, var(--panel-3) 8%, transparent); box-shadow: 0 0 0 1px var(--console-accent); }
+.tile-chooser .form-field, .tile-field { display: grid; gap: 6px; color: var(--console-muted); font-size: 12px; }
+.tile-chooser .form-field label { color: var(--console-muted); }
+.tile-chooser .text-input { width: 100%; background: var(--console-bg); color: var(--console-text); border: 1px solid var(--console-line); }
+.tile-chooser .text-input:focus { border-color: var(--console-accent); outline: 0; }
+.tile-chooser .desktop-path-field { display: flex; gap: 6px; }
+.tile-chooser .btn-go { justify-self: start; align-self: flex-start; }
+.tile-error { margin: 0; color: var(--red-text); font-size: 12px; }
+.tile-choice:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 1px; }
+
+.browser-tile { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel); }
+.browser-bar { display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--console-tile); border-bottom: 1px solid var(--console-line); }
+.browser-bar .icon-btn { color: var(--console-muted); }
+.browser-bar input {
+  flex: 1; min-width: 0; padding: 4px 10px; border: 1px solid var(--console-line); border-radius: 999px; outline: 0;
+  background: var(--console-bg); color: var(--console-text); font: 12px ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+.browser-bar input:focus { border-color: var(--console-accent); }
+.browser-error { margin: 0; padding: 6px 10px; background: var(--console-tile); color: var(--red-text); font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.browser-viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.browser-page { display: block; width: 100%; height: 100%; touch-action: none; }
+.browser-viewport:has(.browser-keys:focus-visible) .browser-page { outline: 2px solid var(--console-accent); outline-offset: -2px; }
+/* Invisible typing target: it takes keyboard and input-method text for the page (a canvas cannot). */
+.browser-keys {
+  position: absolute; width: 1px; height: 1em; padding: 0; border: 0; margin: 0; resize: none; overflow: hidden;
+  opacity: 0; pointer-events: none; font-size: 14px; caret-color: transparent; background: transparent; color: transparent;
+}
+.browser-starting { position: absolute; inset: 0; display: grid; place-content: center; margin: 0; background: var(--console-bg); color: var(--console-text); font-size: 13px; pointer-events: none; }
+.browser-dialog { position: absolute; inset: 0; padding: 24px; background: var(--console-tile); color: var(--console-text); overflow: auto; }
+.browser-dialog p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.browser-dialog > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.browser-status { margin: 0; padding: 4px 8px; display: flex; justify-content: space-between; gap: 8px; background: var(--console-tile); color: var(--console-muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.browser-status span { flex-shrink: 0; }
+.browser-bar .icon-btn:disabled { opacity: .4; cursor: default; }
+/* While a tile or the canvas is being dragged, frames must not swallow the pointer (the drag would stall over a page). */
+body.canvas-dragging iframe { pointer-events: none; }
+body.canvas-dragging .browser-page { pointer-events: none; }

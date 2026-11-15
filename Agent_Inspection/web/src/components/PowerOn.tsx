@@ -1,42 +1,47 @@
 ﻿import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
-import { CREW } from '../crew.ts';
-import { PREVIEW_CREW } from './AgentWorld.tsx';
-import { CrewAvatar } from './CrewAvatar.tsx';
-import { StationScene } from './StationScene.tsx';
+import { useEffect, useMemo, useState } from 'react';
+import { PREVIEW_CREW, PREVIEW_TEAM, buildClusters } from './AgentWorld.tsx';
 import { Icon } from './Icon.tsx';
+import { StationGraph } from './StationGraph.tsx';
 
 interface PowerOnProps { readonly onReady: () => void }
 
+const BOOT_MS = 450;
+
+/** Standby: what Waystation is, a labeled sample of the station, and one way in. */
 export function PowerOn({ onReady }: PowerOnProps) {
   const [booting, setBooting] = useState(false);
   useEffect(() => {
     if (!booting) return;
-    const timer = setTimeout(onReady, 450);
+    const timer = setTimeout(onReady, BOOT_MS);
     return () => clearTimeout(timer);
   }, [booting, onReady]);
+  const sample = useMemo(() => buildClusters(PREVIEW_CREW, [PREVIEW_TEAM]), []);
 
   return (
-    <motion.div className="standby waystation-welcome workbench-content" exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+    <motion.div className="standby waystation-welcome" exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
       <header className="standby-header">
-        <div className="standby-brand"><span className="brand-mark"><Icon name="planet" size={24} /></span>Waystation<span className="welcome-beta">Your agent workspace</span></div>
-        <span className="standby-local"><Icon name="shield" size={13} />Running on your machine</span>
+        <div className="standby-brand"><span className="brand-mark" aria-hidden="true" />Waystation</div>
+        <span className="standby-local"><Icon name="shield" size={13} />Local only · runs on this machine</span>
       </header>
       <main className="standby-main">
         <div className="standby-copy">
-          <h1>Your team,<br />in one place.</h1>
-          <p>Turn your coding sessions into a little crew. Watch them work, see who needs a hand, and guide the mission from one place.</p>
-          <button className="btn btn-go standby-start" onClick={() => setBooting(true)} disabled={booting} aria-label="Enter Waystation"><Icon name={booting ? 'activity' : 'planet'} size={18} />{booting ? 'Opening the station…' : 'Enter the station'}<Icon name="arrow" size={18} /></button>
-          <div className="standby-note"><Icon name="shield" size={15} />Connect your local Claude and Codex sessions.</div>
-          <div className="welcome-crew"><span className="eyebrow">Session avatar previews</span><div>{CREW.map(character => <div key={character.name}><CrewAvatar character={character} size={42} /></div>)}</div></div>
+          <h1>Every coding agent on this machine, in one place.</h1>
+          <p>See who is working, who is waiting, and who needs a decision. Approve, instruct, stop or delegate without hunting through terminals.</p>
+          <div className="standby-actions">
+            <button className="btn btn-go standby-start" onClick={() => setBooting(true)} disabled={booting} aria-label="Enter Waystation">
+              {booting ? 'Opening…' : 'Open the station'}<Icon name="arrow" size={16} />
+            </button>
+            <span className="standby-note">Claude Code, Codex and more</span>
+          </div>
         </div>
-        <div className="welcome-world">
-          <div className="welcome-world-caption"><span><span className="connection-dot live" />WELCOME TO WAYSTATION</span><span>MOONBASE / 01</span></div>
-          <StationScene agents={PREVIEW_CREW} rows={2} theme="moonbase" />
-          <div className="welcome-world-footer"><Icon name="sparkle" size={13} />An illustrated crew. Your real agents are waiting inside.</div>
-        </div>
+        <figure className="welcome-world">
+          <figcaption className="welcome-world-caption"><span><span className="connection-dot live" />Sample crew</span><span>No agents are running</span></figcaption>
+          <div className="welcome-world-canvas" inert>
+            <StationGraph clusters={sample} allAgents={PREVIEW_CREW} demo />
+          </div>
+        </figure>
       </main>
-      <footer className="standby-footer"><span>Built for your local coding sessions.</span><span>Waystation</span></footer>
     </motion.div>
   );
 }

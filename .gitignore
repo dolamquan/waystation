@@ -33,3 +33,7 @@ Thumbs.db
 # Local verification / test-run artifacts (contain live daemon tokens, profile DBs)
 .desktop-verification/
 .waystation-daemon.*
+
+# Local experiments and design-review scratch (not part of Waystation)
+Nebius_test/
+.impeccable/

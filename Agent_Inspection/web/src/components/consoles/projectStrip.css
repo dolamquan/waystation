@@ -1,0 +1,31 @@
+/* Project strip: one chip per working folder, scrolling sideways when there are many. */
+.project-strip { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.project-tabs { display: flex; gap: 6px; min-width: 0; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.project-tab {
+  display: inline-flex; flex: none; align-items: center; gap: 6px; max-width: 16rem; padding: 5px 10px;
+  border: 1px solid var(--console-line); border-radius: 999px; background: transparent;
+  color: var(--console-muted); font-size: 12px; cursor: pointer;
+}
+.project-tab:hover { color: var(--console-text); }
+.project-tab-on { background: var(--console-line); border-color: var(--console-accent); color: var(--console-text); }
+.project-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-tab-count { padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--on-deep) 8%, transparent); font-size: 10px; }
+.project-tab-needs { padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red-text); font-size: 10px; white-space: nowrap; }
+.project-hint { flex: none; color: var(--console-muted); font-size: 12px; }
+
+/* Folder sections (Tiles) and rail headings (Focus). */
+.console-sections { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.folder-section { display: flex; flex-direction: column; gap: 8px; }
+.folder-head {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 2px; border: 0; background: transparent;
+  color: var(--console-text); font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.folder-head small { color: var(--console-muted); font-weight: 400; }
+.folder-head .folder-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--console-muted); font-weight: 400; font-size: 11px; }
+.folder-chevron { display: inline-block; transition: transform 0.15s; }
+.folder-head[aria-expanded="false"] .folder-chevron { transform: rotate(-90deg); }
+.folder-section .console-tiles[hidden] { display: none; }
+.folder-section .console-tiles { flex: none; grid-auto-rows: minmax(22rem, 32rem); }
+.console-rail-folder { margin: 8px 4px 2px; color: var(--console-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .folder-chevron { transition: none; } }
+.console-rail-group { display: flex; flex-direction: column; gap: 4px; }

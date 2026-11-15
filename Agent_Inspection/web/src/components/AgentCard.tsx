@@ -1,7 +1,8 @@
+import { providerLabel } from '../../../shared/agentProviders.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CSSProperties } from 'react';
 import type { Agent } from '../api.ts';
-import { STATUS_LABEL, TIER_LABEL, VENDOR_LABEL, subagentCountLabel, subagentOfLabel, timeAgo } from '../format.ts';
+import { STATUS_LABEL, TIER_LABEL, subagentCountLabel, subagentOfLabel, timeAgo } from '../format.ts';
 import { AgentAlert, AgentMeta } from './AgentMeta.tsx';
 import { Icon } from './Icon.tsx';
 import { CrewAvatar } from './CrewAvatar.tsx';
@@ -18,9 +19,11 @@ interface AgentCardProps {
   readonly nested?: boolean;
   readonly depth?: number;
   readonly parentName?: string;
+  /** Files this agent and another agent in the same checkout both wrote recently. */
+  readonly sharedFiles?: number;
 }
 
-export function AgentCard({ agent, selected, now, onSelect, subagentCount = 0, nested = false, depth = 1, parentName }: AgentCardProps) {
+export function AgentCard({ agent, selected, now, onSelect, subagentCount = 0, nested = false, depth = 1, parentName, sharedFiles = 0 }: AgentCardProps) {
   const tier = TIER_LABEL[agent.tier];
   const parentLabel = agent.parentId && parentName ? `Subagent of ${parentName}` : subagentOfLabel(agent);
   return (
@@ -40,7 +43,7 @@ export function AgentCard({ agent, selected, now, onSelect, subagentCount = 0, n
       <div className="card-head">
         <div className="card-crew-avatar"><CrewAvatar id={agent.id} status={agent.status} size={40} animated={false} /></div>
         <div className="card-title">
-          <div className="card-provider">{VENDOR_LABEL[agent.vendor]}<span> / Agent session</span></div>
+          <div className="card-provider">{providerLabel(agent)}<span>{agent.observation ? ' / Detected runtime' : ' / Agent session'}</span></div>
           <div className="card-name" title={agent.name}>{agent.name}</div>
         </div>
         <span className={`status-pill pill-${agent.status}`}>{STATUS_LABEL[agent.status]}</span>
@@ -72,6 +75,7 @@ export function AgentCard({ agent, selected, now, onSelect, subagentCount = 0, n
         <span className={`tier tier-${agent.tier}`} title={tier.hint}>{tier.label}</span>
         {agent.intercepting && <span className="tag tag-intercept">Intercepting</span>}
         {subagentCount > 0 && <span className="tag tag-subagents">{subagentCountLabel(subagentCount)}</span>}
+        {sharedFiles > 0 && <span className="tag tag-shared-file" title="Another agent in this checkout wrote the same file recently">{sharedFiles === 1 ? 'Shared file' : `${sharedFiles} shared files`}</span>}
         <span className="card-time">{timeAgo(agent.lastEventAt ?? agent.startedAt, now)}</span>
         <Icon name="arrow" size={15} />
       </div>

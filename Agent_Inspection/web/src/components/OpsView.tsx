@@ -1,14 +1,21 @@
+import { providerLabel, managedProvider } from '../../../shared/agentProviders.ts';
 ﻿import { AnimatePresence } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, type AgentTemplate, type Prerequisite, type ScheduleView, type UsageSummary } from '../api.ts';
+import { api, type Agent, type AgentTemplate, type Prerequisite, type ScheduleView, type UsageSummary } from '../api.ts';
+import { AgentDiscovery, ObservedUsage } from './AgentDiscovery.tsx';
+import { CopilotAccountPanel } from './CopilotAccountPanel.tsx';
 import { formatTokens, formatUsd, shortModel } from '../format.ts';
 import { Icon } from './Icon.tsx';
+import { SpendCapPanel } from './SpendCapPanel.tsx';
+import { RemoteAccessPanel } from './RemoteAccessPanel.tsx';
 import { Confirm } from './Modal.tsx';
 import { DAY_NAMES, ScheduleForm } from './ScheduleForm.tsx';
 import { PanelEmpty, SectionTabs, type SectionTab } from './SectionTabs.tsx';
 import { UsageWindows } from './UsageWindows.tsx';
 
 interface OpsViewProps {
+  readonly agents: readonly Agent[];
+  readonly onSelect: (id: string) => void;
   readonly defaultCwd?: string;
   readonly notify: (text: string, kind?: 'ok' | 'error') => void;
   readonly onNewAgent: () => void;
@@ -22,7 +29,7 @@ interface Loaded {
 type Tab = 'usage' | 'schedules' | 'templates' | 'setup';
 type ScheduleFilter = 'all' | 'active' | 'paused';
 
-export function OpsView({ defaultCwd, notify, onNewAgent }: OpsViewProps) {
+export function OpsView({ agents, onSelect, defaultCwd, notify, onNewAgent }: OpsViewProps) {
   const [tab, setTab] = useState<Tab>('usage');
   const [data, setData] = useState<Loaded>({ schedules: [], templates: [], prerequisites: [] });
   const [error, setError] = useState<string>();
@@ -88,7 +95,9 @@ export function OpsView({ defaultCwd, notify, onNewAgent }: OpsViewProps) {
     {loaded && <div id="ops-panel" role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label} className="ops-tab-panel" aria-busy={loading}>
       {tab === 'usage' && <div className="usage-dashboard">
         <UsageWindows refreshKey={windowsKey} />
+        <SpendCapPanel projects={[...new Set(agents.map((agent) => agent.project))].sort()} notify={notify} />
         <SpendSection usage={data.usage} />
+        <ObservedUsage agents={agents} onSelect={onSelect} />
         <div className="automation-callout"><span className="automation-icon"><Icon name="clock" size={24} /></span><div><h3>Something you do every morning?</h3><p>Put it on the calendar. You can pause it whenever you need.</p></div><button className="btn" onClick={createSchedule}>Add a schedule<Icon name="arrow" size={15} /></button></div>
       </div>}
 
@@ -107,7 +116,7 @@ export function OpsView({ defaultCwd, notify, onNewAgent }: OpsViewProps) {
               <p className="schedule-task">{s.launch.prompt}</p>
               <div className="schedule-timing"><strong>{s.time}</strong><span>{s.days.length === 7 ? 'Every day' : s.days.map((d) => DAY_NAMES[d]).join(', ')}</span></div>
               <div className="schedule-next">{s.enabled ? (s.nextRunAt ? <>Next run <time dateTime={new Date(s.nextRunAt).toISOString()}>{new Date(s.nextRunAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></> : 'Waiting for the next run') : 'Paused until you turn it on'}{s.lastResult && <span>Last run: {s.lastResult}</span>}</div>
-              <div className="schedule-card-meta"><span><Icon name="terminal" size={14} />{s.launch.vendor === 'codex' ? 'Codex' : 'Claude'}{s.launch.model ? ` · ${shortModel(s.launch.model)}` : ''}</span><span title={s.launch.cwd}><Icon name="folder" size={14} />{s.launch.cwd}</span></div>
+              <div className="schedule-card-meta"><span><Icon name="terminal" size={14} />{providerLabel(s.launch)}{s.launch.model ? ` · ${shortModel(s.launch.model)}` : ''}</span><span title={s.launch.cwd}><Icon name="folder" size={14} />{s.launch.cwd}</span></div>
               <details className="schedule-details"><summary>Resources &amp; run settings</summary><p>{s.resources?.length ?? 0} resources · {s.maxMinutes ?? 60} minute limit · {s.stopWhenDone === false ? 'keeps running when done' : 'stops when done'}</p><p>{s.notify && s.notify.when !== 'never' ? `Updates ${s.notify.when === 'failure' ? 'on failure' : 'after every run'} to inbox${s.notify.channelIds.length ? ` and ${s.notify.channelIds.length} channels` : ''}` : 'Notifications off'}</p></details>
               <footer><button className="btn btn-small" disabled={!!busy} onClick={() => void act(s.id, () => api.runSchedule(s.id), `Launched ${s.label}`)}><Icon name="play" size={14} />{busy === s.id ? 'Working…' : 'Run now'}</button><button className="btn btn-small btn-ghost" aria-label={`Edit ${s.label}`} onClick={() => { setShowNew(false); setEditingId(s.id); }}>Edit</button><button className="icon-btn schedule-delete" aria-label={`Delete ${s.label}`} title="Delete schedule" disabled={!!busy} onClick={() => setConfirm({ title: `Delete ${s.label}?`, body: 'It will no longer launch agents. Agents it already launched keep running.', action: () => act(s.id, () => api.deleteSchedule(s.id), 'Schedule deleted') })}><Icon name="trash" size={16} /></button></footer>
             </article>}
@@ -119,14 +128,14 @@ export function OpsView({ defaultCwd, notify, onNewAgent }: OpsViewProps) {
         <div className="section-heading"><div><h2 id="ops-templates">Saved starting points</h2><p>Reuse an agent’s model, instructions and task when you start new work.</p></div><button className="btn btn-go" onClick={onNewAgent}><Icon name="plus" size={16} />New agent</button></div>
         <div className="workspace-note"><Icon name="info" size={16} /><span>Create a template with <b>Save as template</b> in New agent. To use one, choose it from the template menu before launching.</span></div>
         {data.templates.length === 0 && <PanelEmpty icon="copy" title="No saved setups yet"><p>Save a setup in New agent to use it again later.</p><button className="btn" onClick={onNewAgent}>Open New agent<Icon name="arrow" size={15} /></button></PanelEmpty>}
-        <ul className="template-cards">{data.templates.map((t) => <li key={t.id} className="template-card"><span className="template-icon"><Icon name="copy" size={20} /></span><div><h3>{t.label}</h3><span className="status-pill">{t.vendor === 'codex' ? 'Codex' : 'Claude'} · {t.model ? shortModel(t.model) : 'Default model'}</span>{t.prompt && <p>{t.prompt}</p>}{t.agentName && <small>Agent name: {t.agentName}</small>}{t.instructions && <small>Includes role instructions</small>}</div><button className="icon-btn" disabled={!!busy} aria-label={`Delete ${t.label}`} onClick={() => setConfirm({ title: `Delete ${t.label}?`, body: 'Agents launched from it are not affected.', action: () => act(t.id, () => api.deleteTemplate(t.id), 'Template deleted') })}><Icon name="trash" size={16} /></button></li>)}</ul>
+        <ul className="template-cards">{data.templates.map((t) => <li key={t.id} className="template-card"><span className="template-icon"><Icon name="copy" size={20} /></span><div><h3>{t.label}</h3><span className="status-pill">{providerLabel(t)} · {t.model ? shortModel(t.model) : 'Default model'}</span>{t.prompt && <p>{t.prompt}</p>}{t.agentName && <small>Agent name: {t.agentName}</small>}{t.instructions && <small>Includes role instructions</small>}</div><button className="icon-btn" disabled={!!busy} aria-label={`Delete ${t.label}`} onClick={() => setConfirm({ title: `Delete ${t.label}?`, body: 'Agents launched from it are not affected.', action: () => act(t.id, () => api.deleteTemplate(t.id), 'Template deleted') })}><Icon name="trash" size={16} /></button></li>)}</ul>
       </section>}
 
-      {tab === 'setup' && <section className="ops-section workspace-panel" aria-labelledby="ops-prereqs">
+      {tab === 'setup' && <><RemoteAccessPanel notify={notify} /><CopilotAccountPanel /><AgentDiscovery agents={agents} onSelect={onSelect} notify={notify} /><section className="ops-section workspace-panel" aria-labelledby="ops-prereqs">
         <div className="section-heading"><div><h2 id="ops-prereqs">Setup checks</h2><p>What’s installed on this machine, and what it’s used for.</p></div><span className={`status-pill ${missing ? 'status-warning' : 'status-active'}`}>{missing ? `${missing} to check` : 'All checks passed'}</span></div>
         <div className="workspace-note"><Icon name="info" size={16} /><span>These checks only report what’s installed. Use Refresh to check again after setting up a tool.</span></div>
         <ul className="ops-list setup-list">{data.prerequisites.map((p) => <li key={p.id} className={`ops-row prereq-${p.ok ? 'ok' : 'missing'}`}><span className="prereq-mark"><Icon name={p.ok ? 'check' : 'alert'} size={20} /></span><div className="ops-row-main"><strong>{p.label}</strong><p>{p.purpose}</p><small>{p.detail}</small></div><span className={`status-pill ${p.ok ? 'status-active' : 'status-warning'}`}>{p.ok ? 'Available' : 'Not found'}</span></li>)}</ul>
-      </section>}
+      </section></>}
     </div>}
     <AnimatePresence>{confirm && <Confirm title={confirm.title} body={confirm.body} confirmLabel="Delete" danger onConfirm={() => void confirm.action()} onClose={() => setConfirm(undefined)} />}</AnimatePresence>
   </div>;
@@ -143,7 +152,7 @@ function SpendSection({ usage }: { readonly usage?: UsageSummary }) {
       <div className="metric"><div className="metric-label">This week’s spend<Icon name="clock" size={17} /></div><div className="metric-value">{formatUsd(week?.costUsd ?? 0)}</div><div className="metric-note">Estimated over the last 7 days</div></div>
       <div className="metric"><div className="metric-label">Tokens this week<Icon name="terminal" size={17} /></div><div className="metric-value">{formatTokens(week?.tokens ?? 0)}</div><div className="metric-note">Across {usage?.byAgent.length ?? 0} agents with recorded usage</div></div>
     </div>
-    <div className="workspace-note"><Icon name="info" size={16} /><span>Spend is an estimate based on list prices. Codex contributes tokens only; subscription billing may differ.</span></div>
+    <div className="workspace-note"><Icon name="info" size={16} /><span>Spend is an estimate based on list prices. Providers without a dollar estimate contribute tokens only; subscription billing may differ.</span></div>
     <section className="workspace-panel" aria-labelledby="ops-spend"><div className="section-heading"><div><h2 id="ops-spend">Daily spending</h2><p>A look at your last 7 days.</p></div><span className="period-label">Last 7 days</span></div>
       {usage && usage.byDay.length > 0 ? <ol className="spend-columns" aria-label="Estimated spend per day">{usage.byDay.map((day) => <li key={day.day}><span className="spend-column-value">{formatUsd(day.costUsd)}</span><span className="spend-column-track"><span style={{ height: `${Math.max(day.costUsd > 0 ? 3 : 0, Math.round(day.costUsd / maxCost * 100))}%` }} /></span><span className="spend-column-day">{new Date(`${day.day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })}<small>{new Date(`${day.day}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small></span></li>)}</ol>
         : <PanelEmpty icon="activity" title="Your usage will appear here"><p>As agents work, you’ll see their daily token usage and estimated spend.</p></PanelEmpty>}

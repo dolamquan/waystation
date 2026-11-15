@@ -1,0 +1,16 @@
+.saved-consoles {
+  margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 12px;
+}
+.saved-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.saved-note { color: var(--muted); flex: 1 1 auto; }
+.saved-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.saved-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.saved-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14rem; }
+.saved-meta { color: var(--muted); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-btn {
+  padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text);
+  font-size: 12px; cursor: pointer;
+}
+.saved-btn:hover:not(:disabled) { border-color: var(--accent); }
+.saved-btn:disabled { opacity: 0.5; cursor: default; }
+.saved-btn-main { border-color: var(--accent); }

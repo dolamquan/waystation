@@ -4,6 +4,7 @@ import { Icon } from '../Icon.tsx';
 import { TEAM_STATUS_LABEL, agentFor, findMember, isArchived, leadOf } from './teamUi.ts';
 
 interface TeamOverviewProps {
+  readonly onOutputs: () => void;
   readonly team: TeamView;
   readonly agents: readonly Agent[];
   readonly now: number;
@@ -15,7 +16,7 @@ interface TeamOverviewProps {
 const LIVE = new Set<TeamView['status']>(['running', 'planning']);
 
 /** Status notices, progress, what needs the operator, and the run limits with spend. */
-export function TeamOverview({ team, agents, now, connected, onSelectAgent, onMessage }: TeamOverviewProps) {
+export function TeamOverview({ team, agents, now, connected, onSelectAgent, onMessage, onOutputs }: TeamOverviewProps) {
   const archived = isArchived(team);
   const doneTasks = team.tasks.filter((task) => task.status === 'done').length;
   const blockedTasks = team.tasks.filter((task) => task.status === 'blocked');
@@ -31,7 +32,7 @@ export function TeamOverview({ team, agents, now, connected, onSelectAgent, onMe
       {!connected && <div className="session-notice" role="status"><Icon name="link" size={16} />Reconnecting. Team controls will be available when the connection returns.</div>}
       {archived && <div className="session-notice" role="status"><Icon name="info" size={16} /><span>This team was disbanded. Its board, conversation and branches are kept here for reference; nothing can be changed.</span></div>}
       {team.statusReason && !archived && <div className="session-notice"><Icon name="info" size={16} /><span>{team.statusReason}</span></div>}
-      {team.summary && <div className="session-summary"><Icon name="check" size={18} /><div><strong>Lead’s summary</strong><p>{team.summary}</p></div></div>}
+      {team.summary && <div className="session-summary"><Icon name="check" size={18} /><div><strong>Lead’s summary</strong><p>{team.summary}</p><button className="btn btn-small" onClick={onOutputs}>View outputs<Icon name="arrow" size={14} /></button></div></div>}
 
       <div className="session-progress" aria-label="Team progress">
         <div><strong>{doneTasks} of {team.tasks.length} tasks complete</strong><span>{workingMembers} of {team.members.length} members working</span></div>

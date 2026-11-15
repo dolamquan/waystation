@@ -1,0 +1,99 @@
+/* Console canvas, live layer: a dotted stage with ambient light, glass controls, and tiles whose edge shows what each
+   session is doing. Loaded after the other canvas sheets; selectors start at .console-canvas to win over them.
+   Everything here sits inside .surface-dark, so the plain theme tokens are the dark set in both app themes. */
+
+.console-board { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; }
+
+/* Stage: brighter dot grid plus two soft pools of light, fixed to the stage (the dots pan, the light does not). */
+.console-canvas .canvas-stage {
+  border-color: var(--line); border-radius: 12px;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.1) 1px, transparent 1.5px);
+}
+.console-canvas .canvas-stage::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 18% 0%, rgb(79 211 148 / 0.07), transparent 70%),
+    radial-gradient(50% 45% at 92% 100%, rgb(127 178 255 / 0.07), transparent 70%);
+}
+
+/* Tiles: raised cards with a lit top edge. */
+.console-canvas .canvas-tile {
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px -16px rgb(0 0 0 / 0.75);
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.console-canvas .canvas-tile .console-head { background: var(--panel-2); border-bottom-color: var(--line); }
+.console-canvas .canvas-tile .console-name { font-weight: 600; }
+.console-canvas .canvas-tile .console-head .icon-btn { color: var(--muted); }
+.console-canvas .canvas-tile .console-head .icon-btn:hover { color: var(--text); background: var(--panel-3); }
+.console-canvas .canvas-drag { border-radius: 12px 12px 0 0; }
+
+/* Status edge: a 2px band across the top of the tile. */
+.console-canvas .canvas-tile::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; z-index: 3; pointer-events: none;
+  background: transparent;
+}
+.console-canvas .canvas-tile[data-status='working'] { border-color: var(--green-line); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px var(--green-soft), 0 18px 44px -14px rgb(79 211 148 / 0.28); }
+.console-canvas .canvas-tile[data-status='working']::before {
+  background: linear-gradient(90deg, transparent, var(--green-text) 30%, var(--green-text) 50%, transparent 80%);
+  background-size: 200% 100%;
+}
+.console-canvas .canvas-tile[data-status='needs-you'] { border-color: var(--amber-line); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px var(--amber-soft), 0 18px 44px -14px rgb(241 181 74 / 0.3); }
+.console-canvas .canvas-tile[data-status='needs-you']::before { background: var(--amber-text); }
+.console-canvas .canvas-tile[data-status='ready']::before { background: var(--blue-text); }
+.console-canvas .canvas-tile[data-status='exited'] .console-head { opacity: 0.6; }
+
+/* The tile you are on: a cool ring, never a white frame. */
+.console-canvas .canvas-tile-on { border-color: var(--blue-line); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px var(--blue-line), 0 22px 50px -16px rgb(0 0 0 / 0.8); }
+.console-canvas .canvas-tile-selected { outline: 2px solid var(--amber-line); outline-offset: 3px; }
+
+/* Resize grip shows on hover/focus only. */
+.console-canvas .canvas-resize { opacity: 0; transition: opacity 0.15s; }
+.console-canvas .canvas-tile:hover .canvas-resize, .console-canvas .canvas-resize:focus-visible { opacity: 0.7; }
+
+/* Glass controls: dock, view tools, drawing palette, canvas title. */
+.console-canvas .canvas-dock, .console-canvas .canvas-tools, .console-canvas .planning-palette, .console-canvas .planning-options {
+  border: 1px solid var(--line-strong); border-radius: 12px;
+  background: rgb(17 17 19 / 0.72); -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 12px 30px -10px rgb(0 0 0 / 0.7);
+}
+.console-canvas .planning-heading { background: transparent; }
+.console-canvas .canvas-dock button { border-color: transparent; color: var(--text-2); border-radius: 8px; }
+.console-canvas .canvas-dock button:hover:not(:disabled) { background: var(--panel-3); color: var(--text); }
+.console-canvas .canvas-dock > button:first-child { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+.console-canvas .canvas-dock > button:first-child:hover { background: var(--primary); color: var(--on-primary); opacity: 0.88; }
+.console-canvas .canvas-dock-sep { background: var(--line-strong); }
+.console-canvas .canvas-tools button { color: var(--text-2); border-radius: 8px; }
+.console-canvas .canvas-tools button:hover { background: var(--panel-3); color: var(--text); }
+.console-canvas .canvas-hint { color: var(--faint); }
+
+/* Session dots breathe while working and ring while waiting. */
+.console-canvas .console-dot-working { box-shadow: 0 0 0 0 rgb(79 211 148 / 0.5); }
+.console-canvas .console-dot-needs-you { background: var(--amber-text); }
+
+/* Tile chooser: each kind gets its own hue, the chosen one glows. */
+.tile-choice { transition: border-color 0.15s, background-color 0.15s, transform 0.15s var(--ease-out); }
+.tile-choice:hover { transform: translateY(-1px); }
+.tile-choice:nth-child(1) { --kind: var(--clay-text); }
+.tile-choice:nth-child(2) { --kind: var(--blue-text); }
+.tile-choice:nth-child(3) { --kind: var(--green-text); }
+.tile-choice:nth-child(4) { --kind: var(--violet-text); }
+.tile-choice:nth-child(5) { --kind: var(--blue-text); }
+.tile-choice:nth-child(6) { --kind: var(--amber-text); }
+.tile-choice:nth-child(7) { --kind: var(--violet-text); }
+.tile-choices .tile-choice svg { color: var(--kind, var(--text)); }
+.tile-choices .tile-choice-on {
+  border-color: color-mix(in srgb, var(--kind, var(--text)) 60%, transparent);
+  background: color-mix(in srgb, var(--kind, var(--text)) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kind, var(--text)) 40%, transparent), 0 10px 28px -12px color-mix(in srgb, var(--kind, var(--text)) 45%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .console-canvas .canvas-tile[data-status='working']::before { animation: canvas-scan 2.4s linear infinite; }
+  .console-canvas .canvas-tile[data-status='needs-you'] { animation: canvas-call 2s ease-in-out infinite; }
+  .console-canvas .console-dot-working { animation: canvas-ping 1.6s ease-out infinite; }
+}
+@keyframes canvas-scan { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes canvas-call { 50% { border-color: var(--amber-text); } }
+@keyframes canvas-ping { 0% { box-shadow: 0 0 0 0 rgb(79 211 148 / 0.5); } 100% { box-shadow: 0 0 0 7px rgb(79 211 148 / 0); } }

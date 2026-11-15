@@ -17,6 +17,27 @@ const scanner = await import('../daemon/collectors/processScanner.ts');
 const { makeAgent } = await import('./helpers.ts');
 
 describe('ProcessCollector', () => {
+  it('keeps process identities stable across polls and separates PID reuse without exposing command lines', async () => {
+    const registry = new AgentRegistry();
+    const collector = new ProcessCollector(registry);
+    const proc = { pid: 100, ppid: 1, name: 'copilot-runtime.exe', commandLine: 'copilot-runtime.exe --token do-not-persist', created: '2026-10-19T10:00:00.1234567Z' };
+    vi.mocked(scanner.scanProcesses).mockResolvedValueOnce([proc]);
+    await collector.scan();
+    const original = registry.list()[0];
+    expect(original).toMatchObject({ providerId: 'copilot', providerLabel: 'GitHub Copilot', status: 'unknown', canInstruct: false, observation: { host: 'editor' } });
+    expect(original.stopBlockedReason).toMatch(/editor/);
+    expect(JSON.stringify(original)).not.toContain('do-not-persist');
+    vi.mocked(scanner.scanProcesses).mockResolvedValueOnce([proc]);
+    await collector.scan();
+    expect(registry.list()[0]).toEqual(original);
+    vi.mocked(scanner.scanProcesses).mockResolvedValueOnce([{ ...proc, created: '2026-10-19T11:00:00Z' }]);
+    await collector.scan();
+    expect(registry.list()[0].id).not.toBe(original.id);
+    vi.mocked(scanner.scanProcesses).mockResolvedValueOnce([]);
+    await collector.scan();
+    expect(registry.list()).toEqual([]);
+  });
+
   it('surfaces other CLI agents as stoppable observe-only agents', async () => {
     const registry = new AgentRegistry();
     const collector = new ProcessCollector(registry);

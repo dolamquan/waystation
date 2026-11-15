@@ -1,7 +1,7 @@
 import type { TokenCounts } from '../domain/types.ts';
 
 /** Where a real plan-limit reading came from. */
-export type LimitSource = 'codex' | 'claude-sdk' | 'claude-transcript';
+export type LimitSource = 'codex' | 'claude-sdk' | 'claude-transcript' | 'copilot';
 
 /** A plan-limit window as reported by the vendor (not computed by Waystation). */
 export interface PlanLimit {
@@ -35,7 +35,8 @@ export interface ComputedWindow {
 }
 
 export interface VendorWindows {
-  readonly vendor: 'claude' | 'codex';
+  readonly vendor: import('../../shared/agentProviders.ts').ManagedVendor;
+  readonly message?: string;
   /** Real readings, newest per window. Empty when the vendor reported none locally. */
   readonly limits: readonly PlanLimit[];
   readonly planType?: string;

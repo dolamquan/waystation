@@ -20,7 +20,9 @@ const SAFE_DIFF = ['--no-ext-diff', '--no-textconv'];
 
 /** Paths that configure agents, editors or git for whoever opens the repo next: never merged automatically. */
 const PROTECTED_PATHS: readonly RegExp[] = [
-  /^\.(claude|codex|cursor|vscode|githooks|husky)\//i,
+  /^\.(claude|codex|copilot|gemini|cursor|vscode|githooks|husky)\//i,
+  /^GEMINI\.md$/i,
+  /^\.github\/(copilot-instructions\.md|agents\/|skills\/)/i,
   /(^|\/)\.mcp\.json$/i,
   /(^|\/)\.git(attributes|modules)$/i,
   /(^|\/)(CLAUDE|AGENTS)\.md$/i,

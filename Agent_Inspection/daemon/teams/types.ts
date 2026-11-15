@@ -1,5 +1,6 @@
+import type { ManagedVendor } from '../../shared/agentProviders.ts';
 export type TeamRole = 'lead' | 'worker';
-export type TeamVendor = 'claude' | 'codex';
+export type TeamVendor = ManagedVendor;
 import type { LaunchLoadout } from '../library/types.ts';
 
 /**
@@ -73,6 +74,17 @@ export interface TeamBudget {
   readonly deadline: number;
 }
 
+export interface TeamOutput {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly memberId: string;
+  readonly filename: string;
+  readonly path: string;
+  readonly bytes: number;
+  readonly createdAt: number;
+}
+
 export interface TeamState {
   readonly id: string;
   readonly name: string;
@@ -90,6 +102,7 @@ export interface TeamState {
   readonly readUpTo: Readonly<Record<string, number>>;
   readonly budget: TeamBudget;
   readonly summary?: string;
+  readonly outputs?: readonly TeamOutput[];
   /** Set when the tower nudged the lead about an all-idle team, cleared by any agent action. */
   readonly idleNudged: boolean;
   readonly intercept: boolean;
@@ -140,6 +153,7 @@ export interface TeamView {
   readonly tasks: readonly TeamTask[];
   readonly budget: TeamBudget;
   readonly summary?: string;
+  readonly outputs?: readonly TeamOutput[];
   readonly requirePlanApproval: boolean;
   readonly archivedAt?: number;
   /** Per member id: messages posted but not yet delivered to it. */

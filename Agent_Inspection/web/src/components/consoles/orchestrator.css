@@ -1,0 +1,162 @@
+/*
+ * Orchestrator tiles: the body of a canvas tile (several may share a canvas), scaling with the zoom like every tile's
+ * contents. Each orchestrator has a tone (--orch-tone) shared by its tile edge and its links to the teams it directs.
+ */
+.orch-panel {
+  flex: 1 1 auto; min-height: 0; zoom: var(--canvas-zoom, 1);
+  display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px; overflow: hidden;
+  background: var(--deep); color: var(--console-text); font-size: 13px;
+}
+.canvas-tile-orchestrator { outline: 1px solid color-mix(in srgb, var(--orch-tone) 55%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--shadow-ink) 53%, transparent), 0 8px 30px color-mix(in srgb, var(--orch-tone) 22%, color-mix(in srgb, var(--shadow-ink) 60%, transparent)); }
+.canvas-tile-orchestrator .console-dot { background: var(--orch-tone); }
+.orch-busy-text { color: var(--green-text); }
+/* Links from orchestrators to their teams' frames: under every tile and frame, never taking the pointer. */
+.orch-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 0; }
+.orch-link { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; opacity: 0.9; }
+.orch-link-glow { fill: none; stroke: currentColor; stroke-width: 7; opacity: 0.16; }
+.orch-link-end { fill: currentColor; }
+/* Nothing inside may push the panel wider than itself. */
+.orch-panel, .orch-panel * { box-sizing: border-box; }
+.orch-panel > * { min-width: 0; }
+
+.orch-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--console-muted); font-size: 12px; }
+.orch-summary-link { display: inline-flex; align-items: center; gap: 8px; }
+.orch-state-on { color: var(--green-text); }
+.orch-text-btn { padding: 2px 8px; border: 1px solid var(--console-line); border-radius: 6px; background: transparent; color: var(--console-text); font: inherit; cursor: pointer; }
+.orch-text-btn:hover:not(:disabled) { border-color: var(--console-accent); }
+.orch-text-btn:disabled { opacity: 0.45; cursor: default; }
+.orch-note, .orch-empty { margin: 0; color: var(--console-muted); font-size: 12px; line-height: 1.45; }
+.orch-empty { padding: 10px 4px; }
+
+.orch-list { flex: 1 1 auto; min-height: 4.5rem; overflow-y: auto; overflow-x: hidden; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: var(--console-line) transparent; }
+.orch-team + .orch-team { margin-top: 10px; }
+.orch-section { display: flex; align-items: center; gap: 7px; padding: 4px 4px 4px 6px; border-bottom: 1px solid var(--console-line); color: var(--console-muted); font-size: 12px; }
+.orch-team-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.orch-section-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--console-text); font-weight: 600; }
+.orch-section-count { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; }
+.orch-group { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 1px; }
+.orch-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 8px; }
+.orch-row:hover, .orch-row:focus-within { background: color-mix(in srgb, var(--on-deep) 3%, transparent); }
+.orch-row-to { background: color-mix(in srgb, var(--panel-3) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shadow-ink) 33%, transparent); }
+.orch-who {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 9px; align-items: center; padding: 4px 2px;
+  border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.orch-who .console-dot { grid-row: span 2; }
+.orch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.orch-who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--console-muted); font-size: 11px; }
+.orch-lead-badge { flex: none; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber-text); font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; }
+.orch-make-lead { flex: none; padding: 1px 7px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--console-muted); font: inherit; font-size: 10.5px; cursor: pointer; opacity: 0; }
+.orch-row:hover .orch-make-lead, .orch-row:focus-within .orch-make-lead { opacity: 1; }
+.orch-make-lead:hover { border-color: color-mix(in srgb, var(--amber-line) 40%, transparent); color: var(--amber-text); }
+.orch-pill { flex: none; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--on-deep) 5%, transparent); color: var(--console-muted); font-size: 11px; }
+.orch-pill-working { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green-text); }
+.orch-pill-needs-you { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red-text); }
+.orch-pill-ready { background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue-text); }
+.orch-icon { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--console-muted); cursor: pointer; }
+.orch-icon:hover:not(:disabled) { background: color-mix(in srgb, var(--on-deep) 7%, transparent); color: var(--console-text); }
+.orch-icon:disabled { opacity: 0.35; cursor: default; }
+
+.orch-compose { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 10px; border-top: 1px solid var(--console-line); }
+.orch-to { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--console-muted); font-size: 12px; }
+.orch-to select {
+  flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--console-line); border-radius: 7px; background: var(--console-tile); color: var(--console-text); font: inherit; font-size: 12.5px;
+}
+.orch-mode { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; padding: 2px; border: 1px solid var(--console-line); border-radius: 8px; }
+.orch-mode button {
+  min-width: 0; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--console-muted);
+  font: inherit; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+}
+.orch-mode .orch-mode-on { background: var(--console-line); color: var(--console-text); font-weight: 600; }
+.orch-textarea {
+  width: 100%; min-width: 0; min-height: 3.2em; max-height: 8rem; resize: vertical; padding: 8px 10px; border: 1px solid var(--console-line); border-radius: 10px;
+  outline: 0; background: var(--console-tile); color: var(--console-text); font: inherit; line-height: 1.45;
+}
+.orch-textarea:focus { border-color: var(--console-accent); }
+.orch-send-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.orch-preview {
+  flex: 1; min-width: 0; margin: 0; color: var(--console-muted); font-size: 11.5px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.orch-send {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; border-radius: 999px;
+  background: var(--console-accent); color: var(--text); font: inherit; font-weight: 600; cursor: pointer;
+}
+.orch-send:disabled { opacity: 0.4; cursor: default; }
+.orch-result { margin: 0; padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--green) 8%, transparent); color: var(--console-text); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.orch-result-bad { background: color-mix(in srgb, var(--red) 8%, transparent); color: var(--red-text); }
+.orch-panel button:focus-visible, .orch-panel select:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 1px; }
+/* The dock's Orchestrator toggle while the panel is open. */
+.canvas-dock .canvas-dock-on { background: var(--console-line); border-color: var(--console-accent); }
+
+/* Waystation voice: mono uppercase eyebrows, lavender accent, squared 6-10px corners (as the chooser and the app's buttons). */
+.orch-eyebrow { font: 600 10px/1.5 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--console-muted); }
+
+/* Header: what is connected, then Launch and Connect. */
+.orch-head { display: flex; align-items: center; gap: 6px; margin: 0 -12px; padding: 0 12px 10px; border-bottom: 1px solid var(--console-line); }
+.orch-head-state { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orch-head-btn {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 4px 10px; border: 1px solid var(--console-line); border-radius: 6px;
+  background: transparent; color: var(--console-text); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s, border-color .15s;
+}
+.orch-head-btn svg { color: var(--console-muted); }
+.orch-head-btn:hover { border-color: var(--deep-line); background: color-mix(in srgb, var(--on-deep) 4%, transparent); }
+.orch-head-btn-primary { border-color: color-mix(in srgb, var(--orch-tone, var(--console-accent)) 55%, transparent); background: color-mix(in srgb, var(--orch-tone, var(--console-accent)) 12%, transparent); }
+.orch-head-btn-primary svg { color: var(--orch-tone, var(--console-accent)); }
+.orch-head-btn-primary:hover { border-color: var(--orch-tone, var(--console-accent)); background: color-mix(in srgb, var(--orch-tone, var(--console-accent)) 20%, transparent); }
+.orch-head-btn-on { border-color: var(--orch-tone, var(--console-accent)); box-shadow: 0 0 0 1px var(--orch-tone, var(--console-accent)); }
+
+/* Blank orchestrator: nothing connected yet. Same card language as the tile chooser. */
+.orch-blank { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 18px 8px; text-align: center; }
+.orch-blank strong { color: var(--console-text); font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
+.orch-blank p { max-width: min(40rem, 100%); margin: 2px 0 10px; color: var(--console-muted); font-size: 12px; line-height: 1.5; }
+.orch-blank-mark {
+  display: grid; place-items: center; width: 46px; height: 46px; margin-bottom: 6px; border-radius: 10px;
+  color: var(--orch-tone, var(--console-accent)); border: 1px solid color-mix(in srgb, var(--orch-tone, var(--console-accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--orch-tone, var(--console-accent)) 10%, var(--deep));
+}
+.orch-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px; width: 100%; max-width: 24rem; }
+.orch-choice {
+  display: grid; gap: 3px; justify-items: start; padding: 12px 14px; border: 1px solid var(--console-line); border-radius: 10px;
+  background: color-mix(in srgb, var(--on-deep) 2%, transparent); color: var(--console-text); font: inherit; font-weight: 500; text-align: left; cursor: pointer; transition: background .15s, border-color .15s;
+}
+.orch-choice svg { color: var(--orch-tone, var(--console-accent)); margin-bottom: 4px; }
+.orch-choice small { color: var(--console-muted); font-size: 11.5px; font-weight: 400; line-height: 1.4; }
+.orch-choice:hover { border-color: var(--deep-line); background: color-mix(in srgb, var(--on-deep) 4%, transparent); }
+.orch-choice-on { border-color: var(--orch-tone, var(--console-accent)); background: color-mix(in srgb, var(--orch-tone, var(--console-accent)) 8%, transparent); box-shadow: 0 0 0 1px var(--orch-tone, var(--console-accent)); }
+.orch-choice:focus-visible, .orch-head-btn:focus-visible { outline: 2px solid var(--console-accent); outline-offset: 1px; }
+.orch-unwire:hover { color: var(--red-text); }
+
+/* Connect mode: click targets over agent tiles and team frames, above every tile. */
+.orch-connect { position: absolute; inset: 0; pointer-events: none; z-index: 9000; }
+.orch-pick {
+  position: absolute; display: flex; align-items: flex-start; justify-content: flex-end; padding: 10px; pointer-events: auto; cursor: pointer;
+  border: 1px dashed color-mix(in srgb, var(--orch-tone) 60%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--deep) 40%, transparent); transition: background .15s, border-color .15s;
+}
+.orch-pick:hover { border-style: solid; border-color: var(--orch-tone); background: color-mix(in srgb, var(--orch-tone) 8%, color-mix(in srgb, var(--deep) 40%, transparent)); }
+.orch-pick.orch-pick-on { border-style: solid; border-color: var(--orch-tone); box-shadow: inset 0 0 0 1px var(--orch-tone); background: color-mix(in srgb, var(--orch-tone) 10%, transparent); }
+.orch-pick-badge, .orch-pick-team {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 4px 9px; border-radius: 6px; font: 600 10px/1.4 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--console-text); background: var(--deep); border: 1px solid color-mix(in srgb, var(--orch-tone) 60%, transparent); box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow-ink) 53%, transparent);
+}
+.orch-pick-badge svg, .orch-pick-team svg { color: var(--orch-tone); }
+.orch-pick-on .orch-pick-badge, .orch-pick-team.orch-pick-on { background: var(--orch-tone); border-color: var(--orch-tone); color: var(--text); }
+.orch-pick-on .orch-pick-badge svg, .orch-pick-team.orch-pick-on svg { color: var(--text); }
+.orch-pick-team { position: absolute; transform: translateY(calc(-100% - 6px)); pointer-events: auto; cursor: pointer; }
+.orch-connect-bar {
+  position: absolute; top: 72px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 10px; border-radius: 10px; pointer-events: auto; color: var(--console-text); font-size: 13px;
+  background: color-mix(in srgb, var(--deep) 95%, transparent); border: 1px solid var(--console-line); box-shadow: 0 0 0 1px color-mix(in srgb, var(--shadow-ink) 53%, transparent), 0 12px 32px color-mix(in srgb, var(--shadow-ink) 67%, transparent);
+}
+.orch-connect-mark {
+  display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px; color: var(--orch-tone);
+  background: color-mix(in srgb, var(--orch-tone) 12%, transparent); border: 1px solid color-mix(in srgb, var(--orch-tone) 40%, transparent);
+}
+.orch-connect-text { display: grid; min-width: 0; white-space: nowrap; }
+.orch-connect-text > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orch-connect-count { padding-left: 12px; border-left: 1px solid var(--console-line); color: var(--console-muted); font: 11px var(--mono); white-space: nowrap; }
+.orch-connect-done {
+  padding: 6px 14px; border: 1px solid var(--orch-tone); border-radius: 6px; background: var(--orch-tone); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.orch-connect-done:hover { filter: brightness(1.08); }

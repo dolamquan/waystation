@@ -1,0 +1,110 @@
+/* Channels panel: sits on the console board (a .surface-dark area), so the plain theme tokens are the dark set here.
+   Classes use the chan- prefix so they never collide with the managed-team UI (team-*). */
+.channels-panel {
+  display: flex; flex-direction: column; gap: 12px; box-sizing: border-box;
+  width: min(26rem, 100%); max-height: 100%; overflow-y: auto; padding: 14px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line-strong); border-radius: 12px; font-size: 13px;
+  box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.7);
+  scrollbar-width: thin;
+}
+.channels-panel h2, .channels-panel h3, .channels-panel h4 { margin: 0; color: var(--text); }
+.channels-panel h2 { font-size: 15px; font-weight: 600; flex: 1; }
+.channels-panel h3 { font-size: 14px; }
+.chan-head { display: flex; align-items: center; gap: 8px; }
+.chan-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.chan-hint { margin: 0; color: var(--muted); font-size: 12px; }
+.chan-error { margin: 0; padding: 8px 10px; border: 1px solid var(--red-line); border-radius: 8px; background: var(--red-soft); color: var(--red-text); }
+.chan-skill {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px;
+  border: 1px solid var(--amber-line); border-radius: 10px; background: var(--amber-soft); color: var(--text);
+}
+.chan-skill span { flex: 1; min-width: 10rem; }
+
+.chan-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 30px; padding: 4px 12px; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--panel-2); color: var(--text); font: 500 12px var(--font); cursor: pointer; white-space: nowrap;
+}
+.chan-btn:hover:not(:disabled) { background: var(--panel-3); }
+.chan-btn:disabled { opacity: 0.5; cursor: default; }
+.chan-btn:focus-visible, .chan-input:focus-visible, .chan-card:focus-visible, .chan-log:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.chan-btn-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+.chan-btn-primary:hover:not(:disabled) { background: var(--primary); opacity: 0.88; }
+.chan-btn-quiet { background: transparent; border-color: transparent; color: var(--muted); }
+.chan-btn-quiet:hover:not(:disabled) { background: var(--panel-3); color: var(--text); }
+.chan-btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.chan-input {
+  box-sizing: border-box; width: 100%; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--bg); color: var(--text); font: 13px var(--font);
+}
+.chan-input:focus { border-color: var(--blue-line); outline: 0; }
+.chan-field { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 12px; border: 0; padding: 0; margin: 0; }
+.chan-form { display: flex; flex-direction: column; gap: 12px; }
+.chan-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.chan-picks { max-height: 12rem; overflow-y: auto; }
+.chan-pick { display: flex; align-items: center; gap: 8px; padding: 5px 0; color: var(--text); }
+.chan-pick-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Channel cards. */
+.chan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.chan-card {
+  display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 12px; text-align: left;
+  border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.chan-card:hover { border-color: var(--green-line); background: var(--panel-3); }
+.chan-card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.chan-card-title::after { content: '›'; margin-left: auto; color: var(--faint); font-size: 16px; line-height: 1; }
+.chan-card-purpose { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.chan-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chan-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--panel); font-size: 12px;
+}
+.chan-chip-gone { color: var(--muted); border-style: dashed; }
+.chan-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--faint); }
+.chan-dot.chan-status-working { background: var(--green-text); box-shadow: 0 0 0 3px var(--green-soft); }
+.chan-dot.chan-status-waiting { background: var(--amber-text); box-shadow: 0 0 0 3px var(--amber-soft); }
+.chan-status-working { color: var(--green-text); }
+.chan-status-waiting { color: var(--amber-text); }
+.chan-status-gone { color: var(--muted); }
+.chan-origin { color: var(--muted); font-size: 11px; }
+.chan-unread { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--green-text); color: var(--on-accent); font-size: 11px; font-weight: 700; text-align: center; }
+
+/* One channel. */
+.chan-detail { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.chan-detail-head { display: flex; align-items: center; gap: 8px; }
+.chan-purpose { margin: 0; color: var(--muted); line-height: 1.45; }
+.chan-sub { font-size: 12px; font-weight: 600; color: var(--muted); }
+.chan-members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.chan-member {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 8px 10px;
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2);
+}
+.chan-member-name { font-weight: 600; }
+.chan-member-meta { flex: 1; min-width: 6rem; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chan-skill-ok { color: var(--green-text); font-size: 11px; }
+.chan-skill-missing { color: var(--amber-text); font-size: 11px; }
+.chan-add, .chan-compose { display: flex; gap: 8px; align-items: flex-start; }
+.chan-add .chan-input { flex: 1; min-width: 0; }
+.chan-compose { flex-wrap: wrap; }
+.chan-compose textarea { flex: 1 1 10rem; resize: vertical; }
+.chan-to { width: auto; }
+
+.chan-log {
+  list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 8px;
+  height: 16rem; min-height: 8rem; overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg);
+}
+.chan-msg { padding: 8px 10px; border-radius: 8px; background: var(--panel-2); }
+.chan-msg-operator { background: var(--blue-soft); border: 1px solid var(--blue-line); }
+.chan-msg-head { display: flex; gap: 6px; align-items: baseline; color: var(--muted); font-size: 11px; }
+.chan-msg-head strong { color: var(--text); }
+.chan-msg-head time { margin-left: auto; }
+.chan-msg p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chan-danger { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.chan-danger span { flex: 1; }
+
+@media (max-width: 480px) {
+  .channels-panel { width: 100%; padding: 10px; }
+  .chan-log { height: 11rem; }
+}

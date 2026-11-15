@@ -1,10 +1,11 @@
+import type { ManagedVendor } from '../../shared/agentProviders.ts';
 import { randomUUID } from 'node:crypto';
 import type { LaunchLoadout, ScheduleNotify, ScheduleResource } from '../library/types.ts';
 import { OpsInputError, optionalText } from './templates.ts';
 
 /** What a schedule launches: the same fields as New agent. */
 export interface ScheduledLaunch {
-  readonly vendor: 'claude' | 'codex';
+  readonly vendor: ManagedVendor;
   readonly cwd: string;
   readonly prompt: string;
   readonly name?: string;

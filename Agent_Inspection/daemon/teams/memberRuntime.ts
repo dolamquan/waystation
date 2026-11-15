@@ -1,3 +1,4 @@
+import { managedProvider } from '../../shared/agentProviders.ts';
 import { join } from 'node:path';
 import type { Agent } from '../domain/types.ts';
 import { markRead, memberById, replaceMember } from './board.ts';
@@ -33,7 +34,7 @@ export class MemberRuntime {
       appendSystemPrompt: briefing(team, member),
       name: `${team.name} · ${member.name}`.slice(0, 80),
       model: member.model,
-      intercept: team.intercept && member.vendor === 'claude',
+      intercept: team.intercept && !!managedProvider(member.vendor)?.intercept,
       writeRoot: member.worktree,
       readGuard: opts.privateRoot ? { deny: opts.privateRoot, allow: join(opts.teamsDir, team.id) } : undefined,
       // The token lives only in the agent's environment; the bridge inherits it (never on a command line).

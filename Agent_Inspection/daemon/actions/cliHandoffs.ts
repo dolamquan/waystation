@@ -113,6 +113,8 @@ export class CliHandoffs {
   started(id: string, pid: number): boolean {
     const entry = this.entries.get(id);
     if (!entry) return false;
+    // A pid that is not running would never be seen as alive again; accepting it would end the session at the next sweep.
+    if (!(this.opts.isAlive ?? isPidAlive)(pid)) return false;
     this.entries = new Map([...this.entries, [id, { ...entry, pids: [...entry.pids, pid] }]]);
     return true;
   }

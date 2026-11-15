@@ -20,6 +20,15 @@ describe('time conversions', () => {
 });
 
 describe('killRefusal', () => {
+  it('validates discovered executable identity and refuses shared editor runtimes and reused PIDs', () => {
+    const observation = { processName: 'my-agent.exe', created: '2026-10-19T00:00:00Z', host: 'cli' as const };
+    const agent = makeAgent({ observation });
+    const process = proc({ name: observation.processName, created: observation.created });
+    expect(killRefusal({ agent, proc: process })).toBeUndefined();
+    expect(killRefusal({ agent, proc: { ...process, created: '2026-10-19T01:00:00Z' } })).toMatch(/identity/);
+    expect(killRefusal({ agent: { ...agent, observation: { ...observation, host: 'editor' } }, proc: process })).toMatch(/editor/);
+    expect(killRefusal({ agent: { ...agent, observation: { ...observation, processName: 'Code.exe' } }, proc: { ...process, name: 'Code.exe' } })).toMatch(/host application/);
+  });
   it('allows stopping a verified agent process', () => {
     expect(killRefusal({ agent: makeAgent(), proc: proc(), expectedProcStart: FILETIME })).toBeUndefined();
   });

@@ -13,11 +13,12 @@ interface Props {
   readonly loading: boolean;
   readonly error?: string;
   readonly status: string;
+  readonly observeOnly?: boolean;
   readonly onRetry: () => void;
   readonly outputRef?: Ref<HTMLDivElement>;
 }
 
-export function AgentConversation({ events, name, now, active, loading, error, status, onRetry, outputRef }: Props) {
+export function AgentConversation({ events, name, now, active, loading, error, status, onRetry, outputRef, observeOnly }: Props) {
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -57,7 +58,7 @@ export function AgentConversation({ events, name, now, active, loading, error, s
     }}>
       <div ref={content} className="chat-content">
         {error && <div className="detail-load-error" role="alert"><p>Couldn’t load conversation. {error}</p><button className="btn" onClick={onRetry} disabled={loading}>Try again</button></div>}
-        {!events.length && <div className="chat-empty"><Icon name="message" size={28} /><h3>{loading ? 'Loading conversation…' : `Chat with ${name}`}</h3><p>{loading ? 'Getting the latest messages.' : 'Send a task, ask a question, or share a context doc.'}</p></div>}
+        {!events.length && <div className="chat-empty"><Icon name="message" size={28} /><h3>{loading ? 'Loading conversation…' : observeOnly ? 'Process detected' : `Chat with ${name}`}</h3><p>{loading ? 'Getting the latest messages.' : observeOnly ? 'Waystation can see this runtime, but cannot read its conversations, tools or model usage. Continue working in the original app.' : 'Send a task, ask a question, or share a context doc.'}</p></div>}
         <ol className="chat-messages" role="log" aria-label="Messages" aria-live={active ? 'polite' : 'off'} aria-relevant="additions" aria-busy={loading}>
           {events.map(event => <li key={event.seq} className={`chat-message chat-${event.kind}`}>
             <div className="chat-message-meta"><strong>{event.kind === 'prompt' ? 'You' : event.kind === 'error' ? 'Something went wrong' : name}</strong><time dateTime={new Date(event.ts).toISOString()} title={new Date(event.ts).toLocaleString()}>{readableTime(event.ts, now)}</time></div>

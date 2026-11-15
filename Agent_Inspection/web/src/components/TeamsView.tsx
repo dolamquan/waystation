@@ -1,9 +1,9 @@
+import { providerLabel, managedProvider } from '../../../shared/agentProviders.ts';
 import { motion } from 'framer-motion';
 import type { Agent, TeamView } from '../api.ts';
 import type { TeamLogItem } from '../useTower.ts';
 import { timeAgo } from '../format.ts';
 import { Icon } from './Icon.tsx';
-import { WorkspaceDoodle } from './WorkspaceDoodle.tsx';
 import { TeamDetail } from './TeamDetail.tsx';
 import { TEAM_STATUS_LABEL, isArchived } from './team/teamUi.ts';
 
@@ -30,7 +30,7 @@ export function TeamsView({
   if (teams.length === 0) {
     return (
       <motion.div className="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <WorkspaceDoodle kind="team" />
+        <div className="empty-icon"><Icon name="crew" size={22} /></div>
         <h3>No teams yet</h3>
         <p>Bring a lead and a few workers together on one goal. Each gets a separate workspace, with a shared task board and conversation here.</p>
         {connected && <button className="btn btn-go" onClick={onNewTeam}><Icon name="plus" size={16} />Create a team</button>}
@@ -83,7 +83,7 @@ function TeamCard({ team, agents, now, selected, onSelect }: TeamCardProps) {
   const done = team.tasks.filter((task) => task.status === 'done').length;
   const blocked = team.tasks.filter((task) => task.status === 'blocked').length;
   const waiting = team.members.filter((member) => agents.some((agent) => agent.id === member.agentId && agent.status === 'waiting')).length;
-  const vendors = [...new Set(team.members.map((m) => (m.vendor === 'claude' ? 'Claude' : 'Codex')))].join(' + ');
+  const vendors = [...new Set(team.members.map((m) => (providerLabel(m))))].join(' + ');
   const memberCount = `${team.members.length} ${team.members.length === 1 ? 'member' : 'members'}`;
   const needs = [blocked > 0 && `${blocked} blocked`, waiting > 0 && `${waiting} needs you`, team.status === 'plan_review' && 'plan to review'].filter(Boolean);
   return (

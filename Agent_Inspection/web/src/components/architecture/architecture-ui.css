@@ -1,0 +1,233 @@
+/* Shared finish for the Architecture workbench. Theme and shell tokens remain authoritative. */
+.architecture { width: 100%; max-width: 1440px; margin-inline: auto; container-type: inline-size; }
+:root .tower .architecture > .arch-surface-tabs {
+  flex-wrap: nowrap; align-items: center; gap: 4px; padding: 0 0 14px;
+  margin-bottom: 30px; overflow-x: auto; scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+:root .tower .architecture > .arch-surface-tabs > button {
+  flex: 0 0 auto; gap: 7px; min-height: 38px; padding: 9px 12px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+:root .tower .architecture > .arch-surface-tabs > button:hover { background: var(--panel); color: var(--text); }
+:root .tower .architecture > .arch-surface-tabs > button.selected { background: var(--panel-2); border-color: var(--line-strong); color: var(--text); }
+.architecture > .arch-surface-tabs > button.selected svg { color: var(--accent); }
+:root .tower .architecture .btn { min-height: 34px; padding: 7px 12px; font-size: 12px; line-height: 1.4; gap: 7px; }
+:root .tower .architecture .btn-small { min-height: 32px; padding: 6px 10px; }
+:root .tower .architecture .icon-btn { min-width: 32px; min-height: 32px; }
+.architecture :is(button, summary, a):focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.architecture :is(.text-input, select):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.architecture .text-input { caret-color: var(--accent); }
+.architecture :is(.agent-platform, .agent-activity) { padding-top: 2px; }
+.architecture :is(.platform-heading, .agent-activity-heading) { align-items: center; margin: 0 0 28px; }
+.architecture :is(.platform-heading h1, .agent-activity-heading h2) { font-size: 27px; font-weight: 550; letter-spacing: -.025em; line-height: 1.25; margin-bottom: 8px; }
+.architecture :is(.platform-heading p, .agent-activity-heading p) { font-size: 13px; line-height: 1.75; max-width: 75ch; }
+.architecture .platform-heading h2 { font-size: 20px; }
+.architecture :is(.platform-heading, .agent-activity-heading) > .btn { flex-shrink: 0; white-space: nowrap; }
+.architecture .platform-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; background: var(--bg-2); }
+.architecture .platform-form > :is(h2, h3) { display: flex; align-items: center; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.5; }
+.architecture .platform-form > label:has(textarea) { grid-column: 1 / -1; }
+.architecture .platform-form-footer { border-top: 1px solid var(--line); padding-top: 20px; }
+.architecture .platform-form small { line-height: 1.7; }
+.architecture :is(.platform-form, .arch-fields, .evaluation-project) .text-input { min-height: 39px; padding: 10px 12px; }
+.architecture :is(.platform-form, .arch-fields) textarea.text-input { line-height: 1.8; }
+.architecture .platform-form .platform-check { min-height: 39px; gap: 10px; }
+.architecture input[type='checkbox'] { accent-color: var(--accent); }
+.architecture .platform-success { display: flex; align-items: start; gap: 9px; padding: 12px 16px; margin: 0 0 20px; background: var(--green-soft); border-radius: var(--radius-sm); line-height: 1.7; }
+.architecture .platform-success > svg { flex-shrink: 0; margin-top: 2px; }
+.architecture .platform-project { align-items: end; padding: 0 0 22px; margin-bottom: 26px; gap: 20px; }
+.architecture .platform-project > label { flex: 0 1 480px; }
+.platform-project-switch { margin-left: auto; max-width: 560px; }
+.platform-project-switch > summary { display: flex; align-items: center; gap: 7px; padding: 10px 0; cursor: pointer; color: var(--text-2); font-size: 12px; list-style: none; }
+.platform-project-switch[open] > summary { margin-bottom: 10px; }
+.platform-project-switch form { align-items: end; }
+.architecture .platform-list-actions { margin-bottom: 18px; }
+.architecture .platform-resource-list { margin-bottom: 24px; }
+.architecture .platform-resource-list > li { padding: 20px 0; gap: 16px; }
+.platform-resource-identity { display: flex; gap: 13px; align-items: start; }
+.platform-resource-identity > div { min-width: 0; }
+.platform-resource-mark { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 38px; height: 38px; border-radius: var(--radius-sm); background: var(--panel-2); color: var(--text-2); }
+.architecture .platform-resource-list strong { font-size: 14px; line-height: 1.6; }
+.architecture .platform-resource-list p { margin: 5px 0; line-height: 1.7; }
+.architecture .platform-resource-list small { font-size: 12px; line-height: 1.7; }
+.platform-resource-actions, .platform-resource-meta { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.platform-resource-actions { justify-content: end; }
+.platform-resource-meta { margin-top: 9px; }
+.platform-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 5px; background: var(--panel-2); color: var(--text-2); font-size: 11px; line-height: 1.6; white-space: nowrap; vertical-align: middle; }
+.platform-badge > span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.platform-badge.tone-success { color: var(--green-text); background: var(--green-soft); }
+.platform-badge.tone-warning { color: var(--amber-text); background: var(--amber-soft); }
+.platform-badge.tone-error { color: var(--red-text); background: var(--red-soft); }
+.platform-count { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font-size: 11px; font-weight: 450; text-align: center; font-variant-numeric: tabular-nums; }
+.platform-inventory-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.platform-inventory-heading h2 { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 550; line-height: 1.6; margin: 0; }
+.platform-inventory-heading > svg { color: var(--muted); }
+.platform-split-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(380px, .9fr); align-items: start; gap: 36px; }
+.platform-inventory { min-width: 0; }
+.platform-split-layout .platform-form { position: sticky; top: 24px; }
+.platform-split-layout .platform-resource-actions { padding-left: 51px; }
+.platform-search-field { position: relative; }
+.platform-search-field > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.architecture .platform-search-field > .text-input { padding-left: 37px; }
+.platform-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 44px 24px; min-height: 220px; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+.platform-empty-state > svg { color: var(--muted); margin-bottom: 16px; }
+.platform-empty-state h3 { font-size: 15px; line-height: 1.5; font-weight: 550; margin: 0 0 8px; }
+.platform-empty-state p { font-size: 12px; line-height: 1.8; color: var(--text-2); max-width: 48ch; margin: 0; }
+.architecture .platform-danger { color: var(--red-text); }
+.architecture .platform-detail-tabs { gap: 24px; margin-bottom: 28px; }
+.architecture .platform-detail-tabs button { font-size: 13px; padding: 12px 2px; }
+.architecture .platform-agent { margin-top: 32px; padding-top: 28px; }
+.architecture .platform-topology { padding: 28px; background: var(--bg); }
+.architecture .platform-topology figcaption { font-size: 13px; font-weight: 500; }
+.architecture .platform-topology-group h3 { font-size: 13px; color: var(--text); }
+.architecture .platform-topology-group li { padding: 14px 0; }
+.architecture .platform-topology-group strong { font-size: 13px; }
+.architecture .platform-topology-group span { font-size: 12px; }
+.architecture .platform-topology-root { padding: 18px 24px; }
+.architecture .platform-chat { min-height: 560px; grid-template-columns: 240px minmax(0, 1fr); }
+.architecture .platform-chat > aside { padding: 20px 16px; }
+.architecture .platform-chat-main { padding: 24px 28px; background: var(--bg); }
+.architecture .platform-chat aside li > button { padding: 12px; margin-bottom: 5px; }
+.architecture .platform-chat aside li > button:hover { background: var(--panel); }
+.architecture .platform-chat-messages { min-height: 280px; padding-right: 8px; }
+.architecture .platform-message { padding: 24px 0; font-size: 13px; }
+.architecture .platform-message header strong { font-size: 13px; }
+.architecture .platform-message header button { padding: 7px 0; }
+.architecture .platform-chat-composer { padding-top: 20px; border-top: 1px solid var(--line); margin-top: 20px; }
+.architecture .platform-chat-composer textarea { padding: 12px 14px; background: var(--panel); }
+.architecture .agent-table-scroll { background: var(--bg); }
+.architecture .agent-table-scroll th { padding: 13px 18px; color: var(--text-2); font-size: 11px; background: var(--panel); }
+.architecture .agent-table-scroll td { padding: 18px; font-size: 12px; line-height: 1.7; font-variant-numeric: tabular-nums; }
+.architecture .agent-table-scroll td > strong { font-size: 13px; }
+.architecture .agent-table-scroll td > .platform-badge { margin-top: 6px; }
+.architecture .agent-table-scroll tbody tr:hover:not(.selected) { background: var(--bg-2); }
+.architecture .agent-table-scroll td:last-child .arch-actions { flex-wrap: nowrap; }
+.architecture .agent-table-scroll td:last-child .btn { white-space: nowrap; }
+.architecture .agent-run-panel { margin-top: 28px; padding: 24px; background: var(--bg-2); }
+.architecture .agent-run-panel > header h3 { font-size: 18px; }
+.architecture .agent-run-facts { gap: 10px 20px; padding: 16px 0; margin: 14px 0; border-block: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.architecture .agent-run-panel > .arch-actions { display: inline-flex; margin-right: 8px; }
+.architecture .agent-run-events { margin-top: 24px; }
+.architecture .agent-run-events summary { padding: 12px 0; font-size: 12px; }
+.architecture .agent-run-events li { padding-block: 16px; }
+.architecture .agent-event-kind { align-self: start; margin-top: 2px; font-size: 10px; line-height: 1.5; border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; width: fit-content; }
+.architecture .agent-run-filter-tabs { gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius); width: fit-content; }
+.architecture .agent-run-filter-tabs button { border-color: transparent; background: transparent; }
+.architecture .agent-run-filter-tabs button.selected { background: var(--panel-2); border-color: var(--line-strong); }
+.architecture .arch-toolbar { padding: 16px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); }
+.architecture .arch-palette { background: var(--bg-2); padding: 20px 12px; }
+.architecture .arch-chat { background: var(--bg-2); }
+.architecture .arch-canvas-toolbar { background: var(--panel); }
+.architecture .arch-inspector { padding: 22px; }
+.architecture .arch-component { min-height: 44px; }
+.architecture .arch-fields { gap: 16px; }
+.architecture .arch-connections-panel { margin-bottom: 24px; }
+.architecture .arch-connection-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 20px; }
+.architecture .arch-connection-form > .btn { align-self: end; justify-self: start; }
+.architecture .arch-runtime-fields, .architecture .arch-resource-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.architecture .arch-agent-test .agent-run-panel { border: 0; padding: 20px 0; background: transparent; }
+.sandbox-runtime-note { display: flex; align-items: start; gap: 10px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text-2); }
+.sandbox-runtime-note svg { flex-shrink: 0; margin-top: 2px; }
+.sandbox-runtime-note p { margin: 0; font-size: 12px; line-height: 1.7; }
+.sandbox-workbench { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, .8fr); gap: 28px; align-items: start; }
+.sandbox-workbench > * { min-width: 0; }
+.sandbox-results { padding-top: 4px; }
+.sandbox-results .evaluation-snapshot { border-top: 0; margin: 0; padding: 0; }
+.sandbox-result-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sandbox-result-heading h3 { margin: 0; }
+.sandbox-results .evaluation-snapshot pre { min-height: 160px; padding: 20px; border-radius: var(--radius-sm); line-height: 1.8; }
+.sandbox-results .evaluation-snapshot summary { padding: 10px 0; cursor: pointer; font-size: 12px; color: var(--text-2); }
+.sandbox-history-heading { font-size: 13px; font-weight: 550; margin: 32px 0 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.architecture .sandbox-history > li { gap: 12px; padding-block: 16px; }
+.sandbox-history > li.selected strong { color: var(--text); }
+.sandbox-history .platform-resource-actions { justify-content: start; }
+.architecture .sandbox-history strong { font-size: 12px; }
+.architecture .sandbox-history small { font-size: 11px; }
+.architecture .sandbox-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.architecture .evaluation-project { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin: 0 0 24px; align-items: end; }
+.architecture .agent-sandboxes .evaluation-project { margin-top: 20px; }
+.architecture .evaluation-project > label { flex: 1 1 300px; }
+.architecture .evaluation-editor { margin-top: 28px; }
+.evaluation-evaluator-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.evaluation-evaluator-editor > .arch-error { grid-column: 1 / -1; }
+.evaluation-test-pane { min-width: 0; }
+.architecture .evaluation-test-pane .evaluation-test-form { margin-top: 0; }
+.architecture .evaluation-test-pane .evaluation-test-form > label { grid-column: 1 / -1; }
+.architecture .evaluation-scores li { padding: 16px 0; gap: 8px 14px; }
+.architecture .evaluation-scores li > span { margin-left: auto; }
+.architecture .evaluation-scores li > p { font-size: 12px; }
+.architecture .evaluation-experiment { margin-top: 28px; }
+.architecture .evaluation-launcher { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.architecture .evaluation-checks { padding: 16px; background: var(--panel); border-radius: var(--radius-sm); gap: 12px 24px; }
+.architecture .evaluation-checks legend { margin: 0; padding: 0 0 10px; }
+.architecture .evaluation-checks > label { font-size: 12px; }
+.architecture .evaluation-comparison { margin-top: 28px; }
+.architecture .evaluation-comparison > form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; }
+.architecture .evaluation-comparison > form > h2 { grid-column: 1 / -1; }
+.architecture .evaluation-comparison .platform-help { font-size: 12px; }
+.architecture .evaluation-comparison td .btn { display: flex; margin-top: 12px; width: fit-content; }
+.architecture .evaluation-comparison td > p { margin: 0; }
+.architecture .evaluation-version { display: flex; flex-direction: row; justify-content: start; align-items: center; gap: 12px; max-width: none; color: var(--text-2); font-size: 12px; }
+.architecture .evaluation-version select { width: auto; min-width: 150px; }
+.architecture .evaluation-snapshot pre { border-radius: var(--radius-sm); }
+.architecture .run-quality-actions .platform-form { background: transparent; padding-inline: 0; }
+@media (max-width: 1200px) {
+  .platform-split-layout, .sandbox-workbench { gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr); }
+  .platform-split-layout .platform-resource-actions { padding-left: 0; }
+  .architecture .platform-topology { padding: 22px; }
+}
+@container (max-width: 880px) {
+  .platform-split-layout, .sandbox-workbench, .evaluation-evaluator-editor { grid-template-columns: minmax(0, 1fr); }
+  .platform-split-layout .platform-form { position: static; }
+  .architecture .arch-connection-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .platform-split-layout, .sandbox-workbench, .evaluation-evaluator-editor { grid-template-columns: minmax(0, 1fr); }
+  .platform-split-layout .platform-form { position: static; }
+  .architecture .platform-chat { grid-template-columns: 180px minmax(0, 1fr); }
+  .architecture .platform-topology-branches { gap: 24px; }
+  .architecture .evaluation-launcher { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  :root .tower .architecture > .arch-surface-tabs { margin-bottom: 24px; padding-bottom: 12px; }
+  :root .tower .architecture > .arch-surface-tabs > button { min-height: 42px; padding-inline: 11px; }
+  :root .tower .architecture .btn { min-height: 38px; }
+  .architecture :is(.platform-heading, .agent-activity-heading) { align-items: start; gap: 16px; margin-bottom: 24px; }
+  .architecture :is(.platform-heading h1, .agent-activity-heading h2) { font-size: 24px; }
+  .architecture .platform-heading h2 { font-size: 19px; }
+  .architecture :is(.platform-form, .evaluation-launcher, .evaluation-comparison > form) { grid-template-columns: minmax(0, 1fr); padding: 20px 16px; }
+  .architecture .platform-form .arch-actions { flex-wrap: wrap; }
+  .architecture .platform-resource-list > li { gap: 12px; }
+  .architecture .platform-resource-identity { flex-basis: 100%; }
+  .architecture .platform-resource-list > li > div { flex-basis: auto; }
+  .architecture .platform-resource-list > li > .platform-resource-identity { flex-basis: 100%; }
+  .platform-resource-actions { justify-content: start; }
+  .platform-project-switch { margin-left: 0; width: 100%; }
+  .architecture .platform-project > label { flex-basis: 100%; }
+  .architecture .platform-detail-tabs { flex-wrap: nowrap; gap: 20px; overflow-x: auto; scrollbar-width: thin; }
+  .architecture .platform-detail-tabs button { flex-shrink: 0; }
+  .architecture .platform-topology { padding: 20px 16px; }
+  .architecture .platform-chat { grid-template-columns: minmax(0, 1fr); }
+  .architecture .platform-chat-main { padding: 20px 16px; }
+  .architecture .platform-chat-composer > div { flex-wrap: wrap; }
+  .architecture .platform-chat-composer > div > small { flex-basis: 100%; }
+  .architecture .platform-chat-composer > div > .btn { margin-left: auto; }
+  .architecture .agent-table-scroll td { padding: 14px; }
+  .architecture .agent-run-panel { padding: 20px 16px; }
+  .architecture .agent-activity :is(.agent-activity-agents, .agent-activity-history) table { min-width: 660px; }
+  .architecture .agent-run-filter-tabs { width: 100%; }
+  .architecture .agent-run-events li { gap: 8px; }
+  .architecture .arch-toolbar { padding: 12px; }
+  .architecture .evaluation-project { padding: 16px; }
+  .architecture .sandbox-settings { gap: 16px 12px; }
+  .architecture .sandbox-settings > label:nth-child(-n+2) { grid-column: 1 / -1; }
+  .architecture .arch-connection-form, .architecture .arch-runtime-fields, .architecture .arch-resource-grid { grid-template-columns: minmax(0, 1fr); }
+  .architecture .sandbox-history > li > div { flex-basis: auto; }
+  .architecture .evaluation-version { flex-wrap: wrap; }
+  .architecture .run-quality-actions .platform-form { padding-inline: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .tower .architecture > .arch-surface-tabs > button { transition: none; }
+}

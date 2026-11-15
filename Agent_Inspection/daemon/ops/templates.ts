@@ -1,3 +1,5 @@
+import { isManagedVendor, managedProvider } from '../../shared/agentProviders.ts';
+import type { ManagedVendor } from '../../shared/agentProviders.ts';
 import { randomUUID } from 'node:crypto';
 import { parseLoadout } from '../library/loadout.ts';
 import { LibraryInputError, type LaunchLoadout } from '../library/types.ts';
@@ -10,7 +12,7 @@ export interface AgentTemplate {
   readonly id: string;
   /** What the template is called in the picker, e.g. "Reviewer on Haiku". */
   readonly label: string;
-  readonly vendor: 'claude' | 'codex';
+  readonly vendor: ManagedVendor;
   readonly model?: string;
   /** Name given to agents launched from it. */
   readonly agentName?: string;
@@ -57,7 +59,7 @@ export function validateTemplate(raw: unknown, now = Date.now()): AgentTemplate 
   const body = (raw ?? {}) as Record<string, unknown>;
   const label = optionalText(body.label, 'label', MAX_LABEL_CHARS);
   if (!label) throw new OpsInputError('label is required');
-  if (body.vendor !== 'claude' && body.vendor !== 'codex') throw new OpsInputError('vendor must be "claude" or "codex"');
+  if (!isManagedVendor(body.vendor)) throw new OpsInputError('vendor must identify a registered managed provider');
   return {
     id: `tpl_${randomUUID().slice(0, 8)}`,
     label,
@@ -66,7 +68,7 @@ export function validateTemplate(raw: unknown, now = Date.now()): AgentTemplate 
     agentName: optionalText(body.agentName, 'agentName', MAX_NAME_CHARS),
     instructions: optionalText(body.instructions, 'instructions', MAX_INSTRUCTIONS_CHARS),
     prompt: optionalText(body.prompt, 'prompt', MAX_PROMPT_CHARS),
-    intercept: body.vendor === 'claude' && body.intercept === true,
+    intercept: !!managedProvider(body.vendor)?.intercept && body.intercept === true,
     loadout: templateLoadout(body.loadout),
     createdAt: now,
   };

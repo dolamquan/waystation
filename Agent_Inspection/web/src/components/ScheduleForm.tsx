@@ -1,3 +1,6 @@
+import { managedProvider } from '../../../shared/agentProviders.ts';
+import { useProviders } from '../useProviders.ts';
+import { CopilotAccountPanel } from './CopilotAccountPanel.tsx';
 import { useEffect, useId, useState } from 'react';
 import { api, type NewSchedule, type ScheduleView } from '../api.ts';
 import { loadoutApi, type LaunchLoadout, type NotifyChannelView } from '../library/loadoutApi.ts';
@@ -47,6 +50,7 @@ function readBase64(file: File): Promise<string> {
 
 /** Create or edit a schedule: when, what, the resources it needs, and who hears about each run. */
 export function ScheduleForm({ defaultCwd, schedule, onDone, notify }: ScheduleFormProps) {
+  const { providers } = useProviders();
   const tools = useToolAvailability();
   const [label, setLabel] = useState(schedule?.label ?? '');
   const [vendor, setVendor] = useState<Vendor>(schedule?.launch.vendor ?? 'claude');
@@ -115,19 +119,19 @@ export function ScheduleForm({ defaultCwd, schedule, onDone, notify }: ScheduleF
       <div className="form-pair">
         <label>Agent
           <select className="text-input" value={vendor} onChange={(e) => { setVendor(e.target.value as Vendor); setModel(''); }}>
-            <option value="claude">Claude</option>
-            <option value="codex" disabled={tools.codex === false}>Codex</option>
+            {providers.map(provider => <option key={provider.id} value={provider.id} disabled={provider.available === false || provider.id === 'codex' && tools.codex === false}>{provider.label}</option>)}
           </select>
         </label>
         <div className="form-field"><span>Model</span><ModelPicker key={vendor} vendor={vendor} value={model} onChange={setModel} /></div>
       </div>
       <ProjectFolderInput value={cwd} onChange={setCwd} />
+      {vendor === 'copilot' && <CopilotAccountPanel compact />}
       <label>Task<textarea className="text-input" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} required placeholder="What should the agent do each time?" /></label>
       </fieldset>
       <details className="schedule-options"><summary><Icon name="folder" size={17} /><span>Resources &amp; agent tools<small>Optional · files, links, skills and project context</small></span><Icon name="chevronDown" size={16} /></summary><div>
       <ResourcesEditor resources={resources} onChange={setResources} uploads={uploads} onUploads={setUploads} notify={notify} />
       <fieldset className="schedule-fieldset"><legend>Skills, docs and tools</legend>
-        <LoadoutPicker vendor={vendor === 'codex' ? 'codex' : 'claude'} value={loadout} onChange={setLoadout} sections={LOADOUT_SECTIONS} />
+        <LoadoutPicker vendor={vendor} value={loadout} onChange={setLoadout} sections={LOADOUT_SECTIONS} />
       </fieldset>
       </div></details>
       <details className="schedule-options"><summary><Icon name="message" size={17} /><span>Notifications &amp; run limits<small>{when === 'never' ? 'Channel notifications off' : when === 'failure' ? 'Channel updates on failure' : 'Channel updates after every run'} · {maxMinutes} minute limit</small></span><Icon name="chevronDown" size={16} /></summary><div>

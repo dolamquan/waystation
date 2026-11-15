@@ -38,9 +38,11 @@ interface McpRecord {
   readonly defaultOn: boolean;
   readonly presetId?: string;
   readonly createdAt: number;
+  /** Set only by registerConnector, never parsed from operator input. */
+  readonly localConnector?: true;
 }
 
-type Fields = Omit<McpRecord, 'id' | 'createdAt'>;
+type Fields = Omit<McpRecord, 'id' | 'createdAt' | 'localConnector'>;
 
 const fail = (message: string): never => { throw new LibraryInputError(message); };
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -65,7 +67,7 @@ function parseArgs(raw: unknown): string[] {
     ? arg : fail(`each argument must be one line of at most ${MAX_ARG} characters`)));
 }
 
-function parseUrl(raw: unknown): string {
+function parseUrl(raw: unknown, trustedUrl?: string): string {
   if (typeof raw !== 'string' || !raw.trim() || raw.length > MAX_URL) return fail('url is required');
   let url: URL;
   try {
@@ -75,12 +77,12 @@ function parseUrl(raw: unknown): string {
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') fail('url must start with http:// or https://');
   if (url.username || url.password) fail('url must not contain a user name or password');
-  assertAllowedHost(url, 'url');
+  if (url.toString() !== trustedUrl) assertAllowedHost(url, 'url');
   return url.toString();
 }
 
-function parseTransportFields(body: Record<string, unknown>, transport: McpTransport): Pick<Fields, 'command' | 'args' | 'env' | 'url'> {
-  if (transport !== 'stdio') return { url: parseUrl(body.url) };
+function parseTransportFields(body: Record<string, unknown>, transport: McpTransport, trustedUrl?: string): Pick<Fields, 'command' | 'args' | 'env' | 'url'> {
+  if (transport !== 'stdio') return { url: parseUrl(body.url, trustedUrl) };
   const command = typeof body.command === 'string' ? body.command.trim() : '';
   if (!command || command.length > 500 || hasControl(command)) fail('command is required (one line, at most 500 characters)');
   return { command, args: parseArgs(body.args), env: stringMap(body.env, 'env', ENV_NAME, MAX_VALUE) };
@@ -123,10 +125,25 @@ export class McpCatalog implements LoadoutProvider {
     return this.view(record);
   }
 
+  /** Daemon-only registration of its own grant-authenticated broker. No general private-network opt-in. */
+  registerConnector(grantId: string, label: string, endpoint: string, token: string): McpServerView {
+    if (!/^[a-f0-9-]{36}$/.test(grantId) || !token || token.length > MAX_SECRET || hasControl(token)) fail('Invalid connector registration.');
+    let url: URL; try { url = new URL(endpoint); } catch { return fail('Invalid connector endpoint.'); }
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.pathname !== '/agent/connectors/mcp' || url.username || url.password || url.search || url.hash) fail('Register only the local Waystation connector endpoint.');
+    const name = `app-${grantId.slice(0, 8)}`;
+    if (this.records().some(r => r.name === name)) fail('This connector MCP server already exists.');
+    if (hasControl(label)) fail('Use a single-line connector label.');
+    const record: McpRecord = { id: randomUUID(), name, label: label.slice(0, MAX_LABEL), transport: 'http', url: url.href, defaultOn: false, createdAt: Date.now(), localConnector: true };
+    this.applySecrets(record.id, { Authorization: `Bearer ${token}` });
+    try { this.deps.store.saveRecord(TABLE, record); } catch (e) { this.deps.secrets.deleteUnder(this.prefix(record.id)); throw e; }
+    this.deps.audit('mcp_create', record.id, { name, transport: 'http', connectorGrant: grantId });
+    return this.view(record);
+  }
+
   update(id: string, raw: unknown): McpServerView {
     const current = this.require(id);
     const { fields, secrets } = this.parse(raw, id);
-    const record: McpRecord = { ...fields, id, createdAt: current.createdAt };
+    const record: McpRecord = { ...fields, id, createdAt: current.createdAt, ...(current.localConnector && fields.transport === 'http' && fields.url === current.url ? { localConnector: true } : {}) };
     // A secret meant for the other kind of transport (env var vs header) no longer applies.
     if (current.transport !== record.transport) this.deps.secrets.deleteUnder(this.prefix(id));
     this.deps.store.saveRecord(TABLE, record);
@@ -226,7 +243,9 @@ export class McpCatalog implements LoadoutProvider {
     if (label.length > MAX_LABEL || hasControl(label)) fail(`label must be one line of at most ${MAX_LABEL} characters`);
     if (raw.defaultOn !== undefined && typeof raw.defaultOn !== 'boolean') fail('defaultOn must be true or false');
     if (raw.presetId !== undefined && (typeof raw.presetId !== 'string' || !PRESET_ID.test(raw.presetId))) fail('presetId is not valid');
-    const transportFields = parseTransportFields(raw, transport);
+    const current = selfId ? this.require(selfId) : undefined;
+    const trustedUrl = current?.localConnector && transport === 'http' ? current.url : undefined;
+    const transportFields = parseTransportFields(raw, transport, trustedUrl);
     const secrets = parseSecrets(raw.secrets, transport);
     const envClash = Object.keys(secrets).find((key) => transportFields.env && key in transportFields.env);
     if (envClash) fail(`${envClash} is both a plain env value and a secret`);

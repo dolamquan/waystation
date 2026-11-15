@@ -1,3 +1,4 @@
+import { providerLabel, managedProvider } from '../../../../shared/agentProviders.ts';
 import type { Agent, TeamMember, TeamView } from '../../api.ts';
 import { formatUsd } from '../../format.ts';
 import { Icon } from '../Icon.tsx';
@@ -39,7 +40,7 @@ export function MemberCard(props: MemberCardProps) {
         <span className={`session-member-avatar avatar-${member.vendor}`} aria-hidden="true">{member.name.slice(0, 1).toUpperCase()}</span>
         <div className="team-member-main">
           <strong>{member.name}{member.role === 'lead' && <span className="session-lead-badge">Lead</span>}</strong>
-          <span>{member.vendor === 'claude' ? 'Claude' : 'Codex'}{member.model ? ` · ${member.model}` : ''}</span>
+          <span>{providerLabel(member)}{member.model ? ` · ${member.model}` : ''}</span>
         </div>
         <span className={`status-pill ${status.pill}`}>{member.merged ? 'Merged' : status.label}</span>
       </div>
@@ -71,7 +72,7 @@ export function MemberCard(props: MemberCardProps) {
           <div className="session-workspace-actions">
             {member.terminal
               ? <button className="btn btn-small" disabled={unavailable} title="Bring this member back to the team now" onClick={() => props.onTakeBack(member)}>Take back</button>
-              : agent?.sessionId && <button className="btn btn-small" disabled={unavailable || !!cliMissing} title={cliMissing ?? `Continue in ${member.vendor === 'codex' ? 'Codex' : 'Claude Code'}`} onClick={() => props.onOpenCli(member)}><Icon name="terminal" size={13} />Open CLI</button>}
+              : agent?.sessionId && <button className="btn btn-small" disabled={unavailable || !!cliMissing} title={cliMissing ?? `Continue in ${providerLabel(member)}`} onClick={() => props.onOpenCli(member)}><Icon name="terminal" size={13} />Open CLI</button>}
           </div>
         )}
       </details>

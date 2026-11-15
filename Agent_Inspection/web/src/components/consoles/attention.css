@@ -1,0 +1,7 @@
+/* Dots for the statuses a Claude Code console reports through its hooks; the base .console-dot is in consoles.css. */
+.console-dot-needs-you { background: var(--red); box-shadow: 0 0 6px color-mix(in srgb, var(--red-soft) 67%, transparent); }
+.console-dot-ready { background: var(--blue); }
+@media (prefers-reduced-motion: no-preference) {
+  .console-dot-needs-you { animation: console-attention-pulse 1s ease-in-out infinite; }
+}
+@keyframes console-attention-pulse { 50% { opacity: 0.35; } }

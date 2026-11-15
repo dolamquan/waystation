@@ -1,9 +1,10 @@
+import type { ManagedVendor } from './agentProviders.ts';
 /**
  * Starting line-ups for the New team dialog. Each member's focus goes into its briefing and into every
  * roster, and the lead assigns tasks by it, so the texts say concretely what each member owns.
  */
 
-export type PresetVendor = 'claude' | 'codex';
+export type PresetVendor = ManagedVendor;
 export type PresetRole = 'lead' | 'worker';
 
 export interface TeamPresetMember {

@@ -6,7 +6,7 @@
 .int-tag { font: 10px var(--mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
 .int-switch-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .int-test { font-size: 12px; overflow-wrap: anywhere; }
-.int-test-ok { color: #355a40; }
+.int-test-ok { color: var(--green-text); }
 .int-test-fail { color: var(--danger); }
 .int-pairs { display: flex; flex-direction: column; gap: 8px; }
 .int-pair { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) auto; gap: 8px; align-items: center; }

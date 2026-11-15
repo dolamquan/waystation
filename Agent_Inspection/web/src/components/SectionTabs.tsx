@@ -1,6 +1,5 @@
 import { useId, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react';
 import { Icon } from './Icon.tsx';
-import { WorkspaceDoodle } from './WorkspaceDoodle.tsx';
 
 export interface SectionTab<T extends string> {
   readonly id: T;
@@ -45,5 +44,5 @@ export function PanelEmpty({ icon, title, children }: {
   readonly title: string;
   readonly children: ReactNode;
 }) {
-  return <div className="panel-empty"><span className="panel-empty-icon">{icon === 'book' ? <WorkspaceDoodle kind="books" /> : icon === 'clock' ? <WorkspaceDoodle kind="planner" /> : <Icon name={icon} size={25} />}</span><h3>{title}</h3>{children}</div>;
+  return <div className="panel-empty"><span className="panel-empty-icon"><Icon name={icon} size={20} /></span><h3>{title}</h3>{children}</div>;
 }

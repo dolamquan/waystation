@@ -1,4 +1,13 @@
 import { Notifier } from '../notify/notifier.ts';
+import { WaystationAutomation } from '../automation/automation.ts';
+import { BrainConnections } from '../architecture/brains.ts';
+import { AgentResources } from '../architecture/resources.ts';
+import { AgentRuns } from '../architecture/runs.ts';
+import { AgentPlatform } from '../architecture/platform.ts';
+import { AgentSecrets } from '../architecture/secrets.ts';
+import { AgentSandboxes } from '../architecture/sandboxes.ts';
+import { AgentEvaluations } from '../architecture/evaluations.ts';
+import { ConnectorBroker } from '../connectors/broker.ts';
 import { CodexPluginCatalog } from './codexPluginCatalog.ts';
 import { ContextDocs } from './contextDocs.ts';
 import type { LibraryDeps } from './deps.ts';
@@ -18,6 +27,15 @@ export class Library {
   /** Codex's own plugins (`codex plugin`): managed here, loaded by Codex from its config, not per agent. */
   readonly codexPlugins: CodexPluginCatalog;
   readonly notifier: Notifier;
+  readonly automation: WaystationAutomation;
+  readonly brains: BrainConnections;
+  readonly resources: AgentResources;
+  readonly agentRuns: AgentRuns;
+  readonly agentPlatform: AgentPlatform;
+  readonly agentSecrets: AgentSecrets;
+  readonly agentSandboxes: AgentSandboxes;
+  readonly agentEvaluations: AgentEvaluations;
+  readonly connectors: ConnectorBroker;
 
   constructor(readonly deps: LibraryDeps) {
     this.skills = new SkillLibrary(deps);
@@ -26,6 +44,19 @@ export class Library {
     this.plugins = new PluginCatalog(deps);
     this.codexPlugins = new CodexPluginCatalog(deps);
     this.notifier = new Notifier(deps);
+    this.automation = new WaystationAutomation(deps.store);
+    this.brains = new BrainConnections(deps);
+    this.resources = new AgentResources(deps);
+    this.agentRuns = new AgentRuns(deps, this.automation.architectures, this.brains, this.resources);
+    this.agentPlatform = new AgentPlatform(deps, this.automation.architectures, this.brains, this.resources, this.agentRuns);
+    this.agentSecrets = new AgentSecrets(deps);
+    this.agentSandboxes = new AgentSandboxes(deps, (project, text) => this.brains.sanitize(project, this.resources.sanitize(project, text)));
+    this.agentRuns.sandboxes = this.agentSandboxes;
+    this.agentEvaluations = new AgentEvaluations(deps, this.agentPlatform, this.agentRuns, this.brains, this.agentSandboxes);
+    this.connectors = new ConnectorBroker(deps);
+    this.automation.capabilityMetadata = project => this.agentPlatform.capabilities(project).map(c => ({ id: c.id, version: c.version, name: c.name, kind: c.spec.kind, description: c.description }));
+    this.automation.runResources = this.agentRuns;
+    this.notifier.on('revoke', (id: string) => this.automation.revoke(id));
   }
 
   /** In order: required reading and skills first, then tools. */

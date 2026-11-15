@@ -1,8 +1,9 @@
+import { providerLabel } from '../../../shared/agentProviders.ts';
 import { useEffect, useId, useState } from 'react';
 import { api, type Agent } from '../api.ts';
 import type { SessionView } from '../../../daemon/sessions/types.ts';
 import { readableTime } from '../activity.ts';
-import { VENDOR_LABEL } from '../format.ts';
+
 import { Icon } from './Icon.tsx';
 import '../session-history.css';
 
@@ -63,7 +64,7 @@ export function SessionHistory({ now, onOpen, notify }: Props) {
   const inProject = sessions.filter(session => !project || session.agent.cwd === project);
   const needle = query.trim().toLowerCase();
   const visible = inProject.filter(session => (!state || session.state === state)
-    && `${session.agent.name} ${session.agent.cwd ?? ''} ${session.agent.project} ${session.originalRequest ?? ''} ${session.latestResult ?? ''}`.toLowerCase().includes(needle));
+    && `${providerLabel(session.agent)} ${session.agent.name} ${session.agent.cwd ?? ''} ${session.agent.project} ${session.originalRequest ?? ''} ${session.latestResult ?? ''}`.toLowerCase().includes(needle));
   const countFor = (value: '' | SessionState) => inProject.filter(session => !value || session.state === value).length;
   const clearFilters = () => { setQuery(''); setProject(''); setState(''); };
   const resume = async (session: SessionView) => {
@@ -111,7 +112,7 @@ function SessionCard({ session, now, resuming, onOpen, onResume }: CardProps) {
       <span className={`history-avatar vendor-${agent.vendor}`} aria-hidden="true">{agent.name.trim().charAt(0).toUpperCase() || '?'}</span>
       <div className="history-card-title">
         <h3>{agent.name}</h3>
-        <p className="history-meta">{VENDOR_LABEL[agent.vendor]}<span aria-hidden="true">·</span>{agent.project}</p>
+        <p className="history-meta">{providerLabel(agent)}<span aria-hidden="true">·</span>{agent.project}</p>
       </div>
       <div className="history-card-aside">
         <span className={`history-status history-status-${session.state}`}>{STATE_LABEL[session.state]}</span>
@@ -127,7 +128,7 @@ function SessionCard({ session, now, resuming, onOpen, onResume }: CardProps) {
       <span className="history-path" title={agent.cwd}><Icon name="folder" size={14} />{agent.cwd ?? 'Project folder unknown'}</span>
       <div className="session-actions">
         {!session.canResume && !session.live && session.resumeBlockedReason && <span className="session-help">{session.resumeBlockedReason}</span>}
-        <button className="btn btn-small" onClick={onOpen}>Open conversation</button>
+        <button className="btn btn-small" onClick={onOpen}>{agent.observation ? 'View detection' : 'Open conversation'}</button>
         {session.canResume && <button className="btn btn-small btn-go" disabled={!!resuming} onClick={onResume}>{resuming === session.id ? 'Restoring…' : 'Resume conversation'}</button>}
       </div>
     </footer>

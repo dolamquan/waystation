@@ -1,0 +1,123 @@
+/* Architecture sketching on the console-board canvas. Lives inside .surface-dark, so theme tokens are the dark set. */
+.planning-color-sand { --sketch: var(--amber-text); }
+.planning-color-mint { --sketch: var(--green-text); }
+.planning-color-rose { --sketch: var(--red-text); }
+.planning-color-blue { --sketch: var(--blue-text); }
+
+/* ---- Components ---- */
+.planning-node.planning-component {
+  min-width: 40px; min-height: 30px; align-items: center; justify-content: center;
+  color: var(--text); background: color-mix(in srgb, var(--sketch) 14%, var(--panel));
+  border: 1.5px solid color-mix(in srgb, var(--sketch) 60%, transparent); border-radius: 10px; box-shadow: 0 8px 22px -12px rgb(0 0 0 / 0.7);
+}
+.planning-component.planning-node-selected { outline: 2px solid var(--blue-line); outline-offset: 3px; }
+.planning-component.sketch-link-source { outline: 2px solid var(--green-text); outline-offset: 3px; }
+.sketch-label {
+  position: relative; z-index: 1; max-width: 100%; padding: 2px 8px; overflow: hidden; text-align: center;
+  font-size: 14px; font-weight: 600; line-height: 1.25; white-space: pre-wrap; overflow-wrap: anywhere; user-select: none; pointer-events: none;
+}
+.sketch-label-input {
+  position: relative; z-index: 2; width: calc(100% - 12px); min-height: 28px; max-height: calc(100% - 8px); resize: none;
+  padding: 4px 6px; border: 1px solid var(--blue-line); border-radius: 6px; background: var(--bg); color: var(--text);
+  font: 600 14px var(--font); text-align: center; outline: 0; touch-action: auto;
+}
+.planning-component .planning-node-resize { opacity: 0; color: var(--muted); }
+.planning-component:hover .planning-node-resize, .planning-component.planning-node-selected .planning-node-resize { opacity: 1; }
+
+/* Filled silhouettes stretch with the block. */
+.sketch-fill { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.sketch-fill polygon, .sketch-fill path { fill: color-mix(in srgb, var(--sketch) 18%, var(--panel)); stroke: color-mix(in srgb, var(--sketch) 70%, transparent); stroke-width: 1.5; }
+.sketch-fill .sketch-rim { fill: none; }
+.planning-component.sketch-loadbalancer, .planning-component.sketch-database, .planning-component.sketch-external {
+  background: transparent; border: 0; box-shadow: none; border-radius: 0;
+}
+.planning-component.sketch-loadbalancer.planning-node-selected, .planning-component.sketch-database.planning-node-selected,
+.planning-component.sketch-external.planning-node-selected { outline-style: dashed; }
+.sketch-loadbalancer .sketch-label { font-size: 13px; padding: 0 22%; }
+.sketch-database .sketch-label { margin-top: 12%; }
+
+/* Icon blocks: icon on the left, label beside it. */
+.sketch-icon { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--sketch); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.planning-component.sketch-server, .planning-component.sketch-gateway, .planning-component.sketch-cache,
+.planning-component.sketch-queue, .planning-component.sketch-storage { flex-direction: row; gap: 4px; padding: 0 10px; }
+.sketch-queue { border-style: dashed; }
+.sketch-service { border-radius: 999px; }
+.sketch-service .sketch-label { font-weight: 500; font-size: 13px; }
+
+/* A person: icon above, name below. */
+.planning-component.sketch-client { flex-direction: column; gap: 2px; background: transparent; border: 0; box-shadow: none; }
+.sketch-icon-client { width: 52%; height: auto; max-height: 64%; fill: color-mix(in srgb, var(--sketch) 75%, var(--panel)); stroke: none; }
+.sketch-client .sketch-label { font-size: 13px; padding: 2px 8px; border-radius: 6px; background: color-mix(in srgb, var(--sketch) 22%, var(--panel)); }
+
+/* Stack: cards behind cards. Layer: a dashed boundary with its name at the top-left. */
+.planning-component.sketch-stack {
+  justify-content: flex-start; padding-top: 14px; background: var(--panel); border-color: color-mix(in srgb, var(--sketch) 45%, transparent);
+  box-shadow: 8px -8px 0 -1.5px var(--panel-2), 8px -8px 0 0 color-mix(in srgb, var(--sketch) 35%, transparent);
+}
+.sketch-stack .sketch-label { font-size: 18px; }
+.planning-component.sketch-layer {
+  justify-content: flex-start; align-items: flex-start; padding: 12px 14px;
+  background: color-mix(in srgb, var(--sketch) 4%, transparent); border: 1.5px dashed color-mix(in srgb, var(--sketch) 55%, transparent);
+  border-radius: 14px; box-shadow: none;
+}
+.sketch-layer .sketch-label { padding: 0; font-size: 18px; text-align: left; }
+
+/* ---- Connections ---- */
+.sketch-link { position: absolute; z-index: 95; overflow: visible; pointer-events: none; color: var(--muted); }
+.sketch-link-line, .sketch-link-head { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sketch-link-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; touch-action: none; }
+.sketch-link:hover, .sketch-link-selected { color: var(--blue-text); }
+.sketch-link-selected .sketch-link-line { stroke-width: 2.5; }
+.sketch-link-draft { color: var(--green-text); }
+.sketch-link-draft .sketch-link-line { stroke-dasharray: 6 5; }
+.sketch-link-label, .sketch-link-input {
+  position: absolute; z-index: 96; transform: translate(-50%, -50%); padding: 1px 7px; border-radius: 6px;
+  border: 1px solid var(--line-strong); background: var(--bg-2); color: var(--text-2); white-space: nowrap; cursor: pointer;
+}
+.sketch-link-input { width: 11rem; padding: 4px 8px; font: 12px var(--font); color: var(--text); border-color: var(--blue-line); outline: 0; cursor: text; }
+
+/* ---- Library panel ---- */
+.sketch-library {
+  position: absolute; left: 76px; top: 50%; transform: translateY(-50%); z-index: 11002; width: 268px;
+  display: grid; gap: 10px; padding: 12px; color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: 12px; background: rgb(17 17 19 / 0.9);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.75);
+}
+.sketch-library header { display: flex; align-items: center; justify-content: space-between; }
+.sketch-library header strong { font-size: 13px; }
+.sketch-library p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.sketch-library kbd { padding: 0 5px; border: 1px solid var(--line-strong); border-radius: 4px; font: 11px var(--mono); }
+.sketch-library-x { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.sketch-library-x:hover { background: var(--panel-3); color: var(--text); }
+.sketch-library-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sketch-pick {
+  display: grid; justify-items: center; gap: 5px; padding: 8px 4px; border: 1px solid transparent; border-radius: 8px;
+  background: var(--panel-2); color: var(--text-2); font: 500 11px var(--font); cursor: pointer;
+}
+.sketch-pick:hover { background: var(--panel-3); color: var(--text); }
+.sketch-pick[aria-pressed='true'] { border-color: var(--green-line); background: var(--green-soft); color: var(--text); }
+.sketch-pick:focus-visible, .sketch-template:focus-visible, .sketch-library-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.sketch-swatch {
+  position: relative; display: grid; place-items: center; width: 40px; height: 28px; border-radius: 6px;
+  background: color-mix(in srgb, var(--sketch) 16%, var(--panel)); border: 1px solid color-mix(in srgb, var(--sketch) 55%, transparent);
+}
+.sketch-swatch .sketch-icon { width: 16px; height: 16px; }
+.sketch-swatch.sketch-service { border-radius: 999px; }
+.sketch-swatch.sketch-queue { border-style: dashed; }
+.sketch-swatch.sketch-layer { background: transparent; border-style: dashed; }
+.sketch-swatch.sketch-stack { box-shadow: 4px -4px 0 -1px var(--panel-2), 4px -4px 0 0 color-mix(in srgb, var(--sketch) 35%, transparent); }
+.sketch-swatch.sketch-client, .sketch-swatch.sketch-loadbalancer, .sketch-swatch.sketch-database, .sketch-swatch.sketch-external { background: transparent; border: 0; }
+.sketch-swatch .sketch-icon-client { width: 22px; max-height: none; }
+.sketch-template {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border: 1px dashed var(--line-strong); border-radius: 8px;
+  background: transparent; color: var(--text-2); font: 500 12px var(--font); cursor: pointer;
+}
+.sketch-template:hover { border-color: var(--green-line); color: var(--text); }
+@media (max-width: 560px) { .sketch-library { left: 50px; width: min(268px, calc(100% - 60px)); } }
+
+/* What the active sketch tool expects next. */
+.sketch-hint {
+  position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 11003; margin: 0; padding: 6px 12px;
+  border: 1px solid var(--green-line); border-radius: 999px; background: rgb(17 17 19 / 0.88); color: var(--text); font-size: 12px;
+  pointer-events: none; white-space: nowrap;
+}

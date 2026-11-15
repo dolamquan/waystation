@@ -114,6 +114,21 @@ describe('plan review over the operator API', () => {
   });
 });
 
+describe('adding a member over the API', () => {
+  it('adds a worker to a running team and 400s for a second lead', async () => {
+    const team = await createTeam({ requirePlanApproval: false });
+    const added = await api('POST', `/api/teams/${team.id}/members`, { name: 'docs', vendor: 'claude', focus: 'Docs only' });
+    expect(added.status).toBe(200);
+    expect(added.json).toMatchObject({ ok: true, member: { name: 'docs', role: 'worker' } });
+    expect(added.json.message).toMatch(/docs joined/);
+    expect(teamView(team.id)!.members.map((m) => m.name)).toContain('docs');
+
+    const lead = await api('POST', `/api/teams/${team.id}/members`, { name: 'boss', role: 'lead', vendor: 'claude' });
+    expect(lead.status).toBe(400);
+    expect(lead.json.error).toMatch(/one lead/);
+  });
+});
+
 describe('operator task board over the API', () => {
   let teamId = '';
 
@@ -234,5 +249,36 @@ describe('member loadouts', () => {
       members: [{ name: 'lead', role: 'lead', vendor: 'claude', loadout: { docIds: 'not-a-list' } }],
     });
     expect(res.status).toBe(400);
+  });
+});
+
+
+describe('published team outputs over the API', () => {
+  it('registers through member tools, lists cards, downloads authenticated snapshots and keeps them after disband', async () => {
+    const before = sdkOptions.length;
+    const team = await createTeam({ requirePlanApproval: false });
+    await until(() => sdkOptions.length > before);
+    const lead = tokenOf(before);
+    const worktree = teamView(team.id)!.members.find(member => member.role === 'lead')!.worktree;
+    writeFileSync(join(worktree, 'report.md'), '# Research result');
+    const tools = await api('POST', '/team/tools', {}, { 'x-team-token': lead });
+    expect(tools.json.tools.map((tool: { name: string }) => tool.name)).toContain('register_output');
+    const published = await memberCall(lead, 'register_output', { title: 'Research report', description: 'Findings and recommendations', path: 'report.md' });
+    expect(published.status).toBe(200);
+    expect(published.json.isError).not.toBe(true);
+    const view = teamView(team.id)!;
+    const output = view.outputs![0];
+    expect(output.title).toBe('Research report');
+    const path = `/api/teams/${team.id}/outputs/${output.id}`;
+    const result = await api('GET', path);
+    expect(result.status).toBe(200);
+    expect(Buffer.from(result.json.data, 'base64').toString()).toBe('# Research result');
+    expect((await api('GET', path, undefined, { 'x-tower-token': 'wrong' })).status).toBe(401);
+    expect((await api('GET', `/api/teams/${team.id}/outputs/unknown`)).status).toBe(400);
+    const rejected = await memberCall(lead, 'register_output', { title: 'Missing', description: 'Missing file', path: 'missing.txt' });
+    expect(rejected.json.isError).toBe(true);
+    expect(teamView(team.id)!.outputs).toHaveLength(1);
+    await api('POST', `/api/teams/${team.id}/disband`, { confirm: true, removeWorktrees: true });
+    expect((await api('GET', path)).json.data).toBe(result.json.data);
   });
 });

@@ -1,3 +1,4 @@
+import { managedProvider, type ManagedVendor } from '../shared/agentProviders.ts';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,10 +18,10 @@ import { isTicketId, type CliHandoffs, type CliSpec } from './actions/cliHandoff
 import type { Notifier } from './notify/notifier.ts';
 import { UserError } from './userError.ts';
 
-export const CLI_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
+export const CLI_NAME: Readonly<Record<string, string>> = { claude: 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' };
 export const MANAGED_SOURCE = 'managed';
 
-export type CliVendor = 'claude' | 'codex';
+export type CliVendor = ManagedVendor;
 
 /** A Waystation agent whose session is open in the operator's terminal. */
 interface ParkedAgent {
@@ -51,15 +52,30 @@ export interface CliRequest {
   readonly sandbox?: boolean;
 }
 
+/** Where the CLI runs: the operator's own Windows Terminal tab (default), or a console on the board. */
+export type CliLauncher = 'external' | 'console';
+
 export interface TowerCliDeps {
   readonly registry: AgentRegistry;
   readonly store: TowerStore;
   readonly managed: ManagedAgents;
   readonly notifier: Notifier;
+  readonly prepareMcp?: (launch: ManagedLaunch) => ManagedLaunch;
   readonly cliSessions: CliHandoffs;
   readonly hooksOn: () => boolean;
   /** Opens a terminal tab running the launcher for a ticket. */
   readonly launchCliTab: (ticketId: string, title: string) => Promise<void>;
+  /**
+   * Runs the same launcher for a ticket inside an in-app console and returns that console's id.
+   * `onExit` runs when its process ends, so a closed console hands the agent back at once.
+   */
+  readonly launchCliConsole?: (ticketId: string, vendor: CliVendor, title: string, agentId: string | undefined, onExit: () => void) => Promise<string>;
+  /** Ends an in-app console's process and unlinks it from its agent; used when its CLI session ended without the console closing. */
+  readonly endConsole?: (consoleId: string) => void;
+  /** True once the tower is stopping: nothing may be relaunched then. */
+  readonly isShuttingDown?: () => boolean;
+  /** True when the agent belongs to a team (those open through their team, in a terminal tab). */
+  readonly isTeamMember?: (agentId: string) => boolean;
   readonly requireAgent: (agentId: string) => Agent;
   readonly queueHookMessage: (agentId: string, sessionId: string, text: string) => void;
   /** A team member opens through its team (it rejoins when the CLI closes); undefined for other agents. */
@@ -77,6 +93,7 @@ function launchExtras(launch: ManagedLaunch): Pick<CliRequest, 'mcpServers' | 'r
 }
 
 export function requireCli(vendor: CliVendor): void {
+  if (!managedProvider(vendor)?.cli) throw new UserError('This provider uses managed sessions in Waystation; CLI handoff is not available.');
   if (vendor === 'claude' && !resolveClaudeExe()) {
     throw new UserError('Claude Code was not found. Install it (npm i -g @anthropic-ai/claude-code) or set AGENT_TOWER_CLAUDE_EXE.');
   }
@@ -134,23 +151,26 @@ export class TowerCli {
   }
 
   /** Continue a managed agent's own session in the real Claude Code / Codex CLI. Team members rejoin when it closes. */
-  async open(agentId: string): Promise<{ message: string }> {
+  async open(agentId: string, launcher: CliLauncher = 'external'): Promise<{ message: string; consoleId?: string }> {
     // One hand-off at a time per agent: a double click must not open the same session twice.
     if (this.opening.has(agentId)) throw new UserError('This agent is already being opened in the CLI.');
     this.opening = new Set([...this.opening, agentId]);
     try {
-      return await this.openOnce(agentId);
+      return await this.openOnce(agentId, launcher);
     } finally {
       this.opening = new Set([...this.opening].filter((id) => id !== agentId));
     }
   }
 
-  private async openOnce(agentId: string): Promise<{ message: string }> {
+  private async openOnce(agentId: string, launcher: CliLauncher): Promise<{ message: string; consoleId?: string }> {
     const agent = this.deps.requireAgent(agentId);
     const runner = this.deps.managed.get(agentId);
-    if (!runner) return this.openCopy(agent);
-    const vendor = agent.vendor === 'codex' ? 'codex' : 'claude';
+    if (!runner) return this.openCopy(agent, launcher);
+    const vendor = agent.vendor === 'other' ? 'claude' : agent.vendor;
     requireCli(vendor);
+    if (launcher === 'console' && this.deps.isTeamMember?.(agentId)) {
+      throw new UserError('Team members open through their team, in a terminal tab.');
+    }
     const asMember = this.deps.openTeamMember(agentId, vendor);
     if (asMember) return asMember;
     if (agent.status === 'busy' || agent.status === 'waiting') {
@@ -163,20 +183,26 @@ export class TowerCli {
     this.parked = new Map([...this.parked, [agentId, { launch: runner.launch, sessionId: runner.sessionId, label, stopping: false }]]);
     // Open the tab first: if that fails, the agent keeps running here untouched. The CLI only starts once
     // its launcher has checked in, by which time the idle runner below has been stopped.
+    let consoleId: string | undefined;
     try {
-      await this.openTab(
+      ({ consoleId } = await this.openTab(
         { vendor, cwd: agent.cwd, sessionId: runner.sessionId, model: runner.model, ...launchExtras(runner.launch) },
         label, `${CLI_NAME[vendor]} · ${agent.name}`,
         () => this.returnFromTerminal(agentId),
-      );
+        launcher, agentId,
+      ));
     } catch (error) {
       this.parked = new Map([...this.parked].filter(([id]) => id !== agentId));
       throw error;
     }
+    // The launcher can already have died (bad ticket, missing exe) while the tab opened.
+    if (!this.parked.has(agentId)) throw new UserError('The CLI session ended before it started, so the agent stayed in Waystation.');
     const card = runner.snapshot();
     this.handedOff = new Set([...this.handedOff, agentId]);
     // The session belongs to the CLI from here on, whether or not the runner stops cleanly.
     await runner.stop().catch((error: Error) => console.error(`[tower] stopping ${agentId} after hand-off failed:`, error));
+    // A launcher that died while the runner was stopping already brought the agent back (and cleared `parked`).
+    if (!this.parked.has(agentId)) throw new UserError('The CLI session ended before it started, so the agent stayed in Waystation.');
     this.deps.managed.forget(agentId);
     // The agent stays listed (and stoppable) while it is in the terminal.
     this.deps.registry.upsert(MANAGED_SOURCE, {
@@ -185,13 +211,17 @@ export class TowerCli {
       pid: undefined,
       inTerminal: true,
       canInstruct: vendor === 'claude' && this.deps.hooksOn(),
-      currentActivity: `Open in your terminal (${CLI_NAME[vendor]})`,
+      currentActivity: consoleId ? `Open in a console (${CLI_NAME[vendor]})` : `Open in your terminal (${CLI_NAME[vendor]})`,
     });
-    return { message: `Opened in ${CLI_NAME[vendor]}. When you close that terminal, the agent comes back to Waystation and waits.` };
+    return consoleId
+      ? { message: `Opened in a ${CLI_NAME[vendor]} console on the board. When you close it, the agent comes back to Waystation and waits.`, consoleId }
+      : { message: `Opened in ${CLI_NAME[vendor]}. When you close that terminal, the agent comes back to Waystation and waits.` };
   }
 
   /** The terminal closed: relaunch the agent on its session, idle, under the same id. Only Stop ends it. */
   private returnFromTerminal(agentId: string): void {
+    // The tower is closing (consoles are being killed): launching a runner now would outlive the shutdown.
+    if (this.deps.isShuttingDown?.()) return;
     const parked = this.parked.get(agentId);
     if (!parked) return;
     this.parked = new Map([...this.parked].filter(([id]) => id !== agentId));
@@ -244,7 +274,7 @@ export class TowerCli {
    * A session that runs outside the tower (your own Claude Code, or a Codex thread in your editor) is already
    * open somewhere: continuing it here would put two writers on one conversation. Open a copy instead.
    */
-  private async openCopy(agent: Agent): Promise<{ message: string }> {
+  private async openCopy(agent: Agent, launcher: CliLauncher): Promise<{ message: string; consoleId?: string }> {
     const vendor = agent.vendor === 'claude' || agent.vendor === 'codex' ? agent.vendor : undefined;
     if (!vendor) throw new UserError('Only Claude Code and Codex sessions can be opened in their CLI.');
     if (!agent.sessionId) throw new UserError('This session has no id recorded yet, so it cannot be opened in the CLI.');
@@ -254,16 +284,19 @@ export class TowerCli {
     const hasConversation = vendor === 'codex'
       || existsSync(join(claudePaths.projects, claudeProjectSlug(agent.cwd), `${agent.sessionId}.jsonl`));
     this.deps.store.audit('open_cli_copy', agent.id, { vendor, sessionId: agent.sessionId, fresh: !hasConversation });
-    await this.openTab(
+    // A copy is a new session: nothing links it to the original agent, so no agent id is passed on.
+    const { consoleId } = await this.openTab(
       hasConversation ? { vendor, cwd: agent.cwd, sessionId: agent.sessionId, fork: true } : { vendor, cwd: agent.cwd },
       `copy:${agent.id}:${Date.now()}`,
       hasConversation ? `${CLI_NAME[vendor]} · copy of ${agent.name}` : `${CLI_NAME[vendor]} · ${agent.project}`,
       () => undefined,
+      launcher,
     );
     return {
       message: hasConversation
-        ? `Opened a copy of this conversation in ${CLI_NAME[vendor]}. The original keeps running where it is.`
+        ? `Opened a copy of this conversation in ${CLI_NAME[vendor]}${consoleId ? ' on the board' : ''}. The original keeps running where it is.`
         : `This session has no conversation yet, so a new ${CLI_NAME[vendor]} session was opened in its folder.`,
+      ...(consoleId ? { consoleId } : {}),
     };
   }
 
@@ -279,11 +312,20 @@ export class TowerCli {
   }
 
   /** Writes the ticket and opens its terminal tab. `onEnd` runs when that CLI session ends (or the tab fails to start it). */
-  async openTab(request: CliRequest, label: string, title: string, onEnd: () => void): Promise<void> {
+  async openTab(
+    request: CliRequest, label: string, title: string, onEnd: () => void, launcher: CliLauncher = 'external', agentId?: string,
+  ): Promise<{ consoleId?: string }> {
     const { notifier, cliSessions } = this.deps;
-    const prepared = notifier.attachDefaults({ ...request, prompt: '', agentId: `cli:${randomUUID()}` });
+    const notified = notifier.attachDefaults({ ...request, prompt: '', agentId: `cli:${randomUUID()}` });
+    const prepared = this.deps.prepareMcp?.(notified) ?? notified;
     request = { ...request, ...prepared };
-    const finish = () => { if (prepared.agentId) notifier.revoke(prepared.agentId); onEnd(); };
+    // Set once the console exists; a session that ends first (launcher never checked in) must not leave it running.
+    let consoleId: string | undefined;
+    const finish = () => {
+      if (prepared.agentId) notifier.revoke(prepared.agentId);
+      if (consoleId) this.deps.endConsole?.(consoleId);
+      onEnd();
+    };
     const secrets: Record<string, string> = { ...request.env, ...(request.teamToken ? { [TOKEN_ENV]: request.teamToken } : {}) };
     // Written to the tower's private folder next to the ticket and deleted when the session ends.
     const mcpFile = request.vendor === 'claude' && (request.mcpServers || request.remoteMcpServers)
@@ -300,11 +342,21 @@ export class TowerCli {
       throw error instanceof UserError ? error : new UserError(`Could not prepare the CLI session: ${(error as Error).message}`);
     }
     try {
+      if (launcher === 'console') {
+        if (!this.deps.launchCliConsole) throw new Error('consoles are not available');
+        consoleId = await this.deps.launchCliConsole(ticketId, request.vendor, title, agentId, () => cliSessions.ended(ticketId));
+        // Ended while the console was starting: nothing else will close it.
+        if (!cliSessions.has(label)) this.deps.endConsole?.(consoleId);
+        return { consoleId };
+      }
       await this.deps.launchCliTab(ticketId, title);
+      return {};
     } catch (error) {
       cliSessions.discard(ticketId);
       if (prepared.agentId) notifier.revoke(prepared.agentId);
-      throw new UserError(`Could not open Windows Terminal (${(error as Error).message}).`);
+      throw new UserError(launcher === 'console'
+        ? `Could not open the console (${(error as Error).message}).`
+        : `Could not open Windows Terminal (${(error as Error).message}).`);
     }
   }
 

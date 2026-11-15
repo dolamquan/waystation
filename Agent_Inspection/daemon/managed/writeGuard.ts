@@ -21,7 +21,7 @@ export const WRITE_TOOL_MATCHER = Object.keys(WRITE_TOOLS).join('|');
 export const READ_TOOL_MATCHER = Object.keys(READ_TOOLS).join('|');
 
 /** Inside a worktree, these configure agents or git for whoever opens the repo next. */
-const PROTECTED_IN_ROOT = /^(\.claude|\.codex|\.git|\.githooks|\.husky)([\\/]|$)|^\.mcp\.json$/i;
+const PROTECTED_IN_ROOT = /^(\.claude|\.codex|\.copilot|\.gemini|\.git|\.githooks|\.husky)([\\/]|$)|^(\.mcp\.json|GEMINI\.md)$|^\.github[\\/](copilot-instructions\.md|agents[\\/]|skills[\\/])/i;
 
 export function isInside(root: string, target: string): boolean {
   const rel = relative(resolve(root), resolve(root, target));

@@ -1,4 +1,5 @@
 import type { Agent, AgentEvent } from '../domain/types.ts';
+import { managedProvider } from '../../shared/agentProviders.ts';
 import { redact } from '../domain/text.ts';
 import type { ManagedLaunch } from '../managed/types.ts';
 import type { TowerStore } from '../store/db.ts';
@@ -17,7 +18,7 @@ export class SessionHistory {
   }
   get(id: string): SessionRecord | undefined { return this.records.get(id); }
   remember(agent: Agent): void {
-    if (!agent.sessionId && agent.tier !== 'A') return;
+    if (!agent.sessionId && agent.tier !== 'A' && !agent.observation) return;
     const previous = this.get(agent.id);
     this.save({ ...previous, id: agent.id, agent: { ...agent, name: redact(agent.name), currentActivity: agent.currentActivity ? redact(agent.currentActivity) : undefined },
       updatedAt: agent.lastEventAt ?? agent.startedAt ?? Date.now(), state: agent.status === 'stopped' ? agent.lastError ? 'interrupted' : 'finished' : 'active' });
@@ -59,16 +60,19 @@ export class SessionHistory {
     return [...this.records.values()].map(record => {
       const current = live.get(record.id);
       const active = current !== undefined && current.status !== 'stopped';
-      const sameConversation = liveAgents.find(agent => agent.vendor === record.agent.vendor && agent.sessionId === record.agent.sessionId && agent.status !== 'stopped');
+      const sameConversation = record.agent.sessionId && liveAgents.find(agent => agent.vendor === record.agent.vendor && agent.sessionId === record.agent.sessionId && agent.status !== 'stopped');
       const reason = record.teamId ? 'Resume this member from its team.'
+        : record.agent.observation ? 'Process detection does not provide conversation recovery. Reopen the agent in its original app.'
         : active || sameConversation ? 'This conversation is already open. Select its live session.'
         : !record.agent.sessionId ? 'No conversation id was recorded before this session ended.'
         : !record.agent.cwd ? 'No project folder was recorded.'
+        : record.agent.capabilities?.resume === false ? 'This agent does not support conversation recovery through ACP.'
+        : record.agent.capabilities && (!managedProvider(record.agent.vendor) || managedProvider(record.agent.vendor)?.available === false) ? 'Reconnect this provider in Setup checks before resuming.'
         : record.agent.vendor === 'other' ? 'This provider does not support conversation recovery.' : undefined;
       return { ...record, state: active ? 'active' as const : record.state, live: active, canResume: !reason, resumeBlockedReason: reason };
     }).filter(record => (!project || record.agent.cwd === project)
       && (!state || record.state === state)
-      && (!needle || `${record.agent.name} ${record.agent.project} ${record.agent.cwd ?? ''} ${record.originalRequest ?? ''} ${record.latestResult ?? ''}`.toLowerCase().includes(needle)))
+      && (!needle || `${record.agent.providerLabel ?? record.agent.vendor} ${record.agent.name} ${record.agent.project} ${record.agent.cwd ?? ''} ${record.originalRequest ?? ''} ${record.latestResult ?? ''}`.toLowerCase().includes(needle)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
   archivedAgent(id: string): Agent | undefined {

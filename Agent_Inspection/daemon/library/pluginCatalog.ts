@@ -156,6 +156,7 @@ export class PluginCatalog implements LoadoutProvider {
     const installed = this.list();
     const chosen = ids.map((id) => installed.find((p) => p.id === id) ?? fail(`unknown or uninstalled plugin: ${id}`));
     if (launch.vendor === 'codex') return { notes: ['Claude Code plugins are ignored for Codex agents (Codex loads the Codex plugins enabled in its own config).'] };
+    if (launch.vendor !== 'claude') return { notes: ['Claude Code plugin bundles are not loaded by this provider. Use shared skills, docs and MCP servers instead.'] };
     // Globally enabled plugins already load through the user's settings.
     const plugins = chosen.filter((p) => !p.enabledGlobally).map((p) => p.installPath);
     return plugins.length ? { plugins } : {};

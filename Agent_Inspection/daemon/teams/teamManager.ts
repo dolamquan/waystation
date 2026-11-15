@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
+import { registerOutput, readOutput, revealOutput } from './outputs.ts';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import type { Agent, AgentEvent } from '../domain/types.ts';
 import type { StdioMcpServer } from '../managed/types.ts';
-import { BoardError, RESUME_GRANT, lead, memberById, memberByName, planPhase, replaceMember } from './board.ts';
+import { BoardError, RESUME_GRANT, lead, memberById, memberByName, planPhase, replaceMember, unreadFor } from './board.ts';
 import { Delivery } from './delivery.ts';
 import { MemberRuntime } from './memberRuntime.ts';
 import { OperatorActions, PLAN_REVIEW_REASON, type MergeAllResult } from './operatorApi.ts';
@@ -14,7 +15,7 @@ import {
   TeamAuthError, TeamContext, TeamError, isPlanStatus, resumePhaseOf, withResumePhase,
   type Membership, type TeamHost, type TeamManagerOptions, type TeamStore,
 } from './teamContext.ts';
-import { parseTeamInput, slug } from './teamInput.ts';
+import { MAX_MEMBERS, parseAddedMember, parseTeamInput, slug } from './teamInput.ts';
 import { advertisedTools, callTool, type ToolDefinition } from './tools.ts';
 import { EVERYONE, OPERATOR, SYSTEM, type TeamLogEntry, type TeamMember, type TeamState, type TeamTask, type TeamView } from './types.ts';
 import {
@@ -168,6 +169,45 @@ export class TeamManager extends EventEmitter<{ teams: [TeamView[]]; log: [TeamL
     return { team: this.ctx.list().find((view) => view.id === id)!, notes: repo.notes };
   }
 
+  /**
+   * A worker joins an existing team: its own worktree off the team's base commit, on a sibling branch. The lead is told
+   * (and woken, if the phase allows) so it can hand out work; the newcomer launches with its first message, like everyone.
+   */
+  async addMember(teamId: string, raw: unknown): Promise<{ member: TeamMember; message: string }> {
+    const team = this.ctx.requireActive(teamId);
+    const input = parseAddedMember(raw, team.members.map((m) => m.name));
+    if (input.vendor === 'codex' && !this.ctx.host.codexAvailable()) {
+      throw new TeamError('Codex CLI not found (expected an npm global install of @openai/codex).');
+    }
+    const leader = lead(team);
+    const member: TeamMember = {
+      ...input,
+      id: input.name,
+      worktree: join(this.ctx.opts.teamsDir, team.id, input.name),
+      branch: `${leader.branch.slice(0, leader.branch.lastIndexOf('/'))}/${input.name}`,
+      merged: false,
+    };
+    await this.createWorktrees(team.repoRoot, team.baseCommit, [member]);
+    // The team may have changed while git ran (another add, a disband): check again before joining.
+    const current = this.ctx.teams.get(teamId);
+    const clash = !current || current.status === 'disbanded' || memberByName(current, member.name) || current.members.length >= MAX_MEMBERS;
+    if (clash) {
+      await removeWorktree(team.repoRoot, member.worktree).catch(() => undefined);
+      await deleteBranch(team.repoRoot, member.branch).catch(() => undefined);
+      throw new TeamError(current?.status === 'disbanded' ? 'This team was disbanded.' : `Could not add ${member.name}: the team changed. Try again.`);
+    }
+    this.ctx.commit({ ...current, members: [...current.members, member] });
+    this.ctx.host.audit('team_add_member', teamId, { member: input });
+    const label = `${member.name} (worker, ${member.vendor}${member.model ? ` ${member.model}` : ''})`;
+    this.ctx.append(teamId, 'system', OPERATOR, `${label} joined the team on ${member.branch}.`);
+    const focus = member.focus ? ` Focus: ${JSON.stringify(member.focus)}.` : '';
+    this.delivery.post(teamId, SYSTEM, leader.id,
+      `${label} joined the team.${focus} Its worktree is ${member.worktree} on branch ${member.branch}. Assign it work with create_task or post_message; it starts when it gets its first message.`);
+    const after = this.ctx.require(teamId).status;
+    const when = after === 'running' || after === 'planning' ? 'The lead was told and can assign it work.' : 'The lead is told when the team runs again.';
+    return { member, message: `${member.name} joined. ${when}` };
+  }
+
   // ---- agent-facing (MCP bridge) ------------------------------------------------------------
 
   authenticate(token: string | undefined): Membership | undefined {
@@ -202,6 +242,16 @@ export class TeamManager extends EventEmitter<{ teams: [TeamView[]]; log: [TeamL
   callForToken(token: string | undefined, name: unknown, args: unknown): { text: string; isError: boolean } {
     const { team, member } = this.caller(token);
     try {
+      if (name === 'register_output') {
+        const output = registerOutput(team, memberById(team, member)!, toolArgs(args), this.ctx.opts.teamsDir, this.ctx.now());
+        this.ctx.commit({ ...team, outputs: [...(team.outputs ?? []), output] });
+        this.ctx.append(team.id, 'system', member, `Published output: ${output.title}`);
+        return { text: `Saved "${output.title}" in the Outputs tab.`, isError: false };
+      }
+      if (name === 'finish_team') {
+        const pending = this.conversationPending(team, member);
+        if (pending) return { text: pending, isError: true };
+      }
       const outcome = callTool(team, member, String(name ?? ''), toolArgs(args));
       const changed = outcome.state !== team;
       const finished = outcome.finished !== undefined;
@@ -215,6 +265,24 @@ export class TeamManager extends EventEmitter<{ teams: [TeamView[]]; log: [TeamL
       if (error instanceof BoardError) return { text: error.message, isError: true };
       throw error;
     }
+  }
+
+  /**
+   * finish_team must not cut a conversation short: a teammate still mid-turn (often answering the lead) or mail the
+   * lead has not read would be lost once the team is done. Members open in the operator's terminal do not block.
+   * Live agent status is only known here, which is why this check is not in the pure callTool.
+   */
+  private conversationPending(team: TeamState, callerId: string): string | undefined {
+    const unread = unreadFor(team, callerId).length;
+    if (unread > 0) return `not finished: you have ${unread} unread message${unread === 1 ? '' : 's'}. Call read_messages first.`;
+    const working = team.members.filter((m) => {
+      if (m.id === callerId || m.terminal) return false;
+      const status = this.ctx.agentStatus(m);
+      return status === 'busy' || status === 'waiting';
+    });
+    if (working.length === 0) return undefined;
+    const names = working.map((m) => m.name).join(', ');
+    return `not finished: ${names} ${working.length === 1 ? 'is' : 'are'} still working and may be answering you. End your turn; you are woken when ${working.length === 1 ? 'it replies or goes idle' : 'they reply or go idle'}.`;
   }
 
   private afterTool(state: TeamState, finished: boolean, submitted: boolean): TeamState {
@@ -431,6 +499,14 @@ export class TeamManager extends EventEmitter<{ teams: [TeamView[]]; log: [TeamL
 
   removeTask(teamId: string, taskId: string): void {
     this.operator.removeTask(teamId, taskId);
+  }
+
+  output(teamId: string, outputId: string) {
+    return readOutput(this.ctx.require(teamId), outputId, this.ctx.opts.teamsDir);
+  }
+
+  revealOutput(teamId: string, outputId: string) {
+    return revealOutput(this.ctx.require(teamId), outputId, this.ctx.opts.teamsDir);
   }
 
   async diff(teamId: string, memberId: string): Promise<MemberDiff> {

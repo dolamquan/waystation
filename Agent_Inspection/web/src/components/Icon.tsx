@@ -1,6 +1,10 @@
 import type { CSSProperties } from 'react';
 
 const paths = {
+  git: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 9a9 9 0 0 1-9 9',
+  undo: 'M9 4 4 9l5 5M4 9h10a6 6 0 0 1 0 12',
+  redo: 'm15 4 5 5-5 5M20 9H10a6 6 0 0 0 0 12',
+  minus: 'M5 12h14',
   tower: 'M4 20h16M8 20V9l4-5 4 5v11M8 12h8M8 16h8M12 4V2',
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   activity: 'M3 12h4l3-8 4 16 3-8h4',
@@ -33,12 +37,14 @@ const paths = {
   mic: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v4M8 22h8',
   chevronDown: 'm6 9 6 6 6-6',
   copy: 'M9 9h12v12H9zM15 9V3H3v12h6',
-  book: 'M12 5v16M12 5Q7 2 2 5v15q5-3 10 1 5-4 10-1V5q-5-3-10 0',
+  book: 'M12 6.5v14M12 6.5Q7 3 2 3.5v14q5-.5 10 3M12 6.5Q17 3 22 3.5v14q-5-.5-10 3',
   refresh: 'M20 7V2M20 7h-5M4 17v5M4 17h5M20 7a9 9 0 0 0-15-3M4 17a9 9 0 0 0 15 3',
   info: 'M12 11v6M12 7h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
   clock: 'M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
   trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
   image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15.5 9.5h.01',
+  sun: 'M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  moon: 'M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z',
 } as const;
 
 export function Icon({ name, size = 18, style }: { readonly name: keyof typeof paths; readonly size?: number; readonly style?: CSSProperties }) {
