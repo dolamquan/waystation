@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="Agent_Inspection/docs/logo.svg" alt="Waystation logo" width="72" height="72" />
+<img src="Agent_Inspection/web/public/waystation-mark.svg" alt="Waystation logo" width="72" height="72" />
 
 # Waystation
 
@@ -18,7 +18,7 @@ Approve tool calls, run agents in terminals on a shared canvas, and coordinate m
 
 <br />
 
-<img src="Agent_Inspection/docs/screenshots/welcome.png" alt="Waystation welcome screen: 'Every coding agent on this machine, in one place.'" width="900" />
+<img src="Agent_Inspection/docs/screenshots/home-2026-11.png" alt="Waystation welcome screen: 'Every coding agent on this machine, in one place.'" width="900" />
 
 <br />
 
@@ -167,7 +167,7 @@ Closing the window keeps Waystation running in the system tray. To shut it down,
 Live sessions appear on the **station**: a calm node canvas grouped by project folder, where each session keeps one identity mark, subagents branch from their parent, teams are framed groups, and held tool calls can be approved right in place. No agents running yet? **Explore the demo** shows a labeled sample crew without launching anything.
 
 <div align="center">
-<img src="Agent_Inspection/docs/screenshots/overview.png" alt="Agent overview: the station with a sample crew, a team frame, and a pending approval" width="900" />
+<img src="Agent_Inspection/docs/screenshots/overview-2026-11.png" alt="Agent overview: the station with a sample crew, a team frame, and a pending approval" width="900" />
 </div>
 
 ### Console board
@@ -175,7 +175,7 @@ Live sessions appear on the **station**: a calm node canvas grouped by project f
 Open real terminals as tiles and plan around them. Switch between **Tiles**, **Focus** and **Canvas** layouts, sketch an architecture, drop in references, and spawn a team or an orchestrator straight from the board.
 
 <div align="center">
-<img src="Agent_Inspection/docs/screenshots/console-canvas.png" alt="Console board in Canvas mode, with the drawing toolbar and tile controls" width="900" />
+<img src="Agent_Inspection/docs/screenshots/console-canvas-2026-11.png" alt="Console board in Canvas mode, with the drawing toolbar and tile controls" width="900" />
 </div>
 
 ### Everything in the sidebar
