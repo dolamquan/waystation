@@ -1,0 +1,144 @@
+/* Architect panel: a calm conversation column. Tokens only (theme.css); every motion has a reduced-motion fallback. */
+.ac-panel { display: flex; flex-direction: column; min-height: 0; container-type: inline-size; }
+
+/* Header: identity + live state. */
+.ac-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+.ac-mark { position: relative; display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-strong); }
+.ac-mark.ac-thinking::after { content: ''; position: absolute; inset: -3px; border-radius: 11px; border: 1px solid var(--line-strong); animation: ac-breathe 1.8s var(--ease-out) infinite; }
+.ac-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ac-head-text strong { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+.ac-state { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-state i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.ac-state.ac-ready i { background: var(--green-text); }
+.ac-state.ac-thinking i { background: var(--text-2); animation: ac-blink 1.2s ease-in-out infinite; }
+.ac-state.ac-approval { color: var(--amber-text); }
+.ac-state.ac-approval i { background: var(--amber-text); }
+.ac-head-btn { width: 30px; height: 30px; border-color: transparent; background: transparent; color: var(--text-2); }
+.ac-head-btn:hover { background: var(--panel-2); color: var(--text); }
+
+.ac-scope { display: flex; align-items: center; gap: 7px; margin: 0 16px; padding: 7px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); font-size: 11.5px; color: var(--text-2); min-width: 0; }
+.ac-scope span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-scope strong { color: var(--text); font-weight: 550; }
+.ac-scope svg { flex: none; color: var(--text-2); }
+
+/* Transcript. */
+.ac-transcript { position: relative; flex: 1; min-height: 0; display: flex; }
+.ac-scroll { flex: 1; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 16px 12px; scrollbar-width: thin; scrollbar-color: var(--faint) transparent; mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 8px), transparent 100%); }
+.ac-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 6px; }
+.ac-messages { display: flex; flex-direction: column; gap: 18px; list-style: none; margin: 0; padding: 0; }
+.ac-messages ::selection { background: var(--panel-3); color: var(--text); }
+
+.ac-you { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; animation: ac-rise .28s var(--ease-out); }
+.ac-bubble { max-width: 88%; padding: 9px 13px; border-radius: 14px 14px 4px 14px; background: var(--panel-3); color: var(--text); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-you time, .ac-sent-label { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ac-sending .ac-bubble { opacity: .78; }
+
+.ac-reply { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; animation: ac-rise .28s var(--ease-out); }
+.ac-avatar { display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; color: var(--text-2); background: var(--panel-2); border: 1px solid var(--line); }
+.ac-reply-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+.ac-reply-meta strong { font-size: 12px; font-weight: 600; color: var(--text); }
+.ac-reply-meta time { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ac-reply-text { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-reply-text code { font: 12px var(--mono); padding: 1px 4px; border-radius: 4px; background: var(--panel-3); color: var(--text-2); }
+.ac-failed .ac-avatar { color: var(--red-text); background: var(--red-soft); }
+.ac-failed .ac-reply-meta strong, .ac-failed .ac-reply-text { color: var(--red-text); }
+
+/* Tool work, folded into one quiet row per burst. */
+.ac-steps { margin-left: 32px; font-size: 12px; color: var(--text-2); }
+.ac-steps > button, .ac-step-line { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 4px 8px 4px 6px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: left; }
+.ac-steps > button { cursor: pointer; }
+.ac-steps > button:hover { background: var(--panel-2); color: var(--text); }
+.ac-steps > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ac-steps span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-steps svg:first-child { flex: none; color: var(--green-text); }
+.ac-steps > button svg:last-child { flex: none; transition: transform .2s var(--ease-out); }
+.ac-steps > button[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
+.ac-steps.failed svg:first-child { color: var(--red-text); }
+.ac-steps ol { margin: 4px 0 0 21px; padding: 0 0 0 12px; border-left: 1px solid var(--line); list-style: none; display: grid; gap: 3px; }
+.ac-steps ol .failed { color: var(--red-text); }
+
+/* "The model is answering" bubble. */
+.ac-typing { display: inline-flex; align-items: center; gap: 10px; justify-self: start; max-width: 100%; padding: 9px 13px 9px 11px; border-radius: 14px 14px 14px 4px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; color: var(--text-2); }
+.ac-typing > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-dots { display: inline-flex; gap: 4px; flex: none; }
+.ac-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-2); animation: ac-hop 1.1s ease-in-out infinite; }
+.ac-dots i:nth-child(2) { animation-delay: .15s; }
+.ac-dots i:nth-child(3) { animation-delay: .3s; }
+.ac-thinking .ac-avatar { animation: ac-breathe 1.8s var(--ease-out) infinite; }
+
+/* Held tool call: approve or decline without leaving the panel. */
+.ac-approval-row { grid-template-columns: minmax(0, 1fr); }
+.ac-held { padding: 12px 13px; border-radius: 12px; border: 1px solid var(--amber-line); background: var(--amber-soft); color: var(--text); font-size: 12.5px; }
+.ac-held-head { display: flex; align-items: center; gap: 8px; color: var(--amber-text); }
+.ac-held-head strong { color: var(--text); font-weight: 600; }
+.ac-held p { margin: 6px 0 0; color: var(--text-2); line-height: 1.5; }
+.ac-held details { margin-top: 8px; }
+.ac-held summary { cursor: pointer; font-size: 11.5px; color: var(--text-2); width: fit-content; }
+.ac-held summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.ac-held pre { margin: 6px 0 0; max-height: 160px; overflow: auto; padding: 8px 10px; border-radius: 8px; background: var(--panel); font: 11px/1.5 var(--mono); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ac-held-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.ac-held-deny { display: grid; gap: 6px; margin-top: 10px; }
+.ac-held-deny label { font-size: 11.5px; color: var(--text-2); }
+.ac-held-deny .text-input { font-size: 12.5px; }
+
+/* Empty state. */
+.ac-intro { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 16px 16px; display: flex; flex-direction: column; }
+.ac-intro-mark { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 14px; border-radius: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-strong); }
+.ac-intro h3 { margin: 0 0 8px; font-size: 15px; line-height: 1.35; font-weight: 600; letter-spacing: -0.01em; color: var(--text); text-wrap: balance; }
+.ac-intro p { margin: 0 0 20px; max-width: 46ch; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+.ac-starters { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ac-starters button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--text-2); font: 12.5px/1.45 var(--font); text-align: left; cursor: pointer; transition: background .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out); }
+.ac-starters button span { flex: 1; }
+.ac-starters button > svg:first-child { flex: none; color: var(--text-2); }
+.ac-starters button > svg:last-child { flex: none; opacity: 0; transform: translateX(-4px); transition: opacity .18s var(--ease-out), transform .18s var(--ease-out); }
+.ac-starters button:hover { background: var(--panel-2); border-color: var(--line-strong); color: var(--text); }
+.ac-starters button:hover > svg:last-child, .ac-starters button:focus-visible > svg:last-child { opacity: 1; transform: none; }
+.ac-starters button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* Composer. */
+.ac-composer { flex: none; padding: 10px 14px 14px; }
+.ac-composer .arch-error { margin: 0 0 8px; }
+.ac-box { border: 1px solid var(--line-strong); border-radius: 14px; background: var(--panel); transition: border-color .18s var(--ease-out), box-shadow .18s var(--ease-out); }
+.ac-box:focus-within { border-color: var(--text-2); box-shadow: 0 0 0 3px var(--panel-3); }
+.ac-box textarea { display: block; width: 100%; min-height: 40px; max-height: 200px; padding: 11px 12px 4px; border: 0; background: transparent; color: var(--text); font: 13px/1.6 var(--font); resize: none; caret-color: var(--text); }
+.ac-box textarea:focus { outline: none; }
+.ac-box textarea::placeholder { color: var(--muted); }
+.ac-box-foot { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px 10px; }
+.ac-chip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: calc(100% - 44px); padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2); color: var(--text-2); font: 11.5px var(--font); cursor: pointer; }
+.ac-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-chip svg { flex: none; }
+button.ac-chip:hover { color: var(--text); border-color: var(--line-strong); }
+button.ac-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ac-chip-static { cursor: default; }
+.ac-hint { display: none; margin-left: auto; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.ac-hint kbd { font: 10px var(--font); padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); }
+.ac-send { display: grid; place-items: center; flex: none; width: 32px; height: 32px; margin-left: auto; border: 0; border-radius: 50%; background: var(--primary); color: var(--on-primary); cursor: pointer; transition: opacity .18s var(--ease-out), transform .18s var(--ease-out); }
+.ac-send:hover:not(:disabled) { opacity: .88; }
+.ac-send:active:not(:disabled) { transform: scale(.94); }
+.ac-send:disabled { background: var(--panel-3); color: var(--muted); cursor: default; }
+.ac-send:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ac-stop { background: var(--text); }
+.ac-stop span { width: 10px; height: 10px; border-radius: 2px; background: var(--panel); }
+.ac-model { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-top: 1px solid var(--line); animation: ac-rise .2s var(--ease-out); }
+.ac-model label { display: grid; gap: 4px; font-size: 11px; color: var(--text-2); min-width: 0; }
+.ac-model select, .ac-model input { width: 100%; min-width: 0; padding: 6px 8px; font-size: 12px; }
+
+.ac-latest { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--text-2); font-size: 11.5px; cursor: pointer; box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow-ink) 14%, transparent); }
+.ac-latest:hover { color: var(--text); }
+.ac-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@container (min-width: 440px) { .ac-hint { display: inline; } .ac-hint + .ac-send { margin-left: 0; } }
+@container (max-width: 300px) { .ac-model { grid-template-columns: 1fr; } }
+
+@keyframes ac-hop { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes ac-blink { 50% { opacity: .35; } }
+@keyframes ac-breathe { 0% { box-shadow: 0 0 0 0 var(--panel-3); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes ac-rise { from { opacity: 0; transform: translateY(4px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ac-you, .ac-reply, .ac-model, .ac-mark.ac-thinking::after, .ac-thinking .ac-avatar, .ac-state.ac-thinking i { animation: none; }
+  .ac-dots i { animation: none; opacity: .5; }
+  .ac-dots i:nth-child(2) { opacity: .75; }
+  .ac-dots i:nth-child(3) { opacity: 1; }
+  .ac-steps > button svg:last-child, .ac-starters button, .ac-starters button > svg:last-child, .ac-box, .ac-send { transition: none; }
+}

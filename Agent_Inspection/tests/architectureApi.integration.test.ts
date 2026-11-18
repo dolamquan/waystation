@@ -56,13 +56,25 @@ describe('architecture HTTP and agent tools', () => {
     const launch = vi.spyOn(tower, 'launch').mockImplementation(raw => { tower.registry.upsert('architecture-test', agent); return agent; });
     const instruct = vi.spyOn(tower, 'instruct').mockResolvedValue('Sent.');
     try {
-      const started = await call('POST', `/api/architectures/${id}/chat`, { text: 'Add a reviewer', vendor: 'codex', selection: 'builder' });
+      expect((await call('POST', `/api/architectures/${id}/chat`, { text: 'Add a reviewer', vendor: 'not-a-vendor' })).status).toBe(400);
+      expect((await call('POST', `/api/architectures/${id}/chat`, { text: 'Add a reviewer', vendor: 'codex' })).status).toBe(400); // cannot enforce tool review
+      expect((await call('POST', `/api/architectures/${id}/chat`, { text: 'Add a reviewer', vendor: 'claude', model: '--dangerously-skip-permissions' })).status).toBe(400);
+      expect((await call('POST', `/api/architectures/${id}/chat`, { text: 'Add a reviewer', vendor: 'claude', model: 42 })).status).toBe(400);
+      expect(launch).not.toHaveBeenCalled();
+      const started = await call('POST', `/api/architectures/${id}/chat`, { text: 'Add a reviewer', vendor: 'claude', model: 'claude-sonnet-5-5', selection: 'builder' });
       expect(started.status).toBe(200); expect(started.data.agentId).toBe(agent.id);
-      expect(launch.mock.calls[0][0]).toMatchObject({ vendor: 'codex', cwd: expect.any(String), appendSystemPrompt: expect.stringContaining(`workflow id is ${id}`) });
+      expect(launch.mock.calls[0][0]).toMatchObject({ vendor: 'claude', model: 'claude-sonnet-5-5', cwd: expect.any(String), toolPolicy: 'review-tools', intercept: true, appendSystemPrompt: expect.stringContaining(`workflow id is ${id}`) });
       expect((await call('GET', `/api/architectures/${id}`)).data.agentId).toBe(agent.id);
       expect((await call('POST', `/api/architectures/${id}/chat`, { text: 'Explain the handoff', vendor: 'claude' })).status).toBe(200);
       expect(launch).toHaveBeenCalledTimes(1); expect(instruct).toHaveBeenCalledWith(agent.id, expect.stringContaining('Explain the handoff'));
       expect((await call('POST', `/api/architectures/${id}/chat`, { text: '' })).status).toBe(400);
+      for (const status of ['busy', 'waiting'] as const) {
+        tower.registry.upsert('architecture-test', { ...agent, status });
+        const rejected = await call('POST', `/api/architectures/${id}/chat`, { text: 'Another idea' });
+        expect(rejected.status).toBe(400); expect(rejected.data.error).toMatch(/still working/);
+      }
+      expect(instruct).toHaveBeenCalledTimes(1);
+      tower.registry.upsert('architecture-test', agent);
     } finally { launch.mockRestore(); instruct.mockRestore(); }
   });
   it('tests a saved individual agent with enforced runtime policy, rejects duplicate or stale tests, and keeps foreign credentials inaccessible', async () => {
@@ -130,6 +142,8 @@ describe('architecture HTTP and agent tools', () => {
       const key = (await call('POST', `/api/agent-triggers/${t.id}/key`, {})).data;
       const hook = async (token: string, path = key.path) => { const res = await fetch(`http://127.0.0.1:${PORT}${path}`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' }); return { status: res.status, data: await res.json() as any }; };
       expect((await hook('wrong')).status).toBe(401);
+      expect((await hook(key.token)).status).toBe(400);
+      expect((await call('POST', `/api/agent-deployments/${deployment.id}/promote`, { override: 'Explicit initial release for authenticated webhook integration verification.' })).status).toBe(200);
       const invoked = await hook(key.token); expect(invoked.status).toBe(200); expect(Object.keys(invoked.data).sort()).toEqual(['runId', 'status']);
       await vi.waitFor(() => expect(tower.library.agentRuns.get(invoked.data.runId).status).toBe('succeeded'));
       const replacement = (await call('POST', `/api/agent-triggers/${t.id}/key`, {})).data;

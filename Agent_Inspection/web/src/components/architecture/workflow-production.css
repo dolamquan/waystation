@@ -1,0 +1,58 @@
+.architecture .arch-save.unsaved { color: var(--amber-text); }
+.arch-mobile-section-picker { display: none; }
+.arch-save.unsaved .arch-save-dot { background: var(--amber-text); box-shadow: none; }
+.arch-workflow-runner { margin: 0 0 22px; padding: 18px 0; border-block: 1px solid var(--line); }
+.arch-workflow-runner h2 { font-size: 18px; margin: 0 0 6px; }
+.arch-workflow-runner p { margin: 0 0 14px; color: var(--text-2); font-size: 13px; line-height: 1.6; max-width: 75ch; }
+.arch-workflow-runner form { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.arch-workflow-runner label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.arch-workflow-task { flex: 1 1 320px; }
+.arch-workflow-task textarea { width: 100%; resize: vertical; }
+.arch-latest-run { margin-top: 16px; }
+.arch-latest-run > summary { cursor: pointer; padding: 10px 0; color: var(--text-2); font-size: 13px; }
+.arch-draft-notice { padding: 12px; margin: 12px 0; background: var(--amber-soft); color: var(--amber-text); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.65; }
+.arch-draft-notice p { margin: 0 0 8px; }
+.arch-replay-warning { display: flex; align-items: start; gap: 10px; padding: 14px 0; color: var(--amber-text); font-size: 13px; line-height: 1.6; }
+.arch-replay-warning input { margin-top: 5px; flex-shrink: 0; }
+.arch-execution-limits { display: block; }
+.arch-execution-limits > summary, .arch-deployment-details > summary { cursor: pointer; padding: 12px 0; font-size: 13px; color: var(--text-2); }
+.arch-execution-limits[open] > label { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.arch-execution-limits > p { margin-top: 12px; }
+.arch-workflow-steps { padding: 16px 0; }
+.arch-workflow-steps h4 { font-size: 13px; margin: 0 0 10px; }
+.arch-workflow-steps ol { padding-left: 24px; margin: 0; }
+.arch-workflow-steps li { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.arch-workflow-steps li > span { margin-left: 12px; color: var(--text-2); }
+.arch-workflow-steps li p { color: var(--amber-text); margin: 6px 0 0; }
+.arch-api-architect { padding: 18px; overflow: auto; }
+.arch-api-architect h2 { margin: 0 0 12px; font-size: 18px; }
+.arch-api-architect p { font-size: 13px; line-height: 1.7; margin: 0 0 16px; }
+.arch-api-architect label { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; font-size: 12px; }
+.arch-api-proposal { margin-top: 22px; }
+.arch-api-proposal summary { cursor: pointer; padding: 10px 0; }
+.arch-api-proposal pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 400px; overflow-y: auto; font: 12px/1.65 var(--mono); }
+.tower.hosted-shell { display: block; min-height: 100vh; }
+.tower.hosted-shell::before { display: none; }
+.hosted-header { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 18px 28px; border-bottom: 1px solid var(--line); }
+.hosted-header > span { color: var(--text-2); font-size: 13px; }
+.hosted-header label { display: flex; align-items: center; gap: 10px; margin-left: auto; font-size: 13px; }
+.hosted-header select { max-width: 320px; }
+.hosted-header a { font-size: 13px; }
+.hosted-main { padding: 28px; }
+.hosted-context { margin: 0 auto 22px; max-width: 1440px; font-size: 13px; line-height: 1.7; color: var(--text-2); }
+@media (max-width: 1250px) { .architecture .arch-workspace { grid-template-columns: 120px minmax(0, 1fr) 340px; } }
+@media (max-width: 1000px) { .architecture .arch-workspace { grid-template-columns: 100px minmax(0, 1fr); height: auto; } .architecture .arch-side { grid-column: 1 / -1; max-height: 680px; } }
+@media (max-width: 600px) {
+  :root .tower .architecture > .arch-surface-tabs { display: none; }
+  .arch-mobile-section-picker { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; font-size: 14px; }
+  .arch-workflow-runner { padding-block: 14px; }
+  .arch-workflow-runner form > label, .arch-workflow-runner form > button { width: 100%; }
+  .architecture .arch-workspace { grid-template-columns: minmax(0, 1fr); }
+  .architecture .arch-palette { gap: 5px; padding: 8px; }
+  .architecture .arch-component { min-height: 38px; padding: 4px; }
+  .architecture .arch-stage { min-height: 340px; }
+  .hosted-header, .hosted-main { padding: 16px; }
+  .hosted-header label { width: 100%; margin-left: 0; }
+  .hosted-header select { flex: 1; min-width: 0; }
+  .arch-workflow-runner .text-input, .hosted-header .text-input { font-size: 16px; }
+}

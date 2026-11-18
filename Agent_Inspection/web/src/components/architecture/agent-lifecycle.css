@@ -1,0 +1,114 @@
+/* Lifecycle navigation, release gating, tool manifests, MCP, evaluation results and code execution.
+   Neutral surfaces; status colour only for pass/fail and stage. Tokens come from theme.css. */
+
+/* ---- Lifecycle navigation ---- */
+:root .tower .architecture > .arch-surface-tabs { gap: 0; }
+.arch-surface-group { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.arch-surface-group + .arch-surface-group { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--line); }
+.arch-surface-group-label { padding-right: 4px; color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.arch-surface-tabs .arch-surface-group > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* ---- Release ---- */
+.release-explainer { display: flex; align-items: start; gap: 9px; margin: 0 0 20px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--text-2); font-size: 12px; line-height: 1.7; max-width: 90ch; }
+.release-explainer > svg { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+.release-production { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; font-size: 13px; color: var(--text-2); }
+.release-production strong { color: var(--text); font-weight: 600; }
+.release-versions { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 12px; }
+.release-version { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg-2); display: grid; gap: 12px; }
+.release-version.stage-production { border-color: var(--green-line); }
+.release-version > header { display: grid; gap: 4px; }
+.release-version > header > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.release-version > header strong { font-size: 15px; font-weight: 600; }
+.release-version > header small { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.release-current { color: var(--muted); font-size: 11px; }
+.release-promotion { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.7; }
+.release-override-note { color: var(--amber-text); overflow-wrap: anywhere; }
+.release-blocked { color: var(--text-2); font-size: 12px; }
+.release-confirm, .release-override { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--panel); }
+.release-confirm p { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-2); }
+.release-override label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--text-2); }
+.release-override .text-input { width: 100%; resize: vertical; }
+.release-gate h4 { margin: 0 0 8px; font-size: 12px; font-weight: 550; color: var(--text-2); }
+.release-gate ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.release-gate li { display: flex; align-items: start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.release-gate li strong { font-weight: 550; }
+.release-gate li p { margin: 2px 0 0; color: var(--text-2); line-height: 1.6; overflow-wrap: anywhere; }
+.release-check-mark { display: inline-grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; }
+.release-gate li.is-ok .release-check-mark { color: var(--green-text); background: var(--green-soft); }
+.release-gate li.is-failing .release-check-mark { color: var(--red-text); background: var(--red-soft); }
+.release-regressions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 0; font-size: 12px; color: var(--red-text); }
+.release-regressions code, .eval-compare-lists code { font: 11px var(--mono); padding: 1px 5px; border-radius: 4px; background: var(--panel-2); color: var(--text-2); }
+.release-policy { padding-top: 20px; border-top: 1px solid var(--line); display: grid; gap: 16px; }
+.release-policy > header { display: flex; align-items: start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.release-policy h3 { margin: 0 0 4px; font-size: 15px; font-weight: 550; }
+
+/* ---- Tools the model sees / trajectory ---- */
+.agent-tools { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.agent-tools > header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.agent-tools h4 { margin: 0; font-size: 12px; font-weight: 550; }
+.agent-tool-list { list-style: none; margin: 0; padding: 0; }
+.agent-tool-list li { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.agent-tool-list li:first-child { border-top: 0; }
+.agent-tool-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.agent-tool-name code, .mcp-tool-picker code, .agent-trajectory code, .mcp-drift code { font: 12px var(--mono); color: var(--text); overflow-wrap: anywhere; }
+.agent-tool-name span { color: var(--text-2); font-size: 12px; }
+.agent-tool-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-tool-list p, .mcp-tool-picker li > p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.agent-trajectory { margin: 12px 0; }
+.agent-trajectory > summary { cursor: pointer; font-size: 12px; font-weight: 550; padding: 6px 0; }
+.agent-trajectory table { font-size: 12px; }
+.agent-trajectory td small { display: block; margin-top: 4px; color: var(--red-text); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-tool-refusal { width: 100%; display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--amber-line); border-radius: var(--radius-sm); background: var(--amber-soft); }
+.arch-tool-refusal > p { display: flex; align-items: start; gap: 8px; margin: 0; color: var(--text); font-size: 12px; line-height: 1.6; }
+.arch-tool-refusal > p > svg { flex-shrink: 0; margin-top: 2px; color: var(--amber-text); }
+.arch-tool-refusal small { color: var(--text-2); font-size: 11px; }
+
+/* ---- MCP ---- */
+.mcp-discover { display: flex; flex-direction: column; justify-content: end; gap: 6px; }
+.mcp-discover small { color: var(--muted); font-size: 11px; }
+.mcp-tool-picker, .mcp-approval { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; }
+.mcp-tool-picker legend, .mcp-approval legend { padding: 0; margin-bottom: 8px; font-size: 12px; color: var(--text-2); }
+.mcp-tool-picker ul { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.mcp-tool-picker li { display: grid; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.mcp-tool-picker li:first-child { border-top: 0; }
+.mcp-tool-picker li > .platform-check { gap: 8px; }
+.mcp-drift { margin-top: 16px; }
+.tavily-help p { margin: 0 0 4px; }
+
+/* ---- Evaluation results ---- */
+.eval-stats { margin: 20px 0 24px; display: grid; gap: 18px; }
+.eval-stats-headline { display: flex; flex-wrap: wrap; align-items: end; gap: 24px 40px; }
+.eval-pass-rate { display: grid; gap: 2px; }
+.eval-pass-rate > span, .eval-compare-rates span { color: var(--text-2); font-size: 12px; }
+.eval-pass-rate > strong { font-size: 40px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.eval-pass-rate > small { color: var(--muted); font-size: 11px; }
+.eval-stats-facts { display: flex; flex-wrap: wrap; gap: 16px 28px; margin: 0; }
+.eval-stats-facts dt { color: var(--text-2); font-size: 11px; margin-bottom: 2px; }
+.eval-stats-facts dd { margin: 0; font-size: 15px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.eval-stats-facts dd small { display: block; color: var(--muted); font-size: 10px; font-weight: 400; }
+.eval-per-evaluator { width: 100%; max-width: 560px; border-collapse: collapse; font-size: 12px; }
+.eval-per-evaluator caption { text-align: left; color: var(--text-2); padding-bottom: 6px; font-size: 12px; }
+.eval-per-evaluator th, .eval-per-evaluator td { text-align: left; padding: 7px 8px 7px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.eval-per-evaluator th { color: var(--muted); font-weight: 500; }
+.eval-bar { display: inline-block; width: 64px; height: 4px; margin-right: 8px; vertical-align: middle; border-radius: 2px; background: var(--panel-2); overflow: hidden; }
+.eval-bar > span { display: block; height: 100%; background: var(--accent); }
+.eval-rate-cell { display: block; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.agent-table-scroll td > span[title] > .platform-badge { margin-top: 6px; }
+.eval-compare-summary { margin: 24px 0; display: grid; gap: 20px; }
+.eval-compare-rates { display: flex; flex-wrap: wrap; gap: 16px 40px; }
+.eval-compare-rates > div { display: grid; gap: 2px; }
+.eval-compare-rates strong { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.eval-compare-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+.eval-compare-lists h3 { margin: 0 0 8px; font-size: 13px; font-weight: 550; }
+.eval-compare-lists ul { list-style: none; margin: 0; padding: 0; }
+.eval-compare-lists li { display: flex; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+
+/* ---- Code execution ---- */
+.sandbox-run-link { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 16px 0 0; font-size: 12px; color: var(--text-2); }
+.sandbox-run-link code { font: 11px var(--mono); }
+
+@media (max-width: 600px) {
+  .arch-surface-group + .arch-surface-group { margin-left: 6px; padding-left: 6px; }
+  .eval-pass-rate > strong { font-size: 32px; }
+  .release-version { padding: 14px; }
+}

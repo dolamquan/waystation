@@ -1,0 +1,136 @@
+/* Add tool dialog, the agent's tool list, and inline connection setup.
+   Neutral surfaces; colour only for selection, status and errors. Tokens come from theme.css. */
+
+/* ---- Dialog shell ---- */
+:root .modal.add-tool-modal { width: min(680px, 100%); }
+.add-tool-back { margin: -6px 0 12px; }
+.add-tool-body { display: grid; gap: 16px; min-width: 0; }
+.add-tool-footer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.add-tool-footer small { color: var(--muted); font-size: 11px; }
+.add-tool-link { padding: 0; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.add-tool-link:hover { color: var(--text); }
+.add-tool-link:focus-visible, .add-tool-choice:focus-visible, .add-tool-option:focus-visible, .add-tool-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---- First screen ---- */
+.add-tool-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.add-tool-choice { display: flex; align-items: start; gap: 12px; padding: 14px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; transition: border-color .15s var(--ease-out), background .15s var(--ease-out); }
+.add-tool-choice:hover:not(:disabled) { border-color: var(--line-strong); background: var(--panel-2); }
+.add-tool-choice:disabled { cursor: not-allowed; opacity: .72; }
+.add-tool-choice > svg:last-child { flex-shrink: 0; margin-top: 3px; color: var(--muted); }
+.add-tool-choice-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: var(--radius-sm); background: var(--panel-3); color: var(--accent); }
+.add-tool-choice-text { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.add-tool-choice-text strong { font-size: 13px; font-weight: 600; }
+.add-tool-choice-text span { color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.add-tool-choice-text small { color: var(--amber-text); font-size: 11px; line-height: 1.5; }
+
+/* ---- Flows ---- */
+.add-tool-flow { display: grid; gap: 16px; min-width: 0; }
+.add-tool-flow > p, .add-tool-flow section > p { margin: 0; }
+.add-tool-flow h4 { margin: 0 0 8px; font-size: 12px; font-weight: 550; color: var(--text-2); }
+.add-tool-flow code { font: 12px var(--mono); overflow-wrap: anywhere; }
+.add-tool-step { color: var(--muted); font-size: 11px; font-weight: 550; letter-spacing: .04em; text-transform: uppercase; }
+.add-tool-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; color: var(--text-2); }
+.add-tool-field .text-input { width: 100%; }
+.add-tool-field textarea.text-input { resize: vertical; }
+.add-tool-field small { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.add-tool-field small a { color: var(--text-2); }
+.add-tool-invalid, .add-tool-field small.add-tool-invalid { color: var(--red-text); }
+.add-tool-secret { display: flex; gap: 6px; }
+.add-tool-secret .text-input { flex: 1; min-width: 0; }
+.add-tool-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.add-tool-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.add-tool-actions .btn-go { margin-left: auto; }
+.add-tool-actions small { color: var(--muted); font-size: 11px; }
+.add-tool-actions small:last-child { flex-basis: 100%; text-align: right; }
+
+/* Selectable server cards and rows */
+.add-tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.add-tool-option { display: grid; align-content: start; gap: 6px; justify-items: start; min-width: 0; padding: 12px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+.add-tool-option:hover:not(:disabled) { border-color: var(--line-strong); }
+.add-tool-option[aria-pressed="true"] { border-color: var(--green-line); background: var(--green-soft); }
+.add-tool-option:disabled { cursor: not-allowed; opacity: .6; }
+.add-tool-option strong { font-size: 13px; font-weight: 600; }
+.add-tool-option > span:not(.platform-badge) { color: var(--text-2); font-size: 11px; line-height: 1.5; }
+.add-tool-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.add-tool-row { width: 100%; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.add-tool-url { font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.add-tool-why { display: block; margin-top: 4px; color: var(--amber-text); font-size: 11px; line-height: 1.5; }
+.add-tool-connect { display: grid; gap: 10px; margin-top: 10px; padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--panel-2); }
+.add-tool-connect .arch-actions small { color: var(--muted); font-size: 11px; }
+
+/* MCP tool checklist */
+.add-tool-connected { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
+.add-tool-connected svg { color: var(--green-text); }
+.add-tool-checklist { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
+.add-tool-checklist legend { padding: 0; margin-bottom: 8px; font-size: 12px; color: var(--text-2); }
+.add-tool-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.add-tool-bulk small { color: var(--muted); font-size: 11px; }
+.add-tool-checklist ul { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.add-tool-checklist li { display: grid; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.add-tool-checklist li:first-child { border-top: 0; }
+.add-tool-checklist li > p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Describe a tool */
+.add-tool-examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.add-tool-chip { padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2); color: var(--text-2); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+.add-tool-chip:hover { border-color: var(--line-strong); color: var(--text); }
+.add-tool-progress { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
+.add-tool-progress > div { flex: 1; min-width: 180px; }
+.add-tool-progress strong { font-size: 13px; font-weight: 600; }
+.add-tool-progress p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.add-tool-spinner { width: 18px; height: 18px; flex-shrink: 0; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: add-tool-spin 1s linear infinite; }
+@keyframes add-tool-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .add-tool-spinner { animation: none; border-top-color: var(--line-strong); background: var(--accent-soft); } }
+.add-tool-draft-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.add-tool-args { width: 100%; font-size: 12px; }
+.add-tool-args td { vertical-align: top; overflow-wrap: anywhere; }
+.add-tool-facts { margin: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.add-tool-facts > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 12px; }
+.add-tool-facts > div:first-child { border-top: 0; }
+.add-tool-facts dt { color: var(--muted); }
+.add-tool-facts dd { margin: 0; color: var(--text); line-height: 1.6; min-width: 0; overflow-wrap: anywhere; }
+.add-tool-test { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.add-tool-test > svg { color: var(--muted); flex-shrink: 0; }
+.add-tool-test pre, .add-tool-code pre { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; border-radius: var(--radius-sm); background: var(--panel-2); font: 11px/1.55 var(--mono); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.add-tool-test pre { flex: 1; min-width: 140px; }
+.add-tool-code > summary, .add-tool-more > summary { cursor: pointer; font-size: 12px; color: var(--text-2); padding: 4px 0; }
+.add-tool-code pre { margin-top: 8px; max-height: 320px; }
+.add-tool-more { display: grid; gap: 10px; }
+.add-tool-more > .add-tool-pair { margin-top: 8px; }
+.add-tool-revise { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+.add-tool-revise .add-tool-field { flex: 1; min-width: 200px; }
+.add-tool-bullets { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--text-2); font-size: 12px; line-height: 1.6; }
+
+/* ---- Agent inspector: tools this agent can use ---- */
+.agent-tool-section { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.agent-tool-section > header { display: flex; align-items: center; gap: 8px; }
+.agent-tool-section h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.agent-tool-section > header .btn { margin-left: auto; }
+.agent-tool-section > p { margin: 0; }
+.agent-tool-rows { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.agent-tool-rows li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); }
+.agent-tool-rows li:first-child { border-top: 0; }
+.agent-tool-rows li > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.agent-tool-rows strong { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.agent-tool-rows small { grid-column: 1; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.agent-tool-rows li > .btn { grid-column: 2; grid-row: 1 / span 2; }
+.add-tool-notice { display: flex; align-items: start; gap: 8px; margin: 0; padding: 8px 10px; border: 1px solid var(--green-line); border-radius: var(--radius-sm); background: var(--green-soft); font-size: 12px; line-height: 1.55; }
+.add-tool-notice > svg { flex-shrink: 0; margin-top: 2px; color: var(--green-text); }
+.add-tool-notice > span { flex: 1; color: var(--text); }
+
+/* ---- Palette hint ---- */
+.add-tool-hint { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--blue-line); border-radius: var(--radius-sm); background: var(--blue-soft); }
+.add-tool-hint > p { display: flex; align-items: start; gap: 8px; margin: 0; font-size: 12px; line-height: 1.55; color: var(--text); }
+.add-tool-hint > p > svg { flex-shrink: 0; margin-top: 2px; color: var(--blue-text); }
+.add-tool-hint .arch-actions { flex-wrap: wrap; gap: 6px; }
+
+/* ---- Inline connection setup in Capabilities ---- */
+.inline-connection { display: grid; gap: 12px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); background: var(--panel-2); }
+.inline-connection > p { margin: 0; font-size: 12px; color: var(--text-2); }
+
+@media (max-width: 560px) {
+  .add-tool-facts > div { grid-template-columns: 1fr; gap: 4px; }
+  .add-tool-actions .btn-go { margin-left: 0; flex: 1 1 100%; }
+  .add-tool-actions small:last-child { text-align: left; }
+  .add-tool-row { grid-template-columns: minmax(0, 1fr); }
+}

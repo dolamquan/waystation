@@ -1,0 +1,19 @@
+# Build from an explicit source allowlist. Never copy local state, credentials or verification artifacts.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts
+!daemon/
+!daemon/**
+!shared/
+!shared/**
+!web/
+web/*
+!web/index.html
+!web/src/
+!web/src/**
+!web/public/
+!web/public/**
+!scripts/
+!scripts/*.mjs

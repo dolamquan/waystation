@@ -1,0 +1,123 @@
+/* Agent activity overview: KPI tiles and inline-SVG charts. Colours are roles; status hues were validated as a stack
+   (succeeded / failed / cancelled / other) for CVD separation against both panel surfaces. Gray "cancelled" is neutral by design. */
+.activity-dash {
+  --viz-1: var(--blue);
+  --viz-2: var(--clay);
+  --viz-ok: #1baf7a;
+  --viz-fail: #d03b3b;
+  --viz-cancel: #6b6b73;
+  --viz-other: #c98500;
+  --viz-grid: var(--line);
+  --viz-axis: var(--line-strong);
+  color: var(--text);
+}
+:root[data-theme='light'] .activity-dash { --viz-other: #e0a020; }
+
+.viz-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; margin-bottom: 24px; }
+.viz-filters label, .viz-project label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-2); }
+.viz-filters select { min-width: 170px; }
+.viz-range { display: inline-flex; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--panel); }
+.viz-range button { appearance: none; border: 0; background: transparent; color: var(--text-2); font: 500 12px var(--font); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.viz-range button:hover { color: var(--text); background: var(--panel-2); }
+.viz-range button.selected { color: var(--text); background: var(--panel-3); }
+.viz-updated { font-size: 12px; color: var(--muted); align-self: center; }
+.viz-project { display: flex; align-items: end; gap: 8px; margin-left: auto; }
+.viz-project input { min-width: 220px; }
+.viz-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.viz-body { transition: opacity 160ms var(--ease-out); }
+.viz-body.is-refreshing { opacity: .72; }
+
+.viz-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.viz-tile { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 112px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.viz-tile-label { font-size: 12px; color: var(--text-2); }
+.viz-tile-value { font-size: 24px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.viz-delta { font-size: 12px; }
+.viz-delta.tone-good { color: var(--green-text); }
+.viz-delta.tone-bad { color: var(--red-text); }
+.viz-delta.tone-neutral { color: var(--muted); }
+.viz-delta-period { color: var(--muted); }
+.viz-tile small { font-size: 11.5px; color: var(--muted); }
+.viz-spark { position: absolute; right: 12px; top: 14px; }
+.viz-spark path { fill: none; stroke: var(--faint); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.viz-spark circle { fill: var(--accent); }
+
+.viz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.viz-card { position: relative; min-width: 0; margin: 0; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.viz-card-wide { grid-column: 1 / -1; }
+.viz-card > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.viz-card h4 { margin: 0; font-size: 13.5px; font-weight: 550; }
+.viz-card > header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.viz-card figcaption { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.viz-table-toggle { appearance: none; flex: none; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); font: 12px var(--font); padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+.viz-table-toggle:hover { color: var(--text); background: var(--panel-2); }
+
+.viz-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 12px; color: var(--text-2); }
+.viz-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.viz-key { display: inline-block; flex: none; }
+.viz-key-rect { width: 10px; height: 10px; border-radius: 2px; }
+.viz-key-line { width: 12px; height: 2px; border-radius: 1px; }
+
+.viz-plot { position: relative; width: 100%; }
+.viz-plot svg { display: block; overflow: visible; border-radius: 4px; }
+.viz-plot svg:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.viz-plot .viz-gridline { stroke: var(--viz-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.viz-plot .viz-baseline { stroke: var(--viz-axis); stroke-width: 1; shape-rendering: crispEdges; }
+.viz-plot .viz-tick { fill: var(--muted); font: 11px var(--font); font-variant-numeric: tabular-nums; }
+.viz-plot .viz-hit { fill: transparent; }
+.viz-plot .viz-active .viz-hit { fill: var(--panel-2); }
+.viz-plot .viz-mark { transition: filter 120ms var(--ease-out); }
+.viz-plot .viz-active .viz-mark { filter: brightness(1.18); }
+.viz-plot .viz-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.viz-plot .viz-dot { stroke: var(--panel); stroke-width: 2; }
+.viz-plot .viz-crosshair { stroke: var(--viz-axis); stroke-width: 1; shape-rendering: crispEdges; }
+
+.viz-tooltip { position: absolute; top: 0; z-index: 2; width: 180px; padding: 8px 10px; pointer-events: none; background: var(--panel-3); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 8px 24px var(--shadow-ink); font-size: 12px; }
+.viz-tooltip-title { color: var(--text-2); margin-bottom: 4px; }
+.viz-tooltip-row { display: flex; align-items: center; gap: 8px; line-height: 1.7; }
+.viz-tooltip-row strong { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.viz-tooltip-row span:last-child { color: var(--muted); }
+.viz-tooltip-hint { margin-top: 4px; color: var(--muted); font-size: 11px; }
+
+.viz-table-scroll { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+.viz-table, .viz-ranked { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.viz-table th, .viz-table td, .viz-ranked th, .viz-ranked td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); font-weight: 400; vertical-align: top; }
+.viz-table thead th, .viz-ranked thead th { color: var(--muted); font-size: 11.5px; font-weight: 500; }
+.viz-table .num, .viz-ranked .num { text-align: right; white-space: nowrap; }
+.viz-ranked-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+.viz-ranked tbody th { min-width: 120px; }
+.viz-ranked tbody th small { display: block; color: var(--muted); font-size: 11.5px; }
+.viz-row-link { appearance: none; border: 0; background: none; padding: 0; color: var(--text); font: 500 12.5px var(--font); text-align: left; cursor: pointer; }
+.viz-row-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.viz-meter { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--panel-3); }
+.viz-meter > span { display: block; height: 100%; border-radius: 2px; }
+.viz-none { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 12.5px; color: var(--muted); }
+
+.viz-failures ol { margin: 0; padding: 0; list-style: none; }
+.viz-failures li + li { border-top: 1px solid var(--line); }
+.viz-failures li button { appearance: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; padding: 10px 4px; border: 0; background: none; color: var(--text); font: 12.5px var(--font); text-align: left; cursor: pointer; border-radius: 4px; }
+.viz-failures li button:hover { background: var(--panel-2); }
+.viz-fail-mark { display: inline-flex; color: var(--red-text); padding-top: 2px; }
+.viz-fail-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.viz-fail-error { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.viz-failures time { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.viz-empty { padding: 48px 24px; text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.viz-empty h4 { margin: 0 0 6px; font-size: 14px; font-weight: 550; }
+.viz-empty p { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+.viz-shimmer { min-height: 112px; background: linear-gradient(90deg, var(--panel) 0%, var(--panel-2) 50%, var(--panel) 100%); background-size: 200% 100%; animation: viz-shimmer 1.4s linear infinite; }
+.viz-shimmer-chart { min-height: 220px; }
+@keyframes viz-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Run list drill chip and Overview/Runs tabs live in the activity surface. */
+.agent-activity-drill { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 12.5px; color: var(--text-2); }
+.agent-activity-drill > span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--text); }
+.agent-activity-drill button { appearance: none; display: inline-flex; border: 0; background: none; color: var(--muted); padding: 2px; cursor: pointer; border-radius: 999px; }
+.agent-activity-drill button:hover { color: var(--text); }
+.agent-activity-drill small { color: var(--muted); }
+
+@media (max-width: 860px) { .viz-grid { grid-template-columns: minmax(0, 1fr); } .viz-project { margin-left: 0; } }
+@media (max-width: 480px) { .viz-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .viz-spark { display: none; } .viz-filters > label, .viz-filters select, .viz-project, .viz-project input { width: 100%; min-width: 0; } .viz-failures li button { grid-template-columns: auto minmax(0, 1fr); } .viz-failures time { grid-column: 2; } }
+@media (prefers-reduced-motion: reduce) { .viz-shimmer { animation: none; } .viz-body, .viz-plot .viz-mark { transition: none; } }
+@media (forced-colors: active) { .viz-plot .viz-mark, .viz-plot .viz-line { forced-color-adjust: none; } }

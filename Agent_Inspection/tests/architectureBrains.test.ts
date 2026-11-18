@@ -39,7 +39,7 @@ describe('LLM connection credentials and request adapters', () => {
         const [endpoint, init] = send.mock.calls[0]; const body = JSON.parse(init!.body as string); const headers = init!.headers as Record<string, string>;
         expect(endpoint).toContain(provider === 'openai' ? '/v1/responses' : provider === 'anthropic' ? '/v1/messages' : '/v1/chat/completions');
         expect(JSON.stringify(body)).not.toContain(key); expect(body.tools ?? []).toEqual([]); expect(init!.redirect).toBe('error');
-        if (provider === 'anthropic') { expect(headers.authorization).toBe(`Bearer ${key}`); expect(headers['anthropic-version']).toBe('2026-10-21'); expect(headers['anthropic-workspace-id']).toBe('wrkspc_test'); expect(body.max_tokens).toBe(256); expect(body.system).toBe('Research documents.'); expect(result.truncated).toBe(true); }
+        if (provider === 'anthropic') { expect(headers['x-api-key']).toBe(key); expect(headers.authorization).toBeUndefined(); expect(headers['anthropic-version']).toBe('2026-10-21'); expect(headers['anthropic-workspace-id']).toBe('wrkspc_test'); expect(body.max_tokens).toBe(256); expect(body.system).toBe('Research documents.'); expect(result.truncated).toBe(true); }
         else { expect(headers.authorization).toBe(`Bearer ${key}`); expect(body.max_tokens ?? body.max_output_tokens).toBe(256); }
         await expect(brains.run(connection.id, tempDir(), '', '', { maxOutputTokens: 64 })).rejects.toThrow(/not found/);
       } finally { db.close(); }

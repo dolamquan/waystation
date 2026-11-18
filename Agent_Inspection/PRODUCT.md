@@ -16,14 +16,16 @@ Waystation ("Agent Tower") lets a developer see and steer every coding agent on 
 One view across vendors, with real intervention: it can hold an agent's next tool call for approval, run mixed Claude + Codex teams that share a task board in separate git worktrees, and guard against runaway loops and spend. The live agents are shown on a station canvas per project folder: each session is a node with its status, live activity and any held tool call, subagents branch from their parent, and teams are framed groups.
 
 ## Operating Context
-Runs locally on Windows, Node 22.20+, served on localhost with a per-start access token in a browser or Electron desktop window. The desktop provides setup checks, a tray, native folder selection, and attention notifications. Agents appear whether they run in a terminal, VS Code, or Waystation itself. Control level varies per agent and is shown as a badge: Full control, Hook control, Observe only. Waystation opens real Claude Code / Codex sessions in Windows Terminal tabs on handoff.
+The desktop runs locally on Windows, Node 22.20+, served on localhost with a per-start access token in a browser or Electron window. It provides setup checks, a tray, native folder selection, and attention notifications. Agents appear whether they run in a terminal, VS Code, or Waystation itself. Control level varies per agent and is shown as a badge: Full control, Hook control, Observe only. Waystation opens real Claude Code / Codex sessions in Windows Terminal tabs on handoff.
+
+The separate hosted Architecture workspace runs API agents in Linux containers, with OIDC identity, organization roles and a dedicated worker, state, project volume and credential-encryption key per organization. It executes connected workflows with durable checkpoints, explicit approvals, bounded execution and evidence-based promotion. See docs/hosted-agent-platform.md for deployment and acceptance requirements. The reference deployment is single-host; real identity-provider login, restore, load and security acceptance require the target environment.
 
 ## Capabilities and Constraints
 - Intercept tool calls: Approve, Edit input, Deny + instruct, Let agent ask.
 - Send messages, interrupt/stop agents, delegate work, attach skills.
 - Teams: shared task board, inter-agent messaging, git worktree sandboxes, merge on demand.
 - Cost estimates, context fill, runaway guard, templates and schedules.
-- Local by default: no cloud or accounts. Remote access is opt-in, for paired devices on the operator's private network (Tailscale Serve), with per-device View, Triage or Full permissions. Windows only.
+- Desktop is local by default, without accounts. Paired-device remote access is opt-in on the operator's private network (Tailscale Serve), with per-device View, Triage or Full permissions. The hosted Architecture workspace is a separate deployment with accounts and organization roles; native CLI and desktop control are unavailable there.
 - Demo mode ("Explore the demo") shows a clearly labeled sample crew with no live actions.
 - Each session keeps one identity mark (Pip, Mica, Orbit, Sprout, Bolt, Nova: a geometric glyph and color) across every view.
 - The scene is a visualization; character movement never issues agent commands.

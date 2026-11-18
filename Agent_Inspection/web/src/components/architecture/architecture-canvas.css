@@ -1,0 +1,276 @@
+/* Architecture design canvas: kind colours, node cards, flowing connections, side panel and overlays.
+   Loaded after architecture.css / architecture-ui.css; theme tokens from theme.css stay authoritative. */
+
+/* ---- Kind palette: each kind gets a hue, a soft wash and a tinted line. ---- */
+.architecture .arch-kind-input    { --node-color: color-mix(in srgb, var(--blue-text) 45%, var(--green-text)); }
+.architecture .arch-kind-agent    { --node-color: var(--blue-text); }
+.architecture .arch-kind-router   { --node-color: var(--violet-text); }
+.architecture .arch-kind-tool     { --node-color: var(--clay-text); }
+.architecture .arch-kind-memory   { --node-color: color-mix(in srgb, var(--amber-text) 55%, var(--clay-text)); }
+.architecture .arch-kind-approval { --node-color: var(--amber-text); }
+.architecture .arch-kind-output   { --node-color: var(--green-text); }
+.architecture [class*='arch-kind-'] {
+  --node-soft: color-mix(in srgb, var(--node-color) 13%, transparent);
+  --node-line: color-mix(in srgb, var(--node-color) 38%, transparent);
+}
+.arch-kind-tile {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 34px; height: 34px; border-radius: 10px;
+  color: var(--node-color); background: var(--node-soft); box-shadow: inset 0 0 0 1px var(--node-line);
+}
+
+/* ---- Toolbar above the workspace ---- */
+.architecture .arch-save { display: inline-flex; align-items: center; gap: 8px; }
+.arch-save-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-text); box-shadow: 0 0 0 3px var(--green-soft); }
+.arch-save.saving .arch-save-dot { background: var(--amber-text); box-shadow: 0 0 0 3px var(--amber-soft); animation: arch-blink 900ms ease-in-out infinite; }
+.arch-save.offline .arch-save-dot { background: var(--red-text); box-shadow: 0 0 0 3px var(--red-soft); }
+.arch-create-mark { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; margin-bottom: 14px; border-radius: 12px; color: var(--accent); background: linear-gradient(135deg, var(--green-soft), var(--blue-soft)); box-shadow: inset 0 0 0 1px var(--green-line); }
+
+/* ---- Workspace grid: palette | canvas | side panel, a fixed height so the canvas stays large ---- */
+.architecture .arch-workspace {
+  grid-template-columns: 152px minmax(0, 1fr) 380px;
+  height: clamp(640px, calc(100vh - 200px), 960px); min-height: 0;
+  box-shadow: 0 24px 60px -32px var(--shadow-ink);
+}
+.architecture .arch-workspace > * { min-height: 0; }
+
+/* Palette */
+.architecture .arch-palette { overflow-y: auto; padding: 18px 12px; scrollbar-width: thin; }
+.architecture .arch-palette h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.architecture .arch-palette > p:first-of-type { margin-bottom: 14px; }
+.architecture .arch-component {
+  gap: 10px; min-height: 46px; padding: 6px 8px; margin-bottom: 6px;
+  border: 1px solid var(--line); background: var(--panel);
+  transition: transform 140ms var(--ease-out), border-color 140ms var(--ease-out), background-color 140ms var(--ease-out);
+}
+.architecture .arch-component:hover:not(:disabled) { transform: translateX(2px); border-color: var(--node-line); background: var(--node-soft); color: var(--text); }
+.architecture .arch-component:active:not(:disabled) { cursor: grabbing; transform: scale(.98); }
+.architecture .arch-component > svg:last-child { color: var(--muted); opacity: 0; transition: opacity 140ms; }
+.architecture .arch-component:hover > svg:last-child, .architecture .arch-component:focus-visible > svg:last-child { opacity: 1; color: var(--node-color); }
+.arch-component-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.arch-component-text > span { font-size: 12.5px; font-weight: 550; color: var(--text); }
+.arch-component-text > small { display: none; font-size: 10.5px; line-height: 1.35; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.architecture .arch-palette .arch-design-note { margin-top: 18px; padding: 12px; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); }
+
+/* ---- Canvas toolbar ---- */
+.architecture .arch-canvas-toolbar { gap: 10px; padding: 9px 12px; min-height: 54px; flex-wrap: wrap; }
+.arch-tool-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg-2); }
+.architecture .arch-tool-group .icon-btn { border-color: transparent; background: transparent; }
+.architecture .arch-tool-group .icon-btn:hover:not(:disabled) { background: var(--panel-3); }
+.arch-find { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--muted); transition: border-color 140ms; }
+.arch-find:focus-within { border-color: var(--focus); color: var(--text-2); }
+.arch-find input { width: 96px; border: 0; outline: 0; background: transparent; color: var(--text); font: 12px var(--font); }
+.arch-find input::placeholder { color: var(--faint); }
+.arch-find small { font: 10.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.arch-toolbar-end { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.arch-edge-count { color: var(--muted); }
+.architecture .arch-on { color: var(--accent); border-color: var(--green-line); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--green-soft); }
+
+/* Popovers (checks + shortcuts) */
+.arch-checks { position: relative; }
+.arch-checks-trigger.tone-ok { color: var(--green-text); border-color: var(--green-line); background: var(--green-soft); }
+.arch-checks-trigger.tone-warning { color: var(--amber-text); border-color: var(--amber-line); background: var(--amber-soft); }
+.arch-checks-trigger.tone-error { color: var(--red-text); border-color: var(--red-line); background: var(--red-soft); }
+.arch-checks-popover {
+  position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(340px, 86vw);
+  padding: 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel);
+  box-shadow: 0 20px 48px -16px var(--shadow-ink); animation: arch-pop 160ms var(--ease-out);
+}
+.arch-checks-popover > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+.arch-checks-popover ul { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+.arch-checks-popover li { display: flex; gap: 9px; align-items: start; padding: 9px 0; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.5; color: var(--text-2); }
+.arch-checks-popover li > svg { flex-shrink: 0; margin-top: 2px; }
+.arch-checks-popover li button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.arch-checks-popover li button:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.arch-checks-popover > small { display: block; margin-top: 10px; color: var(--muted); font-size: 11px; }
+.severity-error > svg { color: var(--red-text); }
+.severity-warning > svg { color: var(--amber-text); }
+.severity-info > svg { color: var(--blue-text); }
+.arch-checks-ok { display: flex; gap: 8px; align-items: center; margin: 4px 0; font-size: 12px; color: var(--green-text); }
+.arch-shortcuts dl { margin: 0; display: grid; gap: 2px; }
+.arch-shortcuts dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.arch-shortcuts dd { margin: 0; color: var(--text-2); }
+.arch-shortcuts kbd { padding: 2px 6px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; background: var(--bg-2); font: 10.5px var(--mono); color: var(--text); white-space: nowrap; }
+
+/* ---- Stage ---- */
+.architecture .arch-stage {
+  min-height: 0;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 60% 50% at 12% 0%, color-mix(in srgb, var(--blue-text) 7%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 100% 100%, color-mix(in srgb, var(--violet-text) 6%, transparent), transparent 70%),
+    radial-gradient(circle, var(--grid-dot) 1px, transparent 1.2px);
+  background-size: 100% 100%, 100% 100%, 20px 20px;
+}
+
+/* Nodes */
+.architecture .arch-node {
+  width: 180px; height: 86px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--node-color) 26%, var(--line-strong));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--node-color) 9%, var(--panel-2)) 0%, var(--panel-2) 60%);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent) inset, 0 10px 24px -14px var(--shadow-ink);
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), border-color 160ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+.architecture .arch-node::before {
+  content: ''; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, transparent, var(--node-color), transparent); opacity: .7;
+}
+.architecture .arch-node:hover { transform: translateY(-2px); box-shadow: 0 16px 32px -14px var(--shadow-ink), 0 0 0 1px var(--node-line); }
+.architecture .arch-node.dragging { transform: scale(1.03); box-shadow: 0 24px 40px -14px var(--shadow-ink), 0 0 0 1px var(--node-color); z-index: 3; }
+.architecture .arch-node.selected { border-color: var(--node-color); outline: 0; box-shadow: 0 0 0 4px var(--node-soft), 0 0 28px -4px var(--node-line), 0 16px 32px -14px var(--shadow-ink); }
+.architecture .arch-node.arch-source { border-color: var(--accent); box-shadow: 0 0 0 4px var(--green-soft); animation: arch-source 1.4s ease-in-out infinite; }
+.architecture .arch-node.arch-match { outline: 2px dashed var(--amber-text); outline-offset: 5px; }
+.architecture .arch-has-focus .arch-node:not(.lit) { opacity: .42; }
+.architecture .arch-node-body { flex-direction: row; align-items: center; gap: 10px; padding: 10px 12px; border-radius: inherit; }
+.architecture .arch-node-body:hover { background: transparent; }
+.arch-node-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.architecture .arch-node-kind { gap: 6px; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--node-color); }
+.architecture .arch-node strong { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.architecture .arch-node-subtitle { font-size: 11px; color: var(--muted); }
+.arch-node-state { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; }
+.arch-node-state.ready { background: var(--green-text); box-shadow: 0 0 0 3px var(--green-soft); }
+.arch-node-state.pending { background: transparent; box-shadow: inset 0 0 0 1.5px var(--amber-text); }
+.arch-node-flag {
+  position: absolute; top: -8px; right: -8px; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--bg);
+}
+.arch-node-flag.severity-warning { background: var(--amber-text); color: var(--on-accent); }
+.arch-node-flag.severity-error { background: var(--red-text); color: var(--on-accent); }
+.architecture .arch-port { top: 36px; width: 14px; height: 14px; border: 2px solid color-mix(in srgb, var(--node-color) 55%, var(--line-strong)); background: var(--panel); transition: transform 140ms var(--ease-out), background-color 140ms; }
+.architecture .arch-port-in { left: -8px; }
+.architecture .arch-port-out { right: -8px; }
+.architecture .arch-port-out:hover, .architecture .arch-port-out:focus-visible { transform: scale(1.35); background: var(--node-color); border-color: var(--node-color); box-shadow: 0 0 0 4px var(--node-soft); }
+.architecture .arch-node:hover .arch-port-out { background: var(--node-soft); }
+
+/* Connections */
+.architecture .arch-edge { color: color-mix(in srgb, var(--node-color) 55%, var(--line-strong)); transition: opacity 200ms var(--ease-out); }
+.architecture .arch-edge-line { stroke-width: 2; stroke-linecap: round; }
+.arch-edge-head { fill: currentColor; }
+.arch-edge-flow { fill: none; stroke: var(--node-color); stroke-width: 2.25; stroke-linecap: round; stroke-dasharray: 2 16; opacity: .55; pointer-events: none; animation: arch-flow 1.1s linear infinite; }
+.architecture .arch-edge.lit, .architecture .arch-edge:hover, .architecture .arch-edge.selected, .architecture .arch-edge:focus-visible { color: var(--node-color); }
+.architecture .arch-edge.lit .arch-edge-flow, .architecture .arch-edge.selected .arch-edge-flow { opacity: 1; stroke-width: 3; filter: drop-shadow(0 0 3px var(--node-line)); }
+.architecture .arch-edge.selected .arch-edge-line { stroke-width: 3; }
+.architecture .arch-has-focus .arch-edge:not(.lit) { opacity: .25; }
+.arch-edge-label rect { fill: var(--panel); stroke: color-mix(in srgb, var(--node-color) 40%, var(--line-strong)); stroke-width: 1; }
+.architecture .arch-edge-label text { fill: var(--text-2); stroke: none; font: 500 10.5px var(--font); }
+.architecture .arch-edge.lit .arch-edge-label text, .architecture .arch-edge.selected .arch-edge-label text { fill: var(--text); }
+
+/* Empty canvas */
+.architecture .arch-empty { pointer-events: none; }
+.arch-empty-mark { display: inline-flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 16px; color: var(--accent); background: radial-gradient(circle at 30% 20%, var(--green-soft), var(--blue-soft)); box-shadow: inset 0 0 0 1px var(--green-line), 0 0 40px -6px var(--green-line); animation: arch-float 3.2s ease-in-out infinite; }
+.arch-empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; pointer-events: auto; }
+.arch-empty-actions .btn[class*='arch-kind-'] { color: var(--node-color); border-color: var(--node-line); background: var(--node-soft); }
+
+/* Overlays on the stage */
+.arch-minimap {
+  position: absolute; left: 14px; bottom: 14px; z-index: 2; cursor: pointer;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
+}
+.arch-minimap-edge { stroke: var(--line-strong); stroke-width: 6; }
+.arch-minimap-node { fill: color-mix(in srgb, var(--node-color) 55%, transparent); }
+.arch-minimap-node.selected { fill: var(--node-color); }
+.arch-minimap-view { fill: color-mix(in srgb, var(--text) 5%, transparent); stroke: var(--text-2); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.architecture .arch-zoom { bottom: 14px; box-shadow: 0 10px 24px -14px var(--shadow-ink); background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(6px); }
+.arch-zoom-level { min-width: 48px; padding: 4px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font: 11px var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; }
+.arch-zoom-level:hover { background: var(--panel-3); color: var(--text); }
+
+/* ---- Side panel: Inspector | Architect ---- */
+.arch-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid var(--line); background: var(--bg-2); }
+.arch-side-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 12px 12px 0; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.arch-side-tabs > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; min-height: 34px; padding: 6px 10px; border: 1px solid transparent; border-radius: calc(var(--radius) - 4px); background: transparent; color: var(--text-2); font: 500 12px var(--font); cursor: pointer; transition: background-color 140ms, color 140ms; }
+.arch-side-tabs > button:hover { color: var(--text); }
+.arch-side-tabs > button.selected { background: var(--panel-2); border-color: var(--line-strong); color: var(--text); box-shadow: 0 4px 12px -8px var(--shadow-ink); }
+.arch-side-tabs > button.selected > svg { color: var(--accent); }
+.arch-side-chip { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 7px; border-radius: 999px; background: var(--panel-3); color: var(--muted); font-size: 10.5px; }
+.architecture .arch-inspector { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px 24px; border-top: 0; background: transparent; scrollbar-width: thin; }
+.architecture .arch-inspector[hidden], .architecture .arch-chat[hidden] { display: none; }
+.arch-inspector-head { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 16px; border: 1px solid var(--node-line); border-radius: var(--radius); background: linear-gradient(135deg, var(--node-soft), transparent 75%); }
+.arch-inspector-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.arch-inspector-head small { font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--node-color); }
+.arch-inspector-head strong { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-edge-route { display: flex; align-items: center; gap: 6px; }
+.arch-edge-route button { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
+.arch-edge-route button:hover { color: var(--node-color); }
+.architecture .arch-inspector .arch-fields label { flex-basis: 100%; }
+.arch-suggestions { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.arch-suggestions button { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text-2); font: 11.5px var(--font); cursor: pointer; }
+.arch-suggestions button:hover, .arch-suggestions button[aria-pressed='true'] { border-color: var(--blue-line); background: var(--blue-soft); color: var(--text); }
+
+/* Workflow overview (no selection) */
+.arch-overview { display: grid; gap: 14px; padding: 16px; margin-bottom: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.arch-overview-progress { display: grid; gap: 10px; }
+.arch-overview-progress > div { display: flex; align-items: baseline; justify-content: space-between; }
+.arch-overview-progress small { color: var(--muted); font-size: 11px; }
+.arch-overview-progress strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+.arch-meter { display: block; height: 6px; border-radius: 999px; background: var(--panel-3); overflow: hidden; }
+.arch-meter > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue-text), var(--green-text)); transition: width 400ms var(--ease-out); }
+.arch-overview-kinds { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.arch-overview-kinds li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border: 1px solid var(--node-line); border-radius: 999px; background: var(--node-soft); font-size: 11.5px; color: var(--text-2); }
+.arch-overview-kinds .arch-kind-tile { width: 20px; height: 20px; border-radius: 50%; box-shadow: none; }
+.arch-overview-kinds b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.arch-overview-issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.arch-overview-issues button { display: flex; align-items: start; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font: 11.5px/1.5 var(--font); text-align: left; cursor: pointer; }
+.arch-overview-issues button:hover { background: var(--panel-3); color: var(--text); }
+.arch-overview-issues svg { flex-shrink: 0; margin-top: 2px; }
+.arch-overview-issues .severity-error svg { color: var(--red-text); }
+.arch-overview-issues .severity-warning svg { color: var(--amber-text); }
+.arch-overview-issues .severity-info svg { color: var(--blue-text); }
+
+/* Architect chat inside the side panel */
+.architecture .arch-chat { flex: 1; min-height: 0; max-height: none; height: auto; border-left: 0; background: transparent; }
+.arch-pulse { position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green-text); }
+.arch-pulse.busy::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--green-text); animation: arch-ping 1.2s ease-out infinite; }
+
+/* Footer */
+.architecture .arch-footer span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- Motion ---- */
+@keyframes arch-flow { to { stroke-dashoffset: -18; } }
+@keyframes arch-blink { 50% { opacity: .35; } }
+@keyframes arch-ping { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.8); opacity: 0; } }
+@keyframes arch-pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes arch-float { 50% { transform: translateY(-4px); } }
+@keyframes arch-source { 50% { box-shadow: 0 0 0 7px var(--green-soft); } }
+@media (prefers-reduced-motion: reduce) {
+  .arch-edge-flow, .arch-pulse.busy::after, .arch-empty-mark, .arch-save.saving .arch-save-dot, .architecture .arch-node.arch-source, .arch-checks-popover { animation: none; }
+  .architecture .arch-node, .architecture .arch-component { transition: none; }
+  .architecture .arch-node:hover, .architecture .arch-component:hover:not(:disabled) { transform: none; }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1350px) {
+  .architecture .arch-workspace { grid-template-columns: 64px minmax(0, 1fr) 340px; }
+  .arch-component-text > small { display: none; }
+  .architecture .arch-component { min-height: 44px; }
+}
+@media (max-width: 1100px) {
+  .architecture .arch-workspace { grid-template-columns: 64px minmax(0, 1fr) 320px; }
+  .architecture .arch-palette { padding-inline: 8px; }
+  .architecture .arch-palette > :is(h2, p) { display: none; }
+  .architecture .arch-component { justify-content: center; padding: 6px; }
+  .architecture .arch-component > .arch-component-text, .architecture .arch-component > svg:last-child { display: none; }
+
+}
+@media (max-width: 860px) {
+  .architecture .arch-workspace { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .architecture .arch-palette { display: flex; flex-wrap: wrap; gap: 6px; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px; overflow: visible; }
+  .architecture .arch-component { width: auto; margin: 0; }
+  .architecture .arch-editor { min-height: 520px; }
+  .architecture .arch-stage { min-height: 460px; }
+  .arch-side { border-left: 0; border-top: 1px solid var(--line); max-height: 820px; min-height: 520px; }
+  .arch-find { flex: 1 1 140px; }
+  .arch-find input { width: 100%; }
+}
+@media (max-width: 600px) {
+  .arch-minimap { display: none; }
+  .arch-toolbar-end { margin-left: 0; }
+}
+
+/* Connect-mode banner (replaces the always-on hint) and the compact step count. */
+.architecture .arch-canvas-hint { left: 50%; right: auto; top: 14px; bottom: auto; transform: translateX(-50%); z-index: 3; display: none; padding: 7px 14px; border: 1px solid var(--green-line); border-radius: 999px; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(6px); color: var(--accent); font-size: 12px; font-weight: 550; white-space: nowrap; box-shadow: 0 10px 24px -14px var(--shadow-ink); }
+.architecture .arch-canvas-hint.active { display: block; animation: arch-pop 160ms var(--ease-out); }
+.arch-step-count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 1700px) { .arch-step-count { display: none; } }
+@media (max-width: 860px) { .architecture .arch-canvas-hint { top: 10px; bottom: auto; left: 50%; right: auto; } }
+@media (max-width: 600px) { .architecture .arch-canvas-hint { top: 10px; bottom: auto; white-space: normal; width: calc(100% - 32px); text-align: center; } }

@@ -304,7 +304,7 @@ export function App() {
               {view === 'ops' && <OpsView agents={tower.agents} onSelect={setSelectedId} defaultCwd={selected?.cwd} notify={notify} onNewAgent={() => setShowNew(true)} />}
               {view === 'setup' && <DesktopSetup onDone={() => setView('fleet')} />}
               {view === 'library' && <LibraryView notify={notify} />}
-              {view === 'architecture' && <Suspense fallback={<p role="status">Loading architecture workspace…</p>}><ArchitectureView agents={tower.agents} onOpenAgent={setSelectedId} /></Suspense>}
+              {view === 'architecture' && <Suspense fallback={<p role="status">Loading architecture workspace…</p>}><ArchitectureView agents={tower.agents} pending={tower.pending} onOpenAgent={setSelectedId} /></Suspense>}
               {view === 'consoles' && <Suspense fallback={<p className="console-note">Loading the console board…</p>}>
                 <ConsoleBoard defaultCwd={selected?.cwd} notify={notify} onSwitchToStation={() => setView('fleet')} agents={tower.agents} agentsReady={tower.connected && tower.snapshotReady} lastEvent={tower.lastEvent} onSelectAgent={setSelectedId} canvasReveal={tower.canvasReveal}
                   teams={{ teams: tower.teams, teamLogFeed: tower.teamLogFeed, connected: tower.connected, selectedTeamId, onSelectTeam: setSelectedTeamId,

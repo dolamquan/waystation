@@ -4,6 +4,8 @@ import type { Agent, PendingInterception, TeamView } from '../api.ts';
 import { CREW, subagentsByParent } from '../crew.ts';
 import { STATUS_LABEL } from '../format.ts';
 import { stationOffices } from '../stationOffices.ts';
+import { splitOffices, useClosedOffices } from '../stationOfficeTabs.ts';
+import { OfficeTabs } from './OfficeTabs.tsx';
 import { teamAgentIds, teamSeats } from '../stationLayout.ts';
 import { useDragPan } from '../useStationViewport.ts';
 import { CrewAvatar } from './CrewAvatar.tsx';
@@ -168,7 +170,9 @@ export function AgentWorld({ agents, selectedId, connected, authError, onSelect,
   useExpandedLock(expanded, collapse);
   const paused = motionPaused || reducedMotion;
   const offices = useMemo(() => stationOffices(agents, teams), [agents, teams]);
-  const office = offices.find(candidate => candidate.key === officeKey) ?? offices[0];
+  const { closedKeys, close: closeOffices, open: reopenOffice } = useClosedOffices();
+  const openOffices = useMemo(() => splitOffices(offices, closedKeys).open, [offices, closedKeys]);
+  const office = openOffices.find(candidate => candidate.key === officeKey) ?? openOffices[0];
   const activeOfficeKey = office?.key;
   // Keep the current office as sessions arrive, and fall back when its last session leaves.
   useEffect(() => {
@@ -179,8 +183,11 @@ export function AgentWorld({ agents, selectedId, connected, authError, onSelect,
     if (previousSelection.current === selectedId) return;
     previousSelection.current = selectedId;
     const selectedOffice = offices.find(candidate => candidate.agents.some(agent => agent.id === selectedId));
-    if (selectedOffice && selectedOffice.key !== activeOfficeKey) setOfficeKey(selectedOffice.key);
-  }, [selectedId, offices, activeOfficeKey]);
+    if (!selectedOffice || selectedOffice.key === activeOfficeKey) return;
+    // Opening a session from elsewhere brings its workspace back if it was closed.
+    reopenOffice(selectedOffice.key);
+    setOfficeKey(selectedOffice.key);
+  }, [selectedId, offices, activeOfficeKey, reopenOffice]);
   useEffect(() => { viewport.current?.scrollTo(0, 0); }, [activeOfficeKey, demo, viewport]);
 
   const crewAgents = demo ? PREVIEW_CREW : office?.agents ?? [];
@@ -196,6 +203,7 @@ export function AgentWorld({ agents, selectedId, connected, authError, onSelect,
   const select = demo ? setDemoId : onSelect;
   const activeSelection = demo ? demoId : selectedId;
   const toggleDemo = () => { setDemo(!demo); setDemoId(undefined); };
+  const allClosed = !demo && offices.length > 0 && openOffices.length === 0;
 
   return (
     <section className={`agent-world ${paused ? 'motion-paused' : ''} ${expanded ? 'world-expanded' : ''}`} aria-label="Waystation station">
@@ -218,34 +226,11 @@ export function AgentWorld({ agents, selectedId, connected, authError, onSelect,
       </header>
 
       {!demo && offices.length > 0 && <div className="office-switcher">
-        <div className="office-tabs" role="tablist" aria-label="Working folders">
-          {offices.map((candidate, index) => <button
-            key={candidate.key}
-            id={`${officeId}-tab-${index}`}
-            className={`office-tab ${candidate.key === activeOfficeKey ? 'office-tab-active' : ''}`}
-            role="tab"
-            aria-selected={candidate.key === activeOfficeKey}
-            aria-controls={`${officeId}-panel`}
-            tabIndex={candidate.key === activeOfficeKey ? 0 : -1}
-            title={candidate.path ?? 'Sessions with no known working folder'}
-            onClick={() => setOfficeKey(candidate.key)}
-            onKeyDown={event => {
-              let next = index;
-              if (event.key === 'ArrowRight') next = (index + 1) % offices.length;
-              else if (event.key === 'ArrowLeft') next = (index - 1 + offices.length) % offices.length;
-              else if (event.key === 'Home') next = 0;
-              else if (event.key === 'End') next = offices.length - 1;
-              else return;
-              event.preventDefault();
-              setOfficeKey(offices[next].key);
-              document.getElementById(`${officeId}-tab-${next}`)?.focus();
-            }}
-          ><Icon name="folder" size={13} /><span className="office-tab-name">{candidate.name}</span><span className="office-tab-count" aria-label={`${candidate.agents.length} agents`}>{candidate.agents.length}</span></button>)}
-        </div>
-        <span className="office-location" title={office?.path}>{office?.path ?? 'Working folder unknown'}</span>
+        <OfficeTabs offices={offices} closedKeys={closedKeys} activeKey={activeOfficeKey} tabIdPrefix={officeId} panelId={`${officeId}-panel`} onSelect={setOfficeKey} onClose={closeOffices} onOpen={reopenOffice} />
+        <span className="office-location" title={office?.path}>{office ? office.path ?? 'Working folder unknown' : 'All workspaces closed'}</span>
       </div>}
 
-      <div className="world-body" id={`${officeId}-panel`} role={!demo && office ? 'tabpanel' : undefined} aria-labelledby={!demo && office ? `${officeId}-tab-${offices.indexOf(office)}` : undefined}>
+      <div className="world-body" id={`${officeId}-panel`} role={!demo && office ? 'tabpanel' : undefined} aria-labelledby={!demo && office ? `${officeId}-tab-${openOffices.indexOf(office)}` : undefined}>
         <div ref={viewport} className={`graph-canvas ${zoomed ? 'graph-zoomed' : ''}`}>
           {clusters.length > 0
             ? <div className="graph-stage" style={{ zoom: zoomed ? ZOOM_IN : 1 }}>
@@ -253,8 +238,8 @@ export function AgentWorld({ agents, selectedId, connected, authError, onSelect,
             </div>
             : <div className="world-empty">
               <span className="world-empty-mark"><CrewAvatar character={CREW[2]} size={36} animated={false} /></span>
-              <h3>{authError ? 'Connect to your workspace' : connected ? 'No sessions here yet' : 'Connecting to the daemon…'}</h3>
-              <p>{authError ? 'Open the daemon’s access link to connect your agents.' : connected ? 'Launch an agent, or start Claude Code or Codex in a terminal. Each session appears here as a node.' : 'Sessions appear here as soon as the local daemon connects.'}</p>
+              <h3>{authError ? 'Connect to your workspace' : allClosed ? 'All workspaces are closed' : connected ? 'No sessions here yet' : 'Connecting to the daemon…'}</h3>
+              <p>{authError ? 'Open the daemon’s access link to connect your agents.' : allClosed ? 'Reopen one from the Workspaces menu above the canvas.' : connected ?'Launch an agent, or start Claude Code or Codex in a terminal. Each session appears here as a node.' : 'Sessions appear here as soon as the local daemon connects.'}</p>
               <div className="world-empty-actions">
                 {connected && <button className="btn btn-go" onClick={onLaunch}><Icon name="plus" size={15} />Launch an agent</button>}
                 <button className="btn" onClick={toggleDemo}>Explore the demo</button>

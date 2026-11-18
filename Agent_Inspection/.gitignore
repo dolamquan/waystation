@@ -1,5 +1,8 @@
 node_modules/
 web/dist/
+deploy/hosted/.env
+deploy/hosted/secrets/
+deploy/hosted/organizations.json
 *.log
 .desktop-verification/
 .mcp-verification/

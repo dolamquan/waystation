@@ -66,7 +66,7 @@ describe('persistent agent execution and management', () => {
       const started = s.runs.start(s.doc.id, 'agent', 'Calculate 2 + 1', 1);
       await wait(() => s.runs.get(started.id).status === 'waiting_approval');
       let run = s.runs.get(started.id); expect(run.output).toBe('{"answer":3}'); expect(existsSync(join(s.project, `results/${run.id}.json`))).toBe(false);
-      expect(JSON.parse(send.mock.calls[0][1]!.body as string).messages[0].content).toContain('Seattle');
+      const firstBody = JSON.parse(send.mock.calls[0][1]!.body as string); expect(firstBody.messages[0].content).not.toContain('Seattle'); expect(firstBody.messages.find((m: any) => m.role === 'user').content).toMatch(/<context>[\s\S]*Seattle/);
       s.runs.decide(run.id, run.pending!.id, true); await wait(() => s.runs.get(run.id).status === 'succeeded'); run = s.runs.get(run.id);
       expect(JSON.parse(readFileSync(join(s.project, `results/${run.id}.json`), 'utf8'))).toEqual({ answer: 3 });
       expect(run.usage).toEqual({ inputTokens: 30, outputTokens: 15, toolCalls: 1 }); expect(run.events.map(e => e.kind)).toEqual(expect.arrayContaining(['model', 'tool', 'memory', 'approval', 'output']));
@@ -99,12 +99,15 @@ describe('persistent agent execution and management', () => {
     const node = s.doc.nodes[0]; const updated = s.architectures.update(s.doc.id, 1, [{ type: 'put_node', node: { ...node, provider: 'claude', runtime: { kind: 'managed', policy: 'review-tools', maxOutputTokens: 512 } } }, { type: 'remove_node', id: 'gate' }, { type: 'put_edge', edge: { id: 'direct', source: 'agent', target: 'out', label: '' } }]).document;
     try {
       const started = s.runs.start(updated.id, 'agent', 'Run managed task', updated.revision); await wait(() => !!launch);
-      const grant = automation.authenticate(launch!.env![AUTOMATION_TOKEN_ENV]); expect(automation.toolsFor(grant).map(t => t.name)).toEqual(['call_agent_tool', 'get_agent_memory', 'put_agent_memory']);
-      expect(await automation.call('call_agent_tool', { nodeId: 'tool', input: { n: 4 } }, grant, { agents: () => [], consoles: () => [] })).toEqual({ answer: 5 });
-      await expect(automation.call('update_architecture', { id: updated.id }, grant, { agents: () => [], consoles: () => [] })).rejects.toThrow(/Unknown/);
-      await expect(s.runs.callResource(started.id, 'other-agent', 'get_agent_memory', { nodeId: 'memory' })).rejects.toThrow(/own active/);
+      const grant = automation.authenticate(launch!.env![AUTOMATION_TOKEN_ENV]); expect(automation.toolsFor(grant).map(t => t.name)).toEqual(['increment', 'memory_history_get', 'memory_history_put']);
+      expect(automation.toolsFor(grant)[0]).toMatchObject({ description: 'Increment a number.', inputSchema: { properties: { n: { type: 'number' } }, required: ['n'] }, annotations: { readOnlyHint: true } });
+      expect(await automation.call('increment', { project: s.project, n: 4 }, grant, { agents: () => [], consoles: () => [] })).toEqual({ answer: 5 });
+      await expect(automation.call('increment', { n: 'four' }, grant, { agents: () => [], consoles: () => [] })).rejects.toThrow(/JSON schema/);
+      expect(s.runs.get(started.id).toolCalls?.map(c => [c.name, c.ok, c.approval])).toEqual([['increment', true, 'harness'], ['increment', false, 'harness']]);
+      await expect(automation.call('update_architecture', { id: updated.id }, grant, { agents: () => [], consoles: () => [] })).rejects.toThrow(/not attached/);
+      await expect(s.runs.callResource(started.id, 'other-agent', 'memory_history_get', { key: 'k' })).rejects.toThrow(/own active/);
       status = 'idle'; await s.runs.tick(); await wait(() => s.runs.get(started.id).status === 'succeeded');
-      await expect(automation.call('get_agent_memory', { nodeId: 'memory' }, grant, { agents: () => [], consoles: () => [] })).rejects.toThrow(/own active/);
+      await expect(automation.call('memory_history_get', { key: 'k' }, grant, { agents: () => [], consoles: () => [] })).rejects.toThrow(/own active/);
     } finally { await s.runs.shutdown(); s.db.close(); }
   });
 });

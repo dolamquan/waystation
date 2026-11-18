@@ -1,6 +1,7 @@
 import type { AgentRuntime } from './agentBrains.ts';
 import { validateResource, type ResourceConfig } from './agentResources.ts';
 import type { CapabilityRef } from './agentPlatform.ts';
+import { validateSandbox } from './agentEvaluation.ts';
 /** The graph is shared by the editor and the agent bridge; labels are data, never instructions. */
 export const ARCHITECTURE_KINDS = ['input', 'agent', 'router', 'tool', 'memory', 'approval', 'output'] as const;
 export type ArchitectureKind = typeof ARCHITECTURE_KINDS[number];
@@ -11,7 +12,7 @@ export interface ArchitectureNode {
   config?: ResourceConfig;
   capabilities?: CapabilityRef[];
 }
-export interface ArchitectureEdge { id: string; source: string; target: string; label: string }
+export interface ArchitectureEdge { id: string; source: string; target: string; label: string; outcome?: 'approved' | 'rejected' }
 export interface ArchitectureGraph { title: string; description: string; nodes: ArchitectureNode[]; edges: ArchitectureEdge[] }
 export interface ArchitectureDocument extends ArchitectureGraph {
   id: string; project: string; revision: number; updatedAt: number; changedBy: string;
@@ -43,7 +44,11 @@ export function validateArchitecture(raw: unknown): ArchitectureGraph {
       if (!['chat-only', 'review-tools', 'configured-tools'].includes(String(r.policy))) fail('Choose a supported capability policy.');
       if (r.kind === 'managed' && r.policy === 'configured-tools') fail('Coding runtimes require review for tool access.');
       if (!Number.isInteger(r.maxOutputTokens) || (r.maxOutputTokens as number) < 64 || (r.maxOutputTokens as number) > 4096) fail('Output limit must be between 64 and 4096 tokens.');
-      runtime = { kind: r.kind as AgentRuntime['kind'], policy: r.policy as AgentRuntime['policy'], maxOutputTokens: r.maxOutputTokens as number, ...(r.connectionId === undefined || r.connectionId === '' ? {} : { connectionId: id(r.connectionId) }), ...(r.maxSteps === undefined ? {} : { maxSteps: Number.isInteger(r.maxSteps) && (r.maxSteps as number) >= 1 && (r.maxSteps as number) <= 12 ? r.maxSteps as number : fail('Model turns must be between 1 and 12.') }), ...(r.maxToolCalls === undefined ? {} : { maxToolCalls: Number.isInteger(r.maxToolCalls) && (r.maxToolCalls as number) >= 0 && (r.maxToolCalls as number) <= 20 ? r.maxToolCalls as number : fail('Tool calls must be between 0 and 20.') }) };
+      runtime = { kind: r.kind as AgentRuntime['kind'], policy: r.policy as AgentRuntime['policy'], maxOutputTokens: r.maxOutputTokens as number, ...(r.connectionId === undefined || r.connectionId === '' ? {} : { connectionId: id(r.connectionId) }), ...(r.maxSteps === undefined ? {} : { maxSteps: Number.isInteger(r.maxSteps) && (r.maxSteps as number) >= 1 && (r.maxSteps as number) <= 12 ? r.maxSteps as number : fail('Model turns must be between 1 and 12.') }), ...(r.maxToolCalls === undefined ? {} : { maxToolCalls: Number.isInteger(r.maxToolCalls) && (r.maxToolCalls as number) >= 0 && (r.maxToolCalls as number) <= 20 ? r.maxToolCalls as number : fail('Tool calls must be between 0 and 20.') }),
+        ...(r.maxDurationSeconds === undefined ? {} : { maxDurationSeconds: Number.isInteger(r.maxDurationSeconds) && Number(r.maxDurationSeconds) >= 10 && Number(r.maxDurationSeconds) <= 3600 ? Number(r.maxDurationSeconds) : fail('Workflow timeout must be between 10 and 3600 seconds.') }),
+        ...(r.maxWorkflowSteps === undefined ? {} : { maxWorkflowSteps: Number.isInteger(r.maxWorkflowSteps) && Number(r.maxWorkflowSteps) >= 1 && Number(r.maxWorkflowSteps) <= 100 ? Number(r.maxWorkflowSteps) : fail('Workflow steps must be between 1 and 100.') }),
+        ...(r.maxTotalTokens === undefined ? {} : { maxTotalTokens: Number.isInteger(r.maxTotalTokens) && Number(r.maxTotalTokens) >= 256 && Number(r.maxTotalTokens) <= 1000000 ? Number(r.maxTotalTokens) : fail('Workflow token budget must be between 256 and 1000000.') }),
+        ...(r.codeExecution === undefined || r.codeExecution === null ? {} : { codeExecution: r.kind === 'api' ? (() => { try { return validateSandbox(r.codeExecution); } catch (e) { return fail((e as Error).message); } })() : fail('Code execution is available to API agents. Coding runtimes already run code on the host with approvals.') }) };
     }
     let capabilities: CapabilityRef[] | undefined;
     if (n.capabilities !== undefined) {
@@ -60,7 +65,8 @@ export function validateArchitecture(raw: unknown): ArchitectureGraph {
     const e = obj(raw); const source = id(e.source); const target = id(e.target);
     if (!nodeIds.has(source) || !nodeIds.has(target)) fail('Every connection must reference existing nodes.');
     if (source === target) fail('Connect two different nodes.');
-    return { id: id(e.id), source, target, label: text(e.label, 200, 'Connection label') };
+    if (e.outcome !== undefined && (!['approved', 'rejected'].includes(String(e.outcome)) || nodes.find(n => n.id === source)?.kind !== 'approval')) fail('An approval outcome belongs on a connection from an Approval step.');
+    return { id: id(e.id), source, target, label: text(e.label, 200, 'Connection label'), ...(e.outcome === undefined ? {} : { outcome: e.outcome as 'approved' | 'rejected' }) };
   });
   if (new Set(edges.map(e => e.id)).size !== edges.length) fail('Connection ids must be unique.');
   if (new Set(edges.map(e => `${e.source}\0${e.target}`)).size !== edges.length) fail('These nodes are already connected.');
@@ -85,15 +91,19 @@ export function applyArchitectureOperations(graph: ArchitectureGraph, raw: unkno
   return validateArchitecture(next);
 }
 
+/**
+ * The starter executes exactly as drawn: the agent drafts, a person reviews (an approval step the runtime pauses
+ * on), then the result is delivered. Additional agent nodes can be connected for executable handoffs.
+ */
 export function starterWorkflow(): ArchitectureGraph {
-  return { title: 'Agent workflow', description: 'Draft a response, review it, and return the result.', nodes: [
+  return { title: 'Agent workflow', description: 'One agent drafts the answer, a person reviews it, then it is delivered.', nodes: [
     { id: 'request', kind: 'input', name: 'User request', description: 'The task and its acceptance criteria.', x: 40, y: 180, config: { type: 'input', format: 'text' } },
-    { id: 'builder', kind: 'agent', name: 'Builder', description: 'Draft a response that satisfies the request. Use connected tools when needed.', x: 300, y: 180 },
-    { id: 'reviewer', kind: 'agent', name: 'Reviewer', description: 'Check the draft for accuracy and completeness. Explain any remaining concerns.', x: 560, y: 180 },
+    { id: 'builder', kind: 'agent', name: 'Agent', description: 'Answer the request accurately and completely. Use attached tools when they help, and say what you could not verify.', x: 300, y: 180 },
+    { id: 'reviewer', kind: 'approval', name: 'Human review', description: 'A person checks the draft before it is delivered.', x: 560, y: 180, config: { type: 'approval', message: 'Review the draft for accuracy and completeness before it is delivered.', timeoutMinutes: 30 } },
     { id: 'response', kind: 'output', name: 'Final response', description: 'Return the reviewed response to the user.', x: 820, y: 180, config: { type: 'output', destination: 'dashboard', format: 'text' } },
   ], edges: [
     { id: 'request-builder', source: 'request', target: 'builder', label: 'Task' },
     { id: 'builder-reviewer', source: 'builder', target: 'reviewer', label: 'Draft' },
-    { id: 'reviewer-response', source: 'reviewer', target: 'response', label: 'Reviewed result' },
+    { id: 'reviewer-response', source: 'reviewer', target: 'response', label: 'Approved' },
   ] };
 }

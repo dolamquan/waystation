@@ -116,6 +116,24 @@ export class McpCatalog implements LoadoutProvider {
     return MCP_PRESETS;
   }
 
+  /**
+   * Remote (Streamable HTTP) servers that built agents can reuse. Only the URL and an Authorization header cross
+   * over; stdio servers stay a coding-CLI feature, and other header names are reported so the UI can explain why.
+   */
+  remoteServers(): { id: string; name: string; label: string; url: string; hasAuthorization: boolean; otherHeaders: string[] }[] {
+    return this.records().filter(r => r.transport === 'http' && r.url && !r.localConnector).map(r => {
+      const names = Object.keys(this.secretValues(r.id));
+      return { id: r.id, name: r.name, label: r.label, url: r.url!, hasAuthorization: names.some(n => n.toLowerCase() === 'authorization'), otherHeaders: names.filter(n => n.toLowerCase() !== 'authorization') };
+    });
+  }
+  /** The URL and Authorization value of one remote server, for the daemon only (never returned to a client). */
+  remoteCredentials(id: string): { url: string; authorization?: string; name: string; otherHeaders: string[] } {
+    const record = this.records().find(r => r.id === id && r.transport === 'http' && !r.localConnector);
+    if (!record?.url) throw new LibraryInputError('That Library MCP server is not a remote HTTP server.');
+    const secrets = this.secretValues(record.id); const key = Object.keys(secrets).find(n => n.toLowerCase() === 'authorization');
+    return { url: record.url, name: record.name, ...(key ? { authorization: secrets[key] } : {}), otherHeaders: Object.keys(secrets).filter(n => n !== key) };
+  }
+
   create(raw: unknown): McpServerView {
     const { fields, secrets } = this.parse(raw);
     const record: McpRecord = { id: randomUUID(), createdAt: Date.now(), ...fields };

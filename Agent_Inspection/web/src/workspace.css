@@ -85,7 +85,7 @@
 .workbench-content .world-toolbar, .workbench-content .office-switcher, .workbench-content .crew-panel { background: var(--paper); border-color: var(--line-strong); }
 .workbench-content .world-title h2, .workbench-content .crew-panel-heading h3 { font-family: var(--font); font-weight: 400; color: var(--ink); }
 .workbench-content .world-title-icon { border-color: var(--line-strong); background: var(--panel-3); border-radius: var(--radius); }
-.workbench-content .office-tab { border: 1px solid var(--line-strong); background: var(--panel-3); border-radius: var(--radius); }
+.workbench-content .office-tab-wrap { border: 1px solid var(--line-strong); background: var(--panel-3); border-radius: var(--radius); }
 .workbench-content .office-tab-active { background: var(--panel-3); border-color: var(--line-strong); box-shadow: none; }
 .workbench-content .crew-row-selected { background: var(--panel-3); border-color: var(--line-strong); }
 .workbench-content .world-demo-card { background: var(--panel-3); border-color: var(--amber-line); border-radius: var(--radius); }

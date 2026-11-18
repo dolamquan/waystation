@@ -6,6 +6,7 @@ import { folder } from '../../web/src/stationOffices.ts';
 import type { BrainConnection, BrainProvider } from '../../shared/agentBrains.ts';
 import { runModelConversation, type ModelRunOptions } from './modelLoop.ts';
 import { AgentSecrets } from './secrets.ts';
+import { assertResolvedHostAllowed } from '../library/urlGuard.ts';
 
 type ConnectionRecord = Omit<BrainConnection, 'hasKey'> & { keyRequired?: boolean };
 const secretName = (id: string) => `architecture-brain:${id}:apiKey`;
@@ -62,6 +63,7 @@ export class BrainConnections {
   }
   async run(id: unknown, project: string, role: string, input: string, options: ModelRunOptions) {
     const connection = this.record(id, project); const key = this.deps.secrets.get(secretName(connection.id));
+    if (process.env.WAYSTATION_HOSTED === '1') await assertResolvedHostAllowed(new URL(connection.baseUrl).hostname, 'The model endpoint');
     if (!key && (connection.provider !== 'compatible' || connection.keyRequired || this.deps.secrets.reference(secretName(connection.id)))) throw new LibraryInputError('This connection has no usable API key. Replace its saved secret or connection key.');
     const result = await runModelConversation(connection, key, role, input, options, this.send);
     this.deps.audit('architecture_brain_test', connection.id, { provider: connection.provider, model: result.model });

@@ -666,6 +666,7 @@ export class Tower {
 
   /** Launches a managed agent. `raw.loadout` (skills, docs, MCP servers, plugins, notify channels) is optional. */
   launch(raw: unknown, trusted?: Pick<ManagedLaunch, 'agentId' | 'mcpServers' | 'env'>): Agent {
+    if (process.env.WAYSTATION_HOSTED === '1') throw new UserError('Native coding sessions are disabled for hosted organization workers. Use an API agent.');
     let launch: ManagedLaunch;
     let notes: readonly string[] = [];
     const rawLoadout = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).loadout : undefined;

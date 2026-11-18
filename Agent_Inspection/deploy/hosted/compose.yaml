@@ -1,0 +1,103 @@
+name: waystation-hosted
+x-runtime: &runtime
+  image: waystation-hosted:local
+  build:
+    context: ../..
+    dockerfile: deploy/hosted/Dockerfile
+    args:
+      NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ["/tmp:size=128m,mode=1777"]
+  pids_limit: 128
+  mem_limit: 1g
+  cpus: 1.0
+  stop_grace_period: 30s
+services:
+  edge:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - tls-data:/data
+      - tls-config:/config
+    networks: [front]
+  identity:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.14.0
+    restart: unless-stopped
+    command: ["--alpha-config=/etc/oauth2/alpha.yaml", "--reverse-proxy=true", "--cookie-secure=true", "--cookie-httponly=true", "--cookie-samesite=lax", "--cookie-refresh=5m", "--cookie-expire=8h", "--email-domain=*", "--skip-provider-button=true", "--request-logging=false"]
+    environment:
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID}
+      OAUTH2_PROXY_REDIRECT_URL: https://${PUBLIC_HOST}/oauth2/callback
+      OAUTH2_PROXY_COOKIE_SECRET: ${OIDC_COOKIE_SECRET:?Run init-hosted.mjs}
+    volumes: ["./oauth2-proxy.yaml:/etc/oauth2/alpha.yaml:ro"]
+    secrets: [proxy-secret, oidc-client-secret]
+    networks: [front]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  gateway:
+    <<: *runtime
+    environment:
+      WAYSTATION_HOSTED_CONFIG: /config/organizations.json
+      WAYSTATION_PROXY_SECRET_FILE: /run/secrets/proxy-secret
+      WAYSTATION_COOKIE_SECRET_FILE: /run/secrets/selection-secret
+      WAYSTATION_HOSTED_AUDIT_FILE: /audit/requests.jsonl
+      ALPHA_TOKEN_FILE: /run/secrets/alpha-token
+      BETA_TOKEN_FILE: /run/secrets/beta-token
+    volumes: ["./organizations.json:/config/organizations.json:ro", "audit:/audit"]
+    secrets: [proxy-secret, selection-secret, alpha-token, beta-token]
+    networks: [front, alpha, beta]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  worker-alpha:
+    <<: *runtime
+    command: ["node", "--import", "tsx", "daemon/hosted/worker.ts"]
+    environment:
+      WAYSTATION_HOSTED: '1'
+      WAYSTATION_PROJECT_ROOT: /workspace
+      WAYSTATION_SECRETS_KEY_FILE: /run/secrets/alpha-key
+      WAYSTATION_WORKER_TOKEN_FILE: /run/secrets/alpha-token
+    volumes: ["alpha-state:/state", "alpha-workspace:/workspace"]
+    secrets: [alpha-key, alpha-token]
+    networks: [alpha]
+  worker-beta:
+    <<: *runtime
+    command: ["node", "--import", "tsx", "daemon/hosted/worker.ts"]
+    environment:
+      WAYSTATION_HOSTED: '1'
+      WAYSTATION_PROJECT_ROOT: /workspace
+      WAYSTATION_SECRETS_KEY_FILE: /run/secrets/beta-key
+      WAYSTATION_WORKER_TOKEN_FILE: /run/secrets/beta-token
+    volumes: ["beta-state:/state", "beta-workspace:/workspace"]
+    secrets: [beta-key, beta-token]
+    networks: [beta]
+networks:
+  front: {}
+  alpha: {}
+  beta: {}
+volumes:
+  tls-data: {}
+  tls-config: {}
+  audit: {}
+  alpha-state: {}
+  alpha-workspace: {}
+  beta-state: {}
+  beta-workspace: {}
+secrets:
+  proxy-secret: {file: ./secrets/proxy-secret}
+  selection-secret: {file: ./secrets/selection-secret}
+  oidc-client-secret: {file: ./secrets/oidc-client-secret}
+  alpha-token: {file: ./secrets/alpha-token}
+  beta-token: {file: ./secrets/beta-token}
+  alpha-key: {file: ./secrets/alpha-key}
+  beta-key: {file: ./secrets/beta-key}

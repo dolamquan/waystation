@@ -12,10 +12,14 @@ import type { ArchitectureDocument, ArchitectureNode } from '../../shared/archit
 import { validateArchitecture } from '../../shared/architecture.ts';
 import { validateResource, type MemoryConfig, type ToolConfig, type OutputConfig, type JsonSchema, type RouterConfig } from '../../shared/agentResources.ts';
 import type { ArchitectureStore } from './store.ts';
+import { McpHttpClient } from './mcpClient.ts';
+import { assertResolvedHostAllowed } from '../library/urlGuard.ts';
+/** Built agents may reach loopback (local dev services) but never link-local/metadata, private or CGNAT ranges unless WAYSTATION_ALLOW_PRIVATE_FETCH=1. */
+const OUTBOUND = { allowLoopback: process.env.WAYSTATION_HOSTED !== '1' };
 
 interface Credential { id: string; project: string; createdAt: number }
 interface MemoryRow { id: string; scope: string; key: string; value: unknown; updatedAt: number; expiresAt: number }
-export interface ResourceContext { document: ArchitectureDocument; agentNodeId: string; runId: string; signal?: AbortSignal; allowedHosts?: string[]; environmentId?: string }
+export interface ResourceContext { document: ArchitectureDocument; agentNodeId: string; runId: string; signal?: AbortSignal; allowedHosts?: string[]; environmentId?: string; idempotencyKey?: string }
 export function checkNetwork(host: string, allowedHosts?: string[]): void {
   if (allowedHosts && !allowedHosts.some(h => h.toLowerCase() === host.toLowerCase())) throw new LibraryInputError(`Environment network policy blocks host: ${host}. Add this exact host to the environment and deploy a new version.`);
 }
@@ -38,8 +42,16 @@ export function routeResult(config: RouterConfig, value: unknown): string {
   }
   return config.fallback;
 }
+/** Compact Tavily search results: the model needs title, url, snippet and score, not the raw payload. */
+export function shapeTavily(raw: unknown): unknown {
+  const r = raw as { answer?: unknown; results?: unknown };
+  if (!r || typeof r !== 'object' || !Array.isArray(r.results)) return raw;
+  return { ...(typeof r.answer === 'string' && r.answer ? { answer: r.answer } : {}), results: r.results.slice(0, 20).map((x: any) => ({ title: String(x?.title ?? ''), url: String(x?.url ?? ''), content: String(x?.content ?? '').slice(0, 1500), ...(typeof x?.score === 'number' ? { score: Math.round(x.score * 1000) / 1000 } : {}), ...(x?.published_date ? { published: String(x.published_date) } : {}) })) };
+}
 export class AgentResources {
-  constructor(private readonly deps: LibraryDeps) {}
+  /** One MCP session per (run, server); the pinned schema is verified once per session before any call. */
+  private readonly mcpSessions = new Map<string, { client: McpHttpClient; verified: Map<string, string> }>();
+  constructor(private readonly deps: LibraryDeps, private readonly send: typeof fetch = fetch) {}
   storeCredential(project: string, name: 'password' | 'authorization', value: unknown, existing?: string): string {
     if (typeof value !== 'string' || !value.trim() || value.length > 8192 || /[\r\n]/.test(value)) throw new LibraryInputError('Enter a single-line secret under 8192 characters.');
     if (existing) this.secret(project, existing, name);
@@ -52,6 +64,8 @@ export class AgentResources {
     if (existing) this.secret(project, existing, name); const id = existing ?? randomUUID(); this.deps.secrets.alias(`${prefix(id)}${name}`, source, prefixValue);
     if (!existing) this.deps.store.saveRecord('architecture_credentials', { id, project, createdAt: Date.now() } satisfies Credential); return id;
   }
+  /** A credential slot with no secret yet (keyless service connections such as public MCP servers). */
+  registerCredential(project: string): string { const id = randomUUID(); this.deps.store.saveRecord('architecture_credentials', { id, project, createdAt: Date.now() } satisfies Credential); return id; }
   hasCredential(project: string, id: string, name: 'password' | 'authorization'): boolean { return !!this.secret(project, id, name); }
   sanitize(project: string, text: string): string {
     for (const c of this.deps.store.loadRecords<Credential>('architecture_credentials').filter(c => sameProject(c.project, project))) for (const name of this.deps.secrets.namesUnder(prefix(c.id))) {
@@ -89,7 +103,7 @@ export class AgentResources {
       const entries = Object.entries(rawSecrets).filter(([, value]) => value !== '');
       if (entries.some(([name, value]) => !['password', 'authorization'].includes(name) || typeof value !== 'string' || !value || value.length > 8192 || /[\r\n]/.test(value))) throw new LibraryInputError('Secrets must be single-line password or authorization values under 8192 characters.');
       if (entries.length) {
-        if (!((config.type === 'memory' && config.backend === 'postgres') || (config.type === 'tool' && config.implementation === 'http') || (config.type === 'output' && config.destination === 'webhook'))) throw new LibraryInputError('This resource does not accept credentials.');
+        if (!((config.type === 'memory' && config.backend === 'postgres') || (config.type === 'tool' && config.implementation !== 'javascript') || (config.type === 'output' && config.destination === 'webhook'))) throw new LibraryInputError('This resource does not accept credentials.');
         const allowedName = config.type === 'memory' ? 'password' : 'authorization';
         if (entries.some(([name]) => name !== allowedName)) throw new LibraryInputError(`This resource accepts only ${allowedName}.`);
         const existing = 'credentialId' in config ? config.credentialId : undefined;
@@ -111,6 +125,7 @@ export class AgentResources {
   private memoryConfig(node: ArchitectureNode): MemoryConfig { if (!node.config || node.config.type !== 'memory') throw new LibraryInputError(`Configure memory “${node.name}” first.`); return validateResource('memory', node.config) as MemoryConfig; }
   private async postgres<T>(ctx: ResourceContext, config: MemoryConfig, use: (client: Client, table: string) => Promise<T>): Promise<T> {
     checkNetwork(config.host!, ctx.allowedHosts);
+    await assertResolvedHostAllowed(config.host!, 'The PostgreSQL host', OUTBOUND);
     if (config.credentialId && !this.secret(ctx.document.project, config.credentialId, 'password')) throw new LibraryInputError('Database credential is revoked or unavailable. Replace its saved secret.');
     const client = new Client({ host: config.host, port: config.port, database: config.database, user: config.user, password: this.secret(ctx.document.project, config.credentialId, 'password'), ssl: config.tls ? { rejectUnauthorized: true } : false, connectionTimeoutMillis: 5000, statement_timeout: 5000, query_timeout: 6000 });
     const abort = () => { void client.end().catch(() => {}); };
@@ -163,8 +178,10 @@ export class AgentResources {
   }
   private async http(ctx: ResourceContext, config: { url?: string; credentialId?: string }, method: string, input: unknown, timeoutMs: number): Promise<string> {
     checkNetwork(new URL(config.url!).hostname, ctx.allowedHosts);
+    await assertResolvedHostAllowed(new URL(config.url!).hostname, 'The tool or webhook URL', OUTBOUND);
     if (config.credentialId && !this.secret(ctx.document.project, config.credentialId, 'authorization')) throw new LibraryInputError('Authorization credential is revoked or unavailable. Replace its saved secret.');
     const url = new URL(config.url!); const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (ctx.idempotencyKey && method !== 'GET') headers['idempotency-key'] = ctx.idempotencyKey;
     const authorization = this.secret(ctx.document.project, config.credentialId, 'authorization'); if (authorization) headers.authorization = authorization;
     if (method === 'GET') for (const [key, value] of Object.entries(input && typeof input === 'object' ? input : {})) url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
     try {
@@ -176,10 +193,37 @@ export class AgentResources {
       return this.sanitize(ctx.document.project, text + decoder.decode());
     } catch (e) { if (e instanceof LibraryInputError) throw e; throw new LibraryInputError('Resource request failed, timed out, or was cancelled. Check the endpoint and credentials.'); }
   }
+  private async mcpCall(ctx: ResourceContext, c: ToolConfig, args: unknown): Promise<unknown> {
+    checkNetwork(new URL(c.url!).hostname, ctx.allowedHosts);
+    await assertResolvedHostAllowed(new URL(c.url!).hostname, 'The MCP server URL', OUTBOUND);
+    if (c.credentialId && !this.secret(ctx.document.project, c.credentialId, 'authorization')) throw new LibraryInputError('MCP credential is revoked or unavailable. Replace its saved secret.');
+    const authorization = this.secret(ctx.document.project, c.credentialId, 'authorization');
+    if (!c.schemaHash) throw new LibraryInputError('This MCP tool has no pinned definition. Publish it as an MCP capability.');
+    const key = `${ctx.runId}\0${c.url}\0${c.credentialId ?? ''}`;
+    ctx.signal?.throwIfAborted();
+    let session = this.mcpSessions.get(key);
+    if (!session) { session = { client: new McpHttpClient({ url: c.url!, headers: authorization ? { authorization } : {} }, this.send), verified: new Map() }; this.mcpSessions.set(key, session); }
+    const signal = ctx.signal ? AbortSignal.any([ctx.signal, AbortSignal.timeout(c.timeoutMs)]) : AbortSignal.timeout(c.timeoutMs);
+    if (!session.verified.has(c.mcpTool!)) {
+      const live = (await session.client.listTools(signal)).find(t => t.name === c.mcpTool);
+      if (!live) throw new LibraryInputError(`The MCP server no longer offers "${c.mcpTool}". Publish a new capability version.`);
+      if (live.schemaHash !== c.schemaHash) throw new LibraryInputError(`The MCP server changed "${c.mcpTool}" since it was reviewed. Publish a new capability version before agents can call it.`);
+      session.verified.set(c.mcpTool!, live.schemaHash);
+    }
+    return JSON.parse(this.sanitize(ctx.document.project, JSON.stringify(await session.client.callTool(c.mcpTool!, args, signal) ?? null)));
+  }
+  /** Close MCP sessions opened for a run. Called when the run finishes. */
+  async closeRun(runId: string): Promise<void> {
+    const prefix = `${runId}\0`;
+    await Promise.allSettled([...this.mcpSessions.entries()].filter(([k]) => k.startsWith(prefix)).map(async ([k, s]) => { this.mcpSessions.delete(k); await s.client.close(); }));
+  }
   async invoke(ctx: ResourceContext, node: ArchitectureNode, input: unknown): Promise<unknown> {
     if (node.config?.type !== 'tool') throw new LibraryInputError(`Configure tool “${node.name}” first.`);
     const c = validateResource('tool', node.config) as ToolConfig; validateJson(c.inputSchema, input); ctx.signal?.throwIfAborted();
-    if (c.implementation === 'http') { const output = await this.http(ctx, c, c.method!, { ...c.defaults, ...(input as Record<string, unknown>) }, c.timeoutMs); try { return JSON.parse(output); } catch { return output; } }
+    // Model input fills in over defaults; operator-pinned values always win.
+    const args = { ...c.defaults, ...(input && typeof input === 'object' ? input as Record<string, unknown> : {}), ...c.pinned };
+    if (c.implementation === 'mcp') return this.mcpCall(ctx, c, args);
+    if (c.implementation === 'http') { const output = await this.http(ctx, c, c.method!, args, c.timeoutMs); let value: unknown; try { value = JSON.parse(output); } catch { value = output; } return c.transform === 'tavily_search' ? shapeTavily(value) : value; }
     const engine = await getQuickJS();
     try {
       const output = engine.evalCode(`(()=>{const result=(function(input){"use strict";\n${c.code}\n})(${JSON.stringify(input)});if(result&&typeof result.then==='function')throw new Error('Return a synchronous value');return JSON.stringify(result);})()`, { shouldInterrupt: shouldInterruptAfterDeadline(Date.now() + Math.min(c.timeoutMs, 1000)), memoryLimitBytes: 32 * 1024 * 1024, maxStackSizeBytes: 512 * 1024 });

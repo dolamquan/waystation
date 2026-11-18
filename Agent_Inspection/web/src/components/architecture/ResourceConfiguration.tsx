@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type SetStateAction } from 'react';
 import type { ArchitectureDocument, ArchitectureNode } from '../../../../shared/architecture.ts';
 import { defaultResource, validateResource, type ResourceConfig, type RouterConfig } from '../../../../shared/agentResources.ts';
 import { request } from '../../api.ts';
 import { Icon } from '../Icon.tsx';
+import { DraftNotice, useInspectorDraft } from './InspectorDraft.tsx';
 
 export function ResourceFields({ node, document, busy, save }: { node: ArchitectureNode; document: ArchitectureDocument; busy: boolean; save: (node: ArchitectureNode, secrets: Record<string, string>) => Promise<boolean> }) {
-  const [name, setName] = useState(node.name); const [description, setDescription] = useState(node.description);
-  const [config, setConfig] = useState<ResourceConfig>(() => node.config ?? defaultResource(node.kind)!);
-  const [schema, setSchema] = useState(() => JSON.stringify(node.config && 'inputSchema' in node.config ? node.config.inputSchema : node.config && 'schema' in node.config ? node.config.schema : defaultResource(node.kind)?.type === 'tool' ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false } : {}, null, 2));
+  const local = useInspectorDraft(`${document.id}:${node.id}`, { name: node.name, description: node.description, config: node.config ?? defaultResource(node.kind)!, schema: JSON.stringify(node.config && 'inputSchema' in node.config ? node.config.inputSchema : node.config && 'schema' in node.config ? node.config.schema : defaultResource(node.kind)?.type === 'tool' ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false } : {}, null, 2) });
+  const { name, description, config, schema } = local.draft;
+  const setName = (name: string) => local.setDraft(d => ({ ...d, name }));
+  const setDescription = (description: string) => local.setDraft(d => ({ ...d, description }));
+  const setSchema = (schema: string) => local.setDraft(d => ({ ...d, schema }));
+  const setConfig = (next: SetStateAction<ResourceConfig>) => local.setDraft(d => ({ ...d, config: typeof next === 'function' ? next(d.config) : next }));
   const [secret, setSecret] = useState(''); const [hasSecret, setHasSecret] = useState(false);
   const [sample, setSample] = useState(node.kind === 'tool' ? '{"text":"hello"}' : node.kind === 'router' ? '{"status":"approved"}' : node.kind === 'output' ? 'Example output' : '');
   const [testing, setTesting] = useState(false); const [result, setResult] = useState(''); const [error, setError] = useState('');
@@ -18,13 +22,14 @@ export function ResourceFields({ node, document, busy, save }: { node: Architect
   const dirty = name !== node.name || description !== node.description || JSON.stringify(config) !== JSON.stringify(node.config) || !!secret || (usesSchema && schema !== schemaWas);
   useEffect(() => { let active = true; void request<{ credentials: { password: boolean; authorization: boolean } }>('GET', endpoint).then(r => { if (active) setHasSecret(r.credentials.password || r.credentials.authorization); }, () => {}); return () => { active = false; }; }, [endpoint]);
   const submit = async () => {
+    if (local.conflict) return;
     setError('');
     try {
       const next = { ...config };
       if (usesSchema) { const parsed = JSON.parse(schema); if (next.type === 'tool') next.inputSchema = parsed; else if (next.type === 'input' || next.type === 'output') next.schema = parsed; }
       const validated = validateResource(node.kind, next);
       const saved = await save({ ...node, name, description, config: validated }, secret ? { [config.type === 'memory' ? 'password' : 'authorization']: secret } : {});
-      if (saved) { if (secret) setHasSecret(true); setSecret(''); setResult(''); }
+      if (saved) { local.commit(); if (secret) setHasSecret(true); setSecret(''); setResult(''); }
     } catch (e) { setError((e as Error).message); }
   };
   const test = async () => {
@@ -38,6 +43,7 @@ export function ResourceFields({ node, document, busy, save }: { node: Architect
   const destinations = document.nodes.filter(n => document.edges.some(e => e.source === node.id && e.target === n.id));
   const setRule = (index: number, value: Record<string, unknown>) => { if (config.type === 'router') patch({ rules: config.rules.map((r, i) => i === index ? { ...r, ...value } : r) }); };
   return <section className="arch-resource" aria-label={`${node.kind} configuration`}>
+    <DraftNotice {...local} />
     <form className="arch-fields" onSubmit={e => { e.preventDefault(); void submit(); }}><h3>{node.kind[0].toUpperCase() + node.kind.slice(1)} configuration</h3>
       <label>Name<input className="text-input" value={name} maxLength={100} required onChange={e => setName(e.target.value)} /></label>
       <label className="arch-instructions">Description<textarea className="text-input" aria-label="Resource description" value={description} rows={2} maxLength={8000} onChange={e => setDescription(e.target.value)} /></label>
@@ -70,7 +76,7 @@ export function ResourceFields({ node, document, busy, save }: { node: Architect
         {config.type === 'router' && <div className="arch-wide arch-router-rules"><p>Match fields in the JSON result. Connect destination blocks before choosing them here.</p>{config.rules.map((rule, index) => <div className="arch-router-rule" key={index}><label>JSON field<input className="text-input" value={rule.field} placeholder="status" required onChange={e => setRule(index, { field: e.target.value })} /></label><label>Condition<select aria-label="Condition" className="text-input" value={rule.operator} onChange={e => setRule(index, { operator: e.target.value })}><option value="equals">Equals</option><option value="contains">Contains</option><option value="exists">Exists</option></select></label><label>Value<input className="text-input" value={rule.value} onChange={e => setRule(index, { value: e.target.value })} /></label><label>Destination<select aria-label="Destination" className="text-input" required value={rule.target} onChange={e => setRule(index, { target: e.target.value })}><option value="">Choose destination</option>{destinations.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}</select></label><button className="icon-btn" type="button" aria-label={`Remove routing rule ${index + 1}`} onClick={() => patch({ rules: config.rules.filter((_, i) => i !== index) })}><Icon name="trash" size={15} /></button></div>)}<button className="btn btn-small" type="button" disabled={config.rules.length >= 20} onClick={() => patch({ rules: [...config.rules, { field: '', operator: 'equals', value: '', target: '' }] })}>Add routing rule</button><label>Fallback destination<select aria-label="Fallback destination" className="text-input" value={config.fallback} onChange={e => patch({ fallback: e.target.value })}><option value="">Finish without a downstream destination</option>{destinations.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}</select></label></div>}
         {usesSchema && <label className="arch-wide">{config.type === 'tool' ? 'Tool input JSON schema' : 'JSON schema'}<textarea className="text-input arch-code" aria-label="Resource JSON schema" rows={6} value={schema} maxLength={16000} spellCheck={false} onChange={e => setSchema(e.target.value)} /></label>}
         {((config.type === 'memory' && config.backend === 'postgres') || (config.type === 'tool' && config.implementation === 'http') || (config.type === 'output' && config.destination === 'webhook')) && <label className="arch-wide">{config.type === 'memory' ? 'Database password' : 'Authorization header'}{hasSecret ? ' · stored; leave blank to keep' : ''}<input className="text-input" aria-label="Resource secret" type="password" autoComplete="new-password" maxLength={8192} value={secret} onChange={e => setSecret(e.target.value)} placeholder={config.type === 'memory' ? 'Stored separately from the graph' : 'e.g. Bearer your-token'} /></label>}
-      </div><button className="btn btn-small" disabled={busy || testing || !dirty}>{busy ? 'Saving…' : 'Save resource'}</button>
+      </div><button className="btn btn-small" disabled={busy || testing || local.conflict || !dirty}>{busy ? 'Saving…' : 'Save resource'}</button>
     </form>
     <div className="arch-resource-test"><h3>Verify this resource</h3>{config.type !== 'memory' && config.type !== 'approval' && <label>Test input<textarea className="text-input arch-code" aria-label="Resource test input" rows={3} value={sample} onChange={e => setSample(e.target.value)} /></label>}<button className="btn btn-small" disabled={busy || testing || dirty || !node.config} onClick={() => { void test(); }}>{testing ? 'Testing…' : config.type === 'memory' ? config.backend === 'postgres' ? 'Initialize & test memory' : 'Test memory' : config.type === 'output' ? 'Deliver test output' : config.type === 'tool' ? 'Run tool test' : 'Test configuration'}</button>{dirty && <small>Save configuration before testing.</small>}{config.type === 'memory' && config.backend === 'postgres' && <p>Initializes the configured memory table if needed, then verifies an isolated write/read/delete.</p>}{result && <pre className="arch-test-output" aria-live="polite">{result}</pre>}{error && <p className="arch-error" role="alert">{error}</p>}</div>
   </section>;

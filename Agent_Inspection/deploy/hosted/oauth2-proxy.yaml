@@ -1,0 +1,32 @@
+server:
+  bindAddress: 0.0.0.0:4180
+providers:
+  - id: organization-login
+    provider: oidc
+    clientID: ${OIDC_CLIENT_ID}
+    clientSecretFile: /run/secrets/oidc-client-secret
+    scope: openid profile email
+    code_challenge_method: S256
+    oidcConfig:
+      issuerURL: ${OIDC_ISSUER}
+      userIDClaim: sub
+      insecureSkipNonce: false
+upstreamConfig:
+  upstreams:
+    - id: gateway
+      path: /
+      uri: http://gateway:8080
+      passHostHeader: true
+      proxyWebSockets: false
+      timeout: 160s
+injectRequestHeaders:
+  - name: X-Waystation-Subject
+    preserveRequestValue: false
+    values:
+      - claimSource:
+          claim: user
+  - name: X-Waystation-Proxy-Secret
+    preserveRequestValue: false
+    values:
+      - secretSource:
+          fromFile: /run/secrets/proxy-secret

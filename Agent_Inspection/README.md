@@ -10,6 +10,8 @@ Construct [multipurpose agents in the Architecture workspace](docs/architecture-
 
 The [agent platform](docs/agent-platform.md) adds immutable local deployments, persistent agent conversations, reusable versioned skills/tools/memory, Tavily search, service connections, environment limits, a durable run queue, schedules and scoped webhook triggers. Inspect each deployed agent's architecture and download its traces and output artifacts. Draft edits stay separate from deployed versions. [Central secrets and agent quality tools](docs/agent-evaluation.md) add reusable credential references, local JavaScript/Docker sandboxes, versioned datasets, deterministic/code/LLM evaluators, experiments and result comparison.
 
+The [hosted Architecture workspace](docs/hosted-agent-platform.md) adds a container deployment with OIDC login, organization roles, separate organization workers and encrypted credentials. Connected agents execute as workflows with checkpoints, approvals, execution limits and guarded production promotion. This is a single-host deployment foundation; the runbook covers the identity, restore, load and security checks required before serving customers.
+
 Agents can now [control Waystation through its built-in MCP](docs/waystation-mcp.md): create notes and tiles, open files and local previews, inspect their workspace, and show results in the canvas. New Waystation-managed sessions receive the tools automatically; `npm run mcp:configure -- --apply` connects external coding agents.
 
 Create and select [Git worktrees on the canvas](docs/git-worktrees.md), then launch Claude Code, Codex, or console tiles in them. Use a **Worktree** tile to keep a branch workspace manager on your board, or enable **Use a Git worktree** while creating a terminal tile.

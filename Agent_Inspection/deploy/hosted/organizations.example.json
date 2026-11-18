@@ -1,0 +1,7 @@
+{
+  "publicOrigin": "https://agents.example.com",
+  "organizations": [
+    {"id":"alpha", "name":"Alpha", "upstream":"http://worker-alpha:4317", "tokenFileEnv":"ALPHA_TOKEN_FILE", "project":"/workspace", "members":{"REPLACE_WITH_OIDC_SUBJECT":"admin"}},
+    {"id":"beta", "name":"Beta", "upstream":"http://worker-beta:4317", "tokenFileEnv":"BETA_TOKEN_FILE", "project":"/workspace", "members":{}}
+  ]
+}

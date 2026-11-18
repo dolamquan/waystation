@@ -83,11 +83,11 @@ describe('local code sandboxes', () => {
     } finally { await docker.shutdown(); await s.close(); }
   });
   it('exposes the configured sandbox as a real bounded agent tool in the API harness', async () => {
-    const s = setup(vi.fn(async (_url, init) => { const body = JSON.parse(String(init!.body)); const result = body.messages.find((m: any) => m.role === 'tool'); return result ? response(result.content) : new Response(JSON.stringify({ choices: [{ message: { tool_calls: [{ id: 'sandbox', function: { name: 'execute_sandbox', arguments: '{"code":"return { answer: input.n + 1 };","input":{"n":4}}' } }] } }] })); }));
+    const s = setup(vi.fn(async (_url, init) => { const body = JSON.parse(String(init!.body)); const result = body.messages.find((m: any) => m.role === 'tool'); return result ? response(result.content) : new Response(JSON.stringify({ choices: [{ message: { tool_calls: [{ id: 'sandbox', function: { name: 'run_code', arguments: '{"code":"return { answer: input.n + 1 };","input":{"n":4}}' } }] } }] })); }));
     try {
       const env = s.platform.saveEnvironment(s.project, { name: 'Sandboxed', maxConcurrentRuns: 1, network: 'configured', allowedHosts: [], sandbox: DEFAULT_SANDBOX });
       const doc = s.architectures.update(s.doc.id, 1, [{ type: 'remove_node', id: 'output' }]).document; const deployment = s.platform.deploy(doc.id, 'a', { expectedRevision: doc.revision, environmentId: env.id }); const run = s.platform.run(deployment.id, 'Calculate'); await wait(() => s.runs.get(run.id).status === 'succeeded');
-      expect(s.runs.get(run.id).output).toContain('"answer":5'); expect(s.sandboxes.list(s.project)[0].runId).toBe(run.id); expect(s.runs.get(run.id).events.some(e => e.message === 'Sandbox execution finished')).toBe(true);
+      expect(s.runs.get(run.id).output).toContain('"answer":5'); expect(s.sandboxes.list(s.project)[0].runId).toBe(run.id); expect(s.runs.get(run.id).events.some(e => e.message === 'Code execution finished')).toBe(true);
     } finally { await s.close(); }
   });
 });
@@ -110,7 +110,7 @@ describe('datasets, evaluators and experiments', () => {
       const dataset = s.evaluations.saveDataset({ project: s.project, name: 'Cities', examples: [{ id: 'oslo', input: 'City?', reference: 'Oslo' }] }); const evaluator = s.evaluations.saveEvaluator({ project: s.project, name: 'Exact', threshold: 1, spec: { kind: 'exact', ignoreCase: false } });
       const first = s.evaluations.create({ name: 'Baseline', deploymentId: s.deployment.id, datasetId: dataset.id, evaluatorIds: [evaluator.id], repetitions: 2, allowTools: false });
       const drive = async (id: string) => { const end = Date.now() + 10000; while (s.evaluations.get(id).status === 'running') { if (Date.now() > end) throw new Error('Experiment timed out'); await s.evaluations.tick(); await new Promise(r => setTimeout(r, 10)); } };
-      await drive(first.id); const complete = s.evaluations.get(first.id); expect(complete.cases).toHaveLength(2); expect(complete.cases.every(c => c.status === 'completed' && c.scores[0].score === 1)).toBe(true); expect(s.runs.get(complete.cases[0].runId!).events.some(e => e.message.includes('external delivery disabled'))).toBe(true); expect(s.runs.get(complete.cases[0].runId!).source).toBe('experiment');
+      await drive(first.id); const complete = s.evaluations.get(first.id); expect(complete.cases).toHaveLength(2); expect(complete.cases).toEqual([0, 1].map(() => expect.objectContaining({ status: 'completed', scores: [expect.objectContaining({ score: 1 })] }))); expect(s.runs.get(complete.cases[0].runId!).events.some(e => e.message.includes('external delivery disabled'))).toBe(true); expect(s.runs.get(complete.cases[0].runId!).source).toBe('experiment');
       s.evaluations.saveEvaluator({ ...evaluator, expectedVersion: 1, spec: { kind: 'contains', text: 'Paris', ignoreCase: false } }, evaluator.id); expect(s.evaluations.get(first.id).evaluators[0].spec.kind).toBe('exact');
       const candidate = s.evaluations.create({ name: 'Candidate', deploymentId: s.deployment.id, datasetId: dataset.id, evaluatorIds: [evaluator.id] }); await drive(candidate.id); const comparison = s.evaluations.compare(first.id, candidate.id); expect(comparison.rows[0].candidate!.scores[0].score).toBe(0); expect(comparison.rows[0].deltas).toEqual([]);
       const reversed = s.evaluations.compare(candidate.id, first.id); expect(reversed.rows).toHaveLength(2); expect(reversed.rows[1].baseline).toBeUndefined(); expect(reversed.rows[1].candidate?.repetition).toBe(2);

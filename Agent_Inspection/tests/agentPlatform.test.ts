@@ -25,7 +25,7 @@ const done = (run: AgentRun) => ['succeeded', 'failed', 'cancelled', 'interrupte
 
 describe('agent platform', () => {
   it('caps conversations at 100 user turns even when prior turns failed without replies', async () => {
-    const s = setup(vi.fn(async () => new Response('{}', { status: 503 })));
+    const s = setup(vi.fn(async () => new Response('{}', { status: 400 })));
     try {
       const d = s.platform.deploy(s.doc.id, 'agent', { expectedRevision: 1 }); const c = s.platform.createConversation(d.id, {});
       const failed = s.platform.message(c.id, { text: 'Failed turn' }); await wait(() => s.runs.get(failed.run.id).status === 'failed');
@@ -38,7 +38,7 @@ describe('agent platform', () => {
   });
   it('reconciles a retried failed chat turn and preserves it in later context, while paused deployments refuse retries', async () => {
     let attempt = 0; const bodies: any[] = [];
-    const s = setup(vi.fn<typeof fetch>(async (_url, init) => { bodies.push(JSON.parse(String(init!.body))); return ++attempt === 1 ? new Response('{}', { status: 503 }) : response('Recovered answer'); }));
+    const s = setup(vi.fn<typeof fetch>(async (_url, init) => { bodies.push(JSON.parse(String(init!.body))); return ++attempt === 1 ? new Response('{}', { status: 400 }) : response('Recovered answer'); }));
     try {
       const d = s.platform.deploy(s.doc.id, 'agent', { expectedRevision: 1 }); const c = s.platform.createConversation(d.id, {});
       const first = s.platform.message(c.id, { text: 'Remember my project' }); await wait(() => s.runs.get(first.run.id).status === 'failed');
@@ -126,6 +126,10 @@ describe('agent platform', () => {
       const interval = s.platform.saveTrigger(d.id, { name: 'Daily research', kind: 'interval', intervalMinutes: 1440, text: 'Research daily' });
       await s.platform.tick(Date.now() + 2 * 86400000); expect(s.runs.list()).toHaveLength(0);
       const enabled = s.platform.saveTrigger(d.id, { enabled: true }, interval.id); await s.platform.tick(enabled.nextAt! + 86400000);
+      expect(s.runs.list()).toHaveLength(0);
+      expect(() => s.platform.fireTrigger(interval.id)).toThrow(/No production/);
+      s.platform.promote(d.id, { override: 'Explicit initial release for this scheduled execution regression test.' });
+      await s.platform.tick(enabled.nextAt! + 2 * 86400000);
       await wait(() => s.runs.list().some(r => r.status === 'succeeded')); expect(s.runs.list()).toHaveLength(1); expect(s.runs.list()[0].source).toBe('interval');
       const webhook = s.platform.saveTrigger(d.id, { name: 'Research hook', kind: 'webhook', text: 'Research from webhook' });
       expect(() => s.platform.fireTrigger(webhook.id)).toThrow(/Enable/); s.platform.saveTrigger(d.id, { enabled: true }, webhook.id);

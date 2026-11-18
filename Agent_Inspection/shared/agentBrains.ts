@@ -11,5 +11,12 @@ export interface AgentRuntime {
   maxOutputTokens: number;
   maxSteps?: number;
   maxToolCalls?: number;
+  /** Bounds the whole connected workflow, including managed sessions and operator waits. */
+  maxDurationSeconds?: number;
+  maxWorkflowSteps?: number;
+  /** Aggregate input + output token ceiling across all agents in a workflow. */
+  maxTotalTokens?: number;
+  /** Gives an API agent a `run_code` tool that runs model-written code in a fresh isolated sandbox. */
+  codeExecution?: import('./agentEvaluation.ts').SandboxConfig;
 }
 export type AgentTestResult = { kind: 'api'; text: string; model: string; truncated: boolean } | { kind: 'managed'; agentId: string };

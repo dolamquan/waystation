@@ -17,6 +17,7 @@ import { WAYSTATION_TOOLS } from './tools.ts';
 import type { Agent } from '../domain/types.ts';
 import type { ConsoleInfo } from '../pty/types.ts';
 import type { BrainConnection } from '../../shared/agentBrains.ts';
+import type { ToolManifestEntry } from '../../shared/agentRuns.ts';
 
 export const AUTOMATION_SCRIPT = fileURLToPath(new URL('./waystation-mcp.mjs', import.meta.url));
 export const AUTOMATION_TOKEN_ENV = 'WAYSTATION_MCP_TOKEN';
@@ -34,7 +35,7 @@ export class WaystationAutomation extends EventEmitter {
   private readonly tokens = new AgentTokens();
   private readonly scopes = new Map<string, string>();
   private readonly runScopes = new Map<string, string>();
-  runResources?: { callResource: (runId: string, actorId: string, name: string, args: Record<string, unknown>) => Promise<unknown> };
+  runResources?: { callResource: (runId: string, actorId: string, name: string, args: Record<string, unknown>) => Promise<unknown>; toolManifest: (runId: string) => readonly ToolManifestEntry[] };
   capabilityMetadata?: (project: string) => unknown[];
 
   constructor(private readonly store: TowerStore) { super(); this.canvas = new CanvasStore(store); this.architectures = new ArchitectureStore(store); this.sketches = new SketchStore(store); }
@@ -57,7 +58,17 @@ export class WaystationAutomation extends EventEmitter {
     const token = this.tokens.issue(launch.agentId, launch.name, []); this.scopes.set(launch.agentId, launch.cwd); this.runScopes.set(launch.agentId, runId);
     return { ...launch, mcpServers: { agent_resources: { command: process.execPath, args: [AUTOMATION_SCRIPT], env: { WAYSTATION_MCP_URL: this.endpoint, WAYSTATION_MCP_CWD: launch.cwd }, inheritEnv: [AUTOMATION_TOKEN_ENV] } }, env: { ...launch.env, [AUTOMATION_TOKEN_ENV]: token } };
   }
-  toolsFor(grant: AutomationGrant) { return WAYSTATION_TOOLS.filter(t => grant.resourcesRunId ? ['call_agent_tool', 'get_agent_memory', 'put_agent_memory'].includes(t.name) : !['call_agent_tool', 'get_agent_memory', 'put_agent_memory'].includes(t.name)); }
+  /**
+   * A managed agent run sees exactly its attached tools, each with its real name, description and input schema
+   * (served from the run's tool manifest). Other grants see the Waystation canvas and workflow tools.
+   */
+  toolsFor(grant: AutomationGrant): readonly { name: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, boolean> }[] {
+    if (grant.resourcesRunId) {
+      try { return (this.runResources?.toolManifest(grant.resourcesRunId) ?? []).map(e => ({ name: e.name, description: e.description, inputSchema: e.parameters, annotations: { readOnlyHint: e.readOnly, destructiveHint: !e.readOnly, openWorldHint: e.source === 'mcp' || e.source === 'tool' } })); }
+      catch { return []; }
+    }
+    return WAYSTATION_TOOLS.filter(t => !['call_agent_tool', 'get_agent_memory', 'put_agent_memory'].includes(t.name));
+  }
   revoke(agentId: string): void { this.tokens.revoke(agentId); this.scopes.delete(agentId); this.runScopes.delete(agentId); }
   authenticate(token: string | undefined): AutomationGrant {
     if (tokensMatch(token, this.token)) return { agentId: 'external' };
@@ -75,9 +86,14 @@ export class WaystationAutomation extends EventEmitter {
     return { navigation: 'requested' };
   }
   async call(name: unknown, raw: unknown, grant: AutomationGrant, host: { agents: () => readonly Agent[]; consoles: () => readonly ConsoleInfo[] }): Promise<unknown> {
-    const spec = this.toolsFor(grant).find(tool => tool.name === name);
-    if (!spec) throw new LibraryInputError(`Unknown Waystation tool: ${String(name)}`);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new LibraryInputError('Tool arguments must be an object.');
+    if (grant.resourcesRunId) {
+      // Attached tools are validated against their own schemas by the run's tool gateway.
+      if (!this.runResources) throw new LibraryInputError('Agent resource runtime is unavailable.');
+      return this.runResources.callResource(grant.resourcesRunId, grant.agentId, String(name), raw as Record<string, unknown>);
+    }
+    const spec = WAYSTATION_TOOLS.find(tool => tool.name === name && !['call_agent_tool', 'get_agent_memory', 'put_agent_memory'].includes(tool.name));
+    if (!spec) throw new LibraryInputError(`Unknown Waystation tool: ${String(name)}`);
     const args = raw as Record<string, unknown>;
     if (Object.keys(args).some(key => !Object.hasOwn(spec.inputSchema.properties, key))) throw new LibraryInputError('Unknown tool argument.');
     for (const required of spec.inputSchema.required) if (args[required] === undefined) throw new LibraryInputError(`Missing argument: ${required}`);
@@ -86,10 +102,6 @@ export class WaystationAutomation extends EventEmitter {
       if (prop.type && (prop.type === 'array' ? !Array.isArray(value) : typeof value !== prop.type)) throw new LibraryInputError(`Invalid argument: ${key}`);
     }
     const { root, key } = this.project(args, grant);
-    if (grant.resourcesRunId) {
-      if (!this.runResources) throw new LibraryInputError('Agent resource runtime is unavailable.');
-      return this.runResources.callResource(grant.resourcesRunId, grant.agentId, String(name), args);
-    }
     const tiles = this.canvas.list().filter(tile => tile.project === key);
     const requireTile = () => {
       const tile = this.canvas.require(args.id);

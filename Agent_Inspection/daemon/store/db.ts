@@ -18,13 +18,13 @@ export type RecordTable =
   | 'connector_accounts' | 'connector_grants' | 'connector_approvals'
   | 'templates' | 'schedules' | 'context_docs' | 'mcp_servers' | 'plugin_prefs' | 'notify_channels' | 'notifications'
   | 'message_queue' | 'session_history' | 'completion_reviews' | 'discovery_rules' | 'provider_usage' | 'provider_usage_totals'
-  | 'channels' | 'factory_definitions' | 'factory_items' | 'canvas_tiles' | 'architecture_documents' | 'brain_connections' | 'architecture_credentials' | 'agent_memory_records' | 'agent_runs' | 'agent_capabilities' | 'agent_service_connections' | 'agent_environments' | 'agent_deployments' | 'agent_conversations' | 'agent_triggers' | 'agent_trace_events' | 'agent_secrets' | 'agent_datasets' | 'agent_evaluators' | 'agent_experiments' | 'agent_sandboxes' | 'settings' | 'remote_devices' | 'sketch_boards';
+  | 'channels' | 'factory_definitions' | 'factory_items' | 'canvas_tiles' | 'architecture_documents' | 'brain_connections' | 'architecture_credentials' | 'agent_memory_records' | 'agent_runs' | 'agent_capabilities' | 'agent_service_connections' | 'agent_environments' | 'agent_deployments' | 'agent_conversations' | 'agent_triggers' | 'agent_trace_events' | 'agent_secrets' | 'agent_datasets' | 'agent_evaluators' | 'agent_experiments' | 'agent_sandboxes' | 'agent_release_policies' | 'settings' | 'remote_devices' | 'sketch_boards';
 
 const RECORD_TABLES: readonly RecordTable[] = [
   'connector_accounts', 'connector_grants', 'connector_approvals',
   'templates', 'schedules', 'context_docs', 'mcp_servers', 'plugin_prefs', 'notify_channels', 'notifications',
   'message_queue', 'session_history', 'completion_reviews', 'discovery_rules', 'provider_usage', 'provider_usage_totals',
-  'channels', 'factory_definitions', 'factory_items', 'canvas_tiles', 'architecture_documents', 'brain_connections', 'architecture_credentials', 'agent_memory_records', 'agent_runs', 'agent_capabilities', 'agent_service_connections', 'agent_environments', 'agent_deployments', 'agent_conversations', 'agent_triggers', 'agent_trace_events', 'agent_secrets', 'agent_datasets', 'agent_evaluators', 'agent_experiments', 'agent_sandboxes', 'settings', 'remote_devices', 'sketch_boards',
+  'channels', 'factory_definitions', 'factory_items', 'canvas_tiles', 'architecture_documents', 'brain_connections', 'architecture_credentials', 'agent_memory_records', 'agent_runs', 'agent_capabilities', 'agent_service_connections', 'agent_environments', 'agent_deployments', 'agent_conversations', 'agent_triggers', 'agent_trace_events', 'agent_secrets', 'agent_datasets', 'agent_evaluators', 'agent_experiments', 'agent_sandboxes', 'agent_release_policies', 'settings', 'remote_devices', 'sketch_boards',
 ];
 
 interface UsageTotals {

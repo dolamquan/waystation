@@ -51,12 +51,41 @@
   color: var(--muted); font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
 }
 .office-tab:hover { color: var(--text); }
-.office-tab::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 1.5px; border-radius: 2px; background: transparent; }
-.office-tab-active { color: var(--text); }
+.office-tab-wrap { position: relative; display: inline-flex; align-items: center; flex: none; }
+.office-tab-wrap::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 1.5px; border-radius: 2px; background: transparent; pointer-events: none; }
+.office-tab-active .office-tab { color: var(--text); }
 .office-tab-active::after { background: var(--text); }
 .office-tab-name { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; }
 .office-tab-count { font: 500 11px var(--mono); color: var(--faint); }
 .office-tab-active .office-tab-count { color: var(--muted); }
+/* The close button stays out of the way until you point at, focus or open a tab. */
+.office-tab-close {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; margin: 0 4px 0 -4px; padding: 0;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--faint); cursor: pointer;
+  opacity: 0; transition: opacity 120ms, background 120ms, color 120ms;
+}
+.office-tab-wrap:hover .office-tab-close, .office-tab-wrap:focus-within .office-tab-close, .office-tab-active .office-tab-close { opacity: 1; }
+.office-tab-close:hover { background: var(--panel-3); color: var(--text); }
+@media (hover: none) { .office-tab-close { opacity: 1; } }
+
+.office-menu { position: relative; flex: none; }
+.office-menu-trigger { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+.office-menu-panel {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; min-width: 240px; max-width: min(360px, 90vw);
+  max-height: 320px; overflow-y: auto; padding: 6px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel);
+  box-shadow: 0 12px 32px -12px var(--shadow-ink);
+}
+.office-menu-heading { margin: 4px 8px 6px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.office-menu-empty { margin: 0 8px 6px; font-size: 12px; color: var(--faint); }
+.office-menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.office-menu-item .office-tab-count { margin-left: auto; }
+.office-menu-item:hover:not(:disabled), .office-menu-item:focus-visible { background: var(--panel-2); }
+.office-menu-item:disabled { color: var(--faint); cursor: default; }
+.office-menu-rule { margin: 6px 4px; border: 0; border-top: 1px solid var(--line); }
 .office-location { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11.5px var(--mono); color: var(--faint); }
 
 /* ---------- Body: canvas + sessions rail ---------- */

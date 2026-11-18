@@ -39,7 +39,7 @@ The architect is a normal Waystation-managed conversation. It receives instructi
 
 Every update must name the revision it read. A stale update fails without saving any of its edits; the architect must reread and reconsider it. The editor polls for graph and chat changes every 1.2 seconds. **Session details** opens the usual agent controls, including approvals and recovery. **Interrupt** stops the current turn. If a session has ended, sending another message starts a new architect with the existing diagram as context.
 
-Design edits do not start work. Explicit individual runs consume connected memory/tools and deliver results through configured outputs, routers, and approvals; they do not automatically start other agent nodes. The architect uses your existing provider account and normal managed-agent permissions. Its role instructions tell it to work on the diagram and avoid running steps or changing project files unless requested; those instructions are not a separate security sandbox.
+Design edits do not start work. Explicit runs execute the selected entry agent and its connected agent handoffs, routers, approvals and outputs. Tools and memory connect as attachments. Workflow steps are checkpointed, with bounded loops, timeout and token accounting. See [the hosted platform and execution contract](hosted-agent-platform.md) for recovery, production release gates and organization isolation. The local architect uses a managed provider with tool approvals; the hosted API architect proposes validated edits for explicit review without file or shell access.
 
 ## Construct and test individual agents
 

@@ -62,6 +62,24 @@ export class AgentSandboxes {
       if (this.get(row.id).status !== 'interrupted') { row.finishedAt = Date.now(); this.deps.store.saveRecord('agent_sandboxes', row); }
     }
   }
+  /**
+   * Evaluator code path: runs a JavaScript function body in a fresh QuickJS context, in memory. It is not
+   * persisted and does not count against the four-execution cap, so graders cannot fail spuriously under load.
+   * Errors from the evaluator's own code are surfaced (sanitized) so authors can fix them.
+   */
+  async evaluateJavaScript(project: string, code: string, input: unknown, timeoutMs = DEFAULT_SANDBOX.timeoutMs, memoryMb = DEFAULT_SANDBOX.memoryMb): Promise<unknown> {
+    const engine = await getQuickJS();
+    let result: unknown;
+    try {
+      result = engine.evalCode(`(()=>{const result=(function(input){"use strict";\n${code}\n})(${JSON.stringify(input)});if(result&&typeof result.then==='function')throw new Error('Return a synchronous JSON value');return JSON.stringify(result??null);})()`, { shouldInterrupt: shouldInterruptAfterDeadline(Date.now() + timeoutMs), memoryLimitBytes: memoryMb * 1024 * 1024, maxStackSizeBytes: 512 * 1024 });
+    } catch (e) {
+      // QuickJS rethrows guest errors as plain {name, message, stack} objects, not Error instances.
+      const detail = e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : String(e);
+      throw new LibraryInputError(`Evaluator code failed: ${this.clean(project, detail).slice(0, 300)}`);
+    }
+    if (typeof result !== 'string' || result.length > 100000) throw new LibraryInputError('Evaluator code must return a JSON value under 100 KB.');
+    return JSON.parse(result);
+  }
   cancel(id: string): SandboxExecution { const row = this.get(id); if (row.status !== 'running') throw new LibraryInputError('This sandbox has already finished.'); this.controllers.get(id)?.abort(); return row; }
   async shutdown(): Promise<void> { for (const [id, controller] of this.controllers) { const row = this.get(id); this.deps.store.saveRecord('agent_sandboxes', { ...row, status: 'interrupted', finishedAt: Date.now(), error: 'Daemon stopped during sandbox execution.' }); controller.abort(); } await Promise.allSettled([...this.jobs.values()]); }
 }

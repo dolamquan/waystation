@@ -1,0 +1,83 @@
+/* Shared finish for the Architecture sections: heading, project bar, empty states and lists.
+   Neutral surfaces only; status colour stays reserved for status. */
+
+/* Section entrance: one short settle when a section opens. */
+.architecture > :is(.agent-platform, .agent-activity) { animation: sec-settle 280ms var(--ease-out); }
+@keyframes sec-settle { from { opacity: .5; transform: translateY(4px); } }
+
+/* Section heading: title and description, with the action aligned right. */
+.architecture > :is(.agent-platform, .agent-activity) > :is(.platform-heading, .agent-activity-heading) {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px;
+  margin: 0 0 24px; padding: 0 0 22px; border-bottom: 1px solid var(--line);
+}
+.architecture > :is(.agent-platform, .agent-activity) > :is(.platform-heading, .agent-activity-heading) :is(h1, h2) { font-size: 22px; margin-bottom: 4px; text-wrap: balance; }
+.architecture > :is(.agent-platform, .agent-activity) > :is(.platform-heading, .agent-activity-heading) p { font-size: 12.5px; line-height: 1.65; text-wrap: pretty; }
+
+/* Project bar: the same quiet strip in every section. */
+.architecture :is(.platform-project, .evaluation-project) {
+  padding: 14px 16px; margin: 0 0 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-2);
+}
+.architecture .agent-sandboxes .evaluation-project { margin-top: 0; }
+.architecture :is(.platform-project, .evaluation-project) label { color: var(--text-2); font-size: 12px; }
+.architecture .platform-project-switch > summary { padding: 9px 4px; border-radius: var(--radius-sm); }
+.architecture .platform-project-switch > summary:hover { color: var(--text); }
+.architecture .sandbox-runtime-note { margin-bottom: 20px; background: var(--bg-2); }
+
+/* Empty states: a solid frame and a neutral mark instead of a dashed outline. */
+.architecture .platform-empty-state { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-2); }
+.platform-empty-mark {
+  display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-bottom: 16px;
+  border-radius: 12px; color: var(--text-2); background: var(--panel-2); border: 1px solid var(--line-strong);
+}
+.platform-empty-state > .btn { margin-top: 22px; }
+.architecture .platform-empty-state h3 { font-size: 16px; text-wrap: balance; }
+
+/* Lists and in-section tabs. */
+.architecture :is(.agent-platform, .agent-activity) .platform-resource-mark { border: 1px solid var(--line-strong); }
+.architecture :is(.agent-platform, .agent-activity) .platform-detail-tabs button { transition: color 160ms var(--ease-out); }
+.architecture :is(.agent-platform, .agent-activity) .platform-detail-tabs button:hover { color: var(--text); }
+.architecture .agent-activity-none { color: var(--muted); }
+.architecture .agent-table-scroll { border-radius: var(--radius); }
+
+/* App access: services read as one catalogue with a letter mark per service. */
+.architecture .app-access-services { padding: 0 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-2); }
+.architecture .app-access-services > li { padding: 18px 0; }
+.architecture .app-access-services > li:last-child { border-bottom: 0; }
+.architecture .app-access-services > li > .app-access-monogram {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 38px; height: 38px; border-radius: 10px;
+  font-size: 15px; font-weight: 600; color: var(--text-2); background: var(--panel-2); border: 1px solid var(--line-strong);
+}
+.architecture .app-access-services > li > .app-access-auth {
+  flex: 0 0 auto; display: inline-flex; justify-content: center; min-width: 96px; padding: 3px 9px;
+  border: 1px solid var(--line-strong); border-radius: 999px; color: var(--text-2); font-size: 11px; line-height: 1.6; white-space: nowrap;
+}
+
+/* Colour only where it reports state. */
+.architecture .sandbox-runtime-note.is-ready > svg { color: var(--green-text); }
+.architecture .sandbox-runtime-note.is-missing > svg { color: var(--amber-text); }
+.architecture .agent-run-filter-tabs button[data-status]:not([data-status='all'])::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--dot, var(--muted));
+}
+.architecture .agent-run-filter-tabs button[data-status='active'] { --dot: var(--blue-text); }
+.architecture .agent-run-filter-tabs button[data-status='waiting_approval'] { --dot: var(--amber-text); }
+.architecture .agent-run-filter-tabs button[data-status='succeeded'] { --dot: var(--green-text); }
+.architecture .agent-run-filter-tabs button[data-status='failed'] { --dot: var(--red-text); }
+.architecture .agent-run-filter-tabs button[data-empty] { --dot: var(--line-strong); }
+.architecture .agent-run-filter-tabs button[data-empty] > span { opacity: .55; }
+.agent-run-status:is(.status-running, .status-queued)::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: run-pulse 1.6s var(--ease-out) infinite;
+}
+@keyframes run-pulse { 0% { box-shadow: 0 0 0 0 var(--blue-line); } 70%, 100% { box-shadow: 0 0 0 6px transparent; } }
+
+@media (max-width: 600px) {
+  .architecture > :is(.agent-platform, .agent-activity) > :is(.platform-heading, .agent-activity-heading) { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .architecture > :is(.agent-platform, .agent-activity) > :is(.platform-heading, .agent-activity-heading) > .btn { justify-self: start; }
+  .architecture > :is(.agent-platform, .agent-activity) > :is(.platform-heading, .agent-activity-heading) :is(h1, h2) { font-size: 20px; }
+  .architecture .app-access-services { padding: 0 14px; }
+  .architecture .app-access-services > li > div { flex-basis: calc(100% - 56px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .architecture > :is(.agent-platform, .agent-activity) { animation: none; }
+  .architecture .platform-detail-tabs button { transition: none; }
+  .agent-run-status::before { animation: none; }
+}

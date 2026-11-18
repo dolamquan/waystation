@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { RemoteGate } from './components/RemoteGate.tsx';
@@ -20,9 +20,10 @@ import './shell.css';
 import { applyUiTheme, savedUiTheme } from './uiTheme.ts';
 
 applyUiTheme(savedUiTheme());
+const HostedApp = lazy(() => import('./components/HostedApp.tsx').then(module => ({ default: module.HostedApp })));
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MotionConfig reducedMotion="user"><RemoteGate><App /></RemoteGate></MotionConfig>
+    <MotionConfig reducedMotion="user">{location.pathname === '/hosted' ? <Suspense fallback={<p role="status">Opening your agent workspace…</p>}><HostedApp /></Suspense> : <RemoteGate><App /></RemoteGate>}</MotionConfig>
   </StrictMode>,
 );

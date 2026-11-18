@@ -5,10 +5,38 @@ export interface MemoryConfig {
   retentionDays: number; maxEntries: number; contextItems: number;
   host?: string; port?: number; database?: string; user?: string; table?: string; tls?: boolean; credentialId?: string;
 }
+/** When a tool call pauses for an operator decision. `auto` never asks; `always` always asks; unset asks only for tools that are not read-only. */
+export type ToolApproval = 'auto' | 'always';
 export interface ToolConfig {
-  type: 'tool'; implementation: 'http' | 'javascript'; functionName: string; inputSchema: JsonSchema;
+  type: 'tool'; implementation: 'http' | 'javascript' | 'mcp'; functionName: string; inputSchema: JsonSchema;
   timeoutMs: number; method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; url?: string; code?: string; credentialId?: string;
+  /** Model-visible defaults: applied first, the model may override them. */
   defaults?: Record<string, unknown>;
+  /** Operator-fixed arguments: applied last, the model can never override them (e.g. allowed domains). */
+  pinned?: Record<string, unknown>;
+  /** Side-effect classification. Unset: JavaScript and GET are read-only, other HTTP methods and MCP tools are not. */
+  readOnly?: boolean;
+  approval?: ToolApproval;
+  /** MCP: the tool name on the server and the hash of the definition pinned when the capability was published. */
+  mcpTool?: string; schemaHash?: string;
+  /** Built-in response shaping for known providers. */
+  transform?: 'tavily_search';
+}
+
+/** Whether a tool can change external state. MCP annotations are untrusted, so MCP tools default to "may write". */
+export function toolReadOnly(config: ToolConfig): boolean {
+  if (config.readOnly !== undefined) return config.readOnly;
+  if (config.implementation === 'javascript') return true;
+  if (config.implementation === 'http') return config.method === 'GET';
+  return false;
+}
+
+/** Per-tool approval under the agent's tool policy. `review-tools` asks for everything; otherwise the tool's own policy decides. */
+export function toolNeedsApproval(config: ToolConfig, policy: 'chat-only' | 'review-tools' | 'configured-tools'): boolean {
+  if (policy === 'review-tools') return true;
+  if (config.approval === 'always') return true;
+  if (config.approval === 'auto') return false;
+  return !toolReadOnly(config);
 }
 export interface OutputConfig {
   type: 'output'; destination: 'dashboard' | 'file' | 'webhook'; format: 'text' | 'json'; schema?: JsonSchema;
@@ -22,7 +50,7 @@ export const EMPTY_SCHEMA: JsonSchema = { type: 'object', properties: {}, additi
 export function resourceSummary(config: ResourceConfig): string {
   switch (config.type) {
     case 'memory': return `${config.backend === 'postgres' ? 'PostgreSQL' : 'SQLite'} · ${config.namespace}`;
-    case 'tool': return `${config.implementation === 'javascript' ? 'JavaScript' : config.method} · ${config.functionName}`;
+    case 'tool': return `${config.implementation === 'javascript' ? 'JavaScript' : config.implementation === 'mcp' ? 'MCP' : config.method} · ${config.functionName}${toolReadOnly(config) ? '' : ' · writes'}`;
     case 'output': return config.destination === 'file' ? `File · ${config.path}` : config.destination === 'webhook' ? 'Webhook delivery' : `${config.format.toUpperCase()} · dashboard`;
     case 'input': return `${config.format.toUpperCase()} input`;
     case 'router': return `${config.rules.length} routing rules`;
@@ -65,12 +93,25 @@ export function validateResource(kind: string, raw: unknown): ResourceConfig {
       return { ...base, host, port: integer(r.port, 1, 65535, 'PostgreSQL port'), database: text(r.database, 'Database', 100), user: text(r.user, 'Database user', 100), table, tls: r.tls !== false, ...credential };
     }
     case 'tool': {
-      const implementation = choice(r.implementation, ['http', 'javascript'], 'tool implementation');
+      const implementation = choice(r.implementation, ['http', 'javascript', 'mcp'], 'tool implementation');
       const functionName = text(r.functionName, 'Function name', 64); if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(functionName)) fail('Use a function name containing letters, digits, and underscores.');
       const inputSchema = schema(r.inputSchema); if (inputSchema.type !== 'object') fail('Tool input schema must describe an object.');
-      const base: ToolConfig = { type: 'tool', implementation, functionName, inputSchema, timeoutMs: integer(r.timeoutMs, 100, 30000, 'Timeout (ms)') };
-      const defaults = r.defaults === undefined ? {} : { defaults: obj(r.defaults) }; if (JSON.stringify(defaults).length > 8000) fail('HTTP defaults must fit in 8 KB.');
-      return implementation === 'javascript' ? { ...base, code: text(r.code, 'JavaScript function body', 20000) } : { ...base, method: choice(r.method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const, 'HTTP method'), url: resourceUrl(r.url), ...credential, ...defaults };
+      const policy = {
+        ...(r.readOnly === undefined ? {} : { readOnly: typeof r.readOnly === 'boolean' ? r.readOnly : fail('Read-only must be true or false.') }),
+        ...(r.approval === undefined ? {} : { approval: choice(r.approval, ['auto', 'always'] as const, 'approval policy') }),
+      };
+      const base: ToolConfig = { type: 'tool', implementation, functionName, inputSchema, timeoutMs: integer(r.timeoutMs, 100, 30000, 'Timeout (ms)'), ...policy };
+      const args = { ...(r.defaults === undefined ? {} : { defaults: obj(r.defaults) }), ...(r.pinned === undefined ? {} : { pinned: obj(r.pinned) }) };
+      if (JSON.stringify(args).length > 8000) fail('Default and pinned arguments must fit in 8 KB.');
+      if (implementation === 'javascript') return { ...base, code: text(r.code, 'JavaScript function body', 20000) };
+      if (implementation === 'mcp') {
+        const mcpTool = text(r.mcpTool, 'MCP tool name', 128); if (!/^[A-Za-z0-9_.-]{1,128}$/.test(mcpTool)) fail('MCP tool names contain letters, digits, dots, underscores and dashes.');
+        // The hash pins the reviewed definition; without it a server could change the tool silently. Publish MCP tools through discovery.
+        const schemaHash = /^[a-f0-9]{64}$/.test(String(r.schemaHash)) ? String(r.schemaHash) : fail('MCP tools need the schema hash recorded at publish time. Publish them as an MCP capability.');
+        return { ...base, url: resourceUrl(r.url), mcpTool, schemaHash, ...credential, ...args };
+      }
+      const transform = r.transform === undefined ? {} : { transform: choice(r.transform, ['tavily_search'] as const, 'response transform') };
+      return { ...base, method: choice(r.method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const, 'HTTP method'), url: resourceUrl(r.url), ...credential, ...args, ...transform };
     }
     case 'output': {
       const destination = choice(r.destination, ['dashboard', 'file', 'webhook'], 'output destination');

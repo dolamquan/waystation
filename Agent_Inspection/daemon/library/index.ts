@@ -12,6 +12,7 @@ import { CodexPluginCatalog } from './codexPluginCatalog.ts';
 import { ContextDocs } from './contextDocs.ts';
 import type { LibraryDeps } from './deps.ts';
 import { McpCatalog } from './mcpCatalog.ts';
+import { AgentToolBuilder } from '../architecture/toolBuilder.ts';
 import { PluginCatalog } from './pluginCatalog.ts';
 import { SkillLibrary } from './skillLibrary.ts';
 import type { LoadoutProvider } from './types.ts';
@@ -35,6 +36,8 @@ export class Library {
   readonly agentSecrets: AgentSecrets;
   readonly agentSandboxes: AgentSandboxes;
   readonly agentEvaluations: AgentEvaluations;
+  /** One-step "Add tool": describe-to-generate, MCP by URL/preset/Library, web search, code execution. */
+  readonly agentTools: AgentToolBuilder;
   readonly connectors: ConnectorBroker;
 
   constructor(readonly deps: LibraryDeps) {
@@ -53,6 +56,8 @@ export class Library {
     this.agentSandboxes = new AgentSandboxes(deps, (project, text) => this.brains.sanitize(project, this.resources.sanitize(project, text)));
     this.agentRuns.sandboxes = this.agentSandboxes;
     this.agentEvaluations = new AgentEvaluations(deps, this.agentPlatform, this.agentRuns, this.brains, this.agentSandboxes);
+    this.agentTools = new AgentToolBuilder(deps, this.automation.architectures, this.agentPlatform, this.brains, this.agentSandboxes, this.resources);
+    this.agentTools.library = this.mcp;
     this.connectors = new ConnectorBroker(deps);
     this.automation.capabilityMetadata = project => this.agentPlatform.capabilities(project).map(c => ({ id: c.id, version: c.version, name: c.name, kind: c.spec.kind, description: c.description }));
     this.automation.runResources = this.agentRuns;

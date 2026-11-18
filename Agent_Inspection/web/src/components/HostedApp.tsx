@@ -1,0 +1,14 @@
+import { useEffect, useState } from 'react';
+import { ArchitectureView } from './architecture/ArchitectureView.tsx';
+import { request } from '../api.ts';
+interface Session { hosted: true; subject: string; organizations: { id: string; name: string; role: string }[]; organization: { id: string; name: string; role: string; project: string } | null }
+
+export function HostedApp() {
+  const [session, setSession] = useState<Session>(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  useEffect(() => { let active = true; const load = () => request<Session>('GET', '/api/hosted/session').then(next => { if (active) { if (next.organization) localStorage.setItem('waystation-console-cwd', next.organization.project); setSession(next); setError(''); } }, e => { if (active) setError(e.message); }); void load(); const timer = setInterval(() => { void load(); }, 60000); return () => { active = false; clearInterval(timer); }; }, []);
+  const choose = async (id: string) => { setBusy(true); setError(''); try { await request('POST', '/api/hosted/organization', { organizationId: id }); location.reload(); } catch (e) { setError((e as Error).message); setBusy(false); } };
+  return <div className="tower hosted-shell"><header className="hosted-header"><strong>Waystation</strong><span>Agent workspace</span>{session && <><label>Organization<select className="text-input" disabled={busy} value={session.organization?.id ?? ''} onChange={e => { void choose(e.target.value); }}><option value="" disabled>Choose an organization</option>{session.organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>{session.organization && <span className="platform-badge">{session.organization.role}</span>}<a href="/oauth2/sign_out">Sign out</a></>}</header>
+    <main className="hosted-main">{error && <p className="arch-error" role="alert">{error} <a href="/oauth2/start?rd=/hosted">Sign in again</a></p>}
+      {!session ? <p role="status">Connecting to your organization…</p> : !session.organizations.length ? <p>Your account has no organization membership. Ask your administrator to add your identity.</p> : !session.organization ? <p>Choose an organization to open its agent workspace.</p> : <><p className="hosted-context">{session.organization.name} · {session.organization.role === 'viewer' ? 'View configurations, results and run history. An operator or administrator can run agents.' : session.organization.role === 'operator' ? 'Run saved workflows and review approvals. An administrator manages definitions, credentials and releases.' : 'Configure agents, manage credentials, evaluate candidates and release production versions.'}</p><ArchitectureView key={session.organization.id} agents={[]} hosted onOpenAgent={() => setError('Native coding sessions are unavailable in the hosted API worker.')} /></>}
+    </main></div>;
+}
