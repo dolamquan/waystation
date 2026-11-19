@@ -32,6 +32,7 @@ import { ContentionPanel } from './components/ContentionPanel.tsx';
 import { SpendBanner } from './components/SpendCapPanel.tsx';
 import { useSpendCap } from './useSpendCap.ts';
 import { isTypingTarget, stepQueue, triageQueue, type TriageItem } from './triage.ts';
+import { previewWorkspacesEnabled, workspaceAvailable } from './releaseFeatures.ts';
 
 /** Loaded on first use: the terminal engine is a sizeable bundle that the station view never needs. */
 const ConsoleBoard = lazy(() => import('./components/consoles/ConsoleBoard.tsx').then((module) => ({ default: module.ConsoleBoard })));
@@ -70,7 +71,7 @@ export function App() {
   // A paired remote device has already been through the pairing screen: go straight in.
   const [powered, setPowered] = useState(() => Boolean(desktop()) || autostart() || isRemote());
   const tower = useTower(powered);
-  const factory = useFactory(powered);
+  const factory = useFactory(powered && previewWorkspacesEnabled);
   const [factoryItemId, setFactoryItemId] = useState<string>();
   const factoryAttentionCount = factory.data?.items.filter(item => FACTORY_ATTENTION.includes(item.status)).length ?? 0;
   const consolesNeedingYou = useNeedsYou(powered);
@@ -215,6 +216,7 @@ export function App() {
   };
 
   const go = (destination: View) => () => {
+    if (!workspaceAvailable(destination)) return;
     setView(destination);
     setSelectedId(undefined);
     if (destination === 'fleet' || destination === 'attention') { setFilter('all'); setQuery(''); }
@@ -227,7 +229,7 @@ export function App() {
     { id: 'hooks', group: 'Actions', label: tower.hooksInstalled ? 'Manage hooks' : 'Install hooks', keywords: 'claude intercept', run: () => setHookConfirm(tower.hooksInstalled ? 'uninstall' : 'install') },
     { id: 'spend-cap', group: 'Actions', label: 'Set the daily spend cap', keywords: 'budget cost quota limit', run: go('ops') },
     ...queue.map((item): PaletteCommand => ({ id: `triage:${item.key}`, group: 'Needs you', label: item.label, run: () => goTo(item) })),
-    ...(Object.keys(VIEW_TITLE) as View[]).filter((id) => id !== 'setup' || desktop())
+    ...(Object.keys(VIEW_TITLE) as View[]).filter((id) => workspaceAvailable(id) && (id !== 'setup' || desktop()))
       .map((id): PaletteCommand => ({ id: `view:${id}`, group: 'Go to', label: VIEW_TITLE[id].crumb, run: go(id) })),
     ...tower.agents.map((agent): PaletteCommand => ({
       id: `agent:${agent.id}`, group: 'Agents', label: agent.name, hint: `${agent.project} · ${agent.status}`,
@@ -253,8 +255,8 @@ export function App() {
               <nav className="sidebar-nav" aria-label="Workspace">
                 <button className={view === 'fleet' ? 'nav-active' : ''} aria-current={view === 'fleet' ? 'page' : undefined} onClick={() => { setView('fleet'); setFilter('all'); setQuery(''); }}><Icon name="grid" />Agent overview<span className="nav-count">{counts.total}</span></button>
                 <button className={view === 'consoles' ? 'nav-active' : ''} aria-current={view === 'consoles' ? 'page' : undefined} onClick={() => { setView('consoles'); setSelectedId(undefined); }}><Icon name="terminal" />Console board{consolesNeedingYou > 0 && <span className="nav-count nav-alert">{consolesNeedingYou}</span>}</button>
-                <button className={view === 'factory' ? 'nav-active' : ''} aria-current={view === 'factory' ? 'page' : undefined} onClick={() => { setFactoryItemId(undefined); setView('factory'); setSelectedId(undefined); }}><Icon name="tower" />Software factory{factoryAttentionCount > 0 && <span className="nav-count nav-alert">{factoryAttentionCount}</span>}</button>
-                <button className={view === 'architecture' ? 'nav-active' : ''} aria-current={view === 'architecture' ? 'page' : undefined} onClick={() => { setView('architecture'); setSelectedId(undefined); }}><Icon name="git" />Architecture</button>
+                <button className={!previewWorkspacesEnabled ? 'nav-coming-soon' : view === 'factory' ? 'nav-active' : ''} disabled={!previewWorkspacesEnabled} aria-label={previewWorkspacesEnabled ? undefined : 'Software factory, coming soon'} aria-current={view === 'factory' ? 'page' : undefined} title={previewWorkspacesEnabled ? undefined : 'Software factory is coming soon'} onClick={() => { setFactoryItemId(undefined); setView('factory'); setSelectedId(undefined); }}><Icon name="tower" /><span className="nav-workspace-label">Software factory</span>{!previewWorkspacesEnabled ? <span className="nav-coming-soon-note">Coming soon</span> : factoryAttentionCount > 0 && <span className="nav-count nav-alert">{factoryAttentionCount}</span>}</button>
+                <button className={!previewWorkspacesEnabled ? 'nav-coming-soon' : view === 'architecture' ? 'nav-active' : ''} disabled={!previewWorkspacesEnabled} aria-label={previewWorkspacesEnabled ? undefined : 'Architecture, coming soon'} aria-current={view === 'architecture' ? 'page' : undefined} title={previewWorkspacesEnabled ? undefined : 'Architecture is coming soon'} onClick={() => { setView('architecture'); setSelectedId(undefined); }}><Icon name="git" /><span className="nav-workspace-label">Architecture</span>{!previewWorkspacesEnabled && <span className="nav-coming-soon-note">Coming soon</span>}</button>
                 <button className={view === 'attention' ? 'nav-active' : ''} aria-current={view === 'attention' ? 'page' : undefined} onClick={() => { setView('attention'); setFilter('all'); setQuery(''); }}><Icon name="alert" />Needs attention<span className={`nav-count ${counts.attention + factoryAttentionCount ? 'nav-alert' : ''}`}>{counts.attention + factoryAttentionCount}</span></button>
                 <button className={view === 'ops' ? 'nav-active' : ''} aria-current={view === 'ops' ? 'page' : undefined} onClick={() => setView('ops')}><Icon name="activity" />Usage &amp; schedules</button>
                 <button className={view === 'history' ? 'nav-active' : ''} aria-current={view === 'history' ? 'page' : undefined} onClick={() => setView('history')}><Icon name="list" />Session history</button>
@@ -304,15 +306,15 @@ export function App() {
               {view === 'ops' && <OpsView agents={tower.agents} onSelect={setSelectedId} defaultCwd={selected?.cwd} notify={notify} onNewAgent={() => setShowNew(true)} />}
               {view === 'setup' && <DesktopSetup onDone={() => setView('fleet')} />}
               {view === 'library' && <LibraryView notify={notify} />}
-              {view === 'architecture' && <Suspense fallback={<p role="status">Loading architecture workspace…</p>}><ArchitectureView agents={tower.agents} onOpenAgent={setSelectedId} /></Suspense>}
+              {previewWorkspacesEnabled && view === 'architecture' && <Suspense fallback={<p role="status">Loading architecture workspace…</p>}><ArchitectureView agents={tower.agents} onOpenAgent={setSelectedId} /></Suspense>}
               {view === 'consoles' && <Suspense fallback={<p className="console-note">Loading the console board…</p>}>
                 <ConsoleBoard defaultCwd={selected?.cwd} notify={notify} onSwitchToStation={() => setView('fleet')} agents={tower.agents} agentsReady={tower.connected && tower.snapshotReady} lastEvent={tower.lastEvent} onSelectAgent={setSelectedId} canvasReveal={tower.canvasReveal}
                   teams={{ teams: tower.teams, teamLogFeed: tower.teamLogFeed, connected: tower.connected, selectedTeamId, onSelectTeam: setSelectedTeamId,
                     sheetOpen: teamsSheetOpen, onSheetOpen: setTeamsSheetOpen, onNewTeam: () => setShowNewTeam(true) }} />
               </Suspense>}
               {view === 'history' && <SessionHistory now={now} notify={notify} onOpen={agent => { setHistoricalAgent(agent); setSelectedId(agent.id); }} />}
-              {view === 'factory' && <FactoryView data={factory.data} error={factory.error} refresh={factory.refresh} initialItemId={factoryItemId} onOpenAgent={setSelectedId} agents={tower.agents} connected={tower.connected} />}
-              {view === 'attention' && <FactoryAttention items={factory.data?.items ?? []} onOpen={id => { setFactoryItemId(id); setView('factory'); }} />}
+              {previewWorkspacesEnabled && view === 'factory' && <FactoryView data={factory.data} error={factory.error} refresh={factory.refresh} initialItemId={factoryItemId} onOpenAgent={setSelectedId} agents={tower.agents} connected={tower.connected} />}
+              {previewWorkspacesEnabled && view === 'attention' && <FactoryAttention items={factory.data?.items ?? []} onOpen={id => { setFactoryItemId(id); setView('factory'); }} />}
               {(view === 'fleet' || view === 'attention') && <>
               {view === 'fleet' && <AgentWorld agents={tower.agents} teams={tower.teams} onOpenTeam={openTeamOnBoard} selectedId={selectedId} connected={tower.connected} authError={tower.authError} onSelect={setSelectedId} onLaunch={() => setShowNew(true)} pending={tower.pending} notify={notify} ready={ready} onLook={lookAt} />}
 

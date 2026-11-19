@@ -36,6 +36,15 @@
 :root :is(.tower) .sidebar-nav button:hover { background: var(--panel-2); color: var(--text); }
 :root :is(.tower) .sidebar-nav .nav-active { background: var(--panel-3); color: var(--text); border: 0; }
 :root :is(.tower) .sidebar-nav .nav-active > svg { color: var(--text); }
+:root :is(.tower) .sidebar-nav .nav-coming-soon {
+  gap: 6px; cursor: default; opacity: 1; background: transparent; color: var(--muted);
+}
+:root :is(.tower) .sidebar-nav .nav-coming-soon > :is(svg, .nav-workspace-label) {
+  flex: none; white-space: nowrap; filter: blur(1.3px); opacity: 0.65; user-select: none;
+}
+:root :is(.tower) .nav-coming-soon-note {
+  margin-left: auto; flex: none; white-space: nowrap; color: var(--muted); font-size: 10.5px; font-weight: 500;
+}
 :root :is(.tower) .nav-count { padding: 0; background: transparent; font: 500 11px var(--mono); color: var(--faint); }
 :root :is(.tower) .nav-active .nav-count { background: transparent; color: var(--muted); }
 :root :is(.tower) .nav-count.nav-alert { color: var(--amber-text); }

@@ -6,6 +6,8 @@
 
 ## Why Waystation
 
+**Coming soon:** Software factory and Architecture are unavailable in public builds. Their tabs show a blurred label and “Coming soon.” The Architecture and agent-platform capabilities described below are development previews.
+
 Construct [multipurpose agents in the Architecture workspace](docs/architecture-workspace.md), with [executable resources and an activity dashboard](docs/agent-resources.md). Configure SQLite/PostgreSQL memory, build JavaScript or HTTP tools, and deliver outputs to files or webhooks. Choose a restrained coding runtime or an OpenAI, Anthropic, or compatible API brain, keeping keys separate from the graph. Run agents and manage history, logs, approvals, cancellations, and retries across architectures. Designs save locally, with undo for manual and architect edits.
 
 The [agent platform](docs/agent-platform.md) adds immutable local deployments, persistent agent conversations, reusable versioned skills/tools/memory, Tavily search, service connections, environment limits, a durable run queue, schedules and scoped webhook triggers. Inspect each deployed agent's architecture and download its traces and output artifacts. Draft edits stay separate from deployed versions. [Central secrets and agent quality tools](docs/agent-evaluation.md) add reusable credential references, local JavaScript/Docker sandboxes, versioned datasets, deterministic/code/LLM evaluators, experiments and result comparison.
@@ -233,7 +235,7 @@ The project folder must be the top of its own git repository; a subfolder of a l
 
 Teams survive a tower restart. They come back as **Stopped**, and **Resume** relaunches their members.
 
-## Software factory
+## Software factory (coming soon)
 
 Open **Software factory** to configure a project’s reusable planner, builder and reviewer, required checks, approval points and repair limits. Its six sections are **Overview**, **Work**, **Agents**, **Workflows**, **Quality**, and **Settings**. Queue scoped requests with acceptance criteria, approve plans, inspect real branch diffs and check evidence, then accept and explicitly merge a candidate. Active work recovers paused after a restart. Factory decisions also appear in **Needs attention**.
 
@@ -326,6 +328,8 @@ The desktop adds `desktop.json` for preferences and `desktop-profile` for its br
 Before publishing, use the [publication guide](docs/publication.md). `npm run export:source` prepares a clean source tree without old local captures or Git history.
 
 ## Development
+
+To enable the unreleased Software factory and Architecture workspaces in a development checkout, create `web/.env.local` with `VITE_ENABLE_UNRELEASED_WORKSPACES=true`, then restart Vite or rebuild. The file is ignored by Git. Leave this variable unset for public builds; it controls UI availability, not API authorization.
 
 ```bash
 npm run daemon:dev   # daemon that also trusts the Vite dev server origin
